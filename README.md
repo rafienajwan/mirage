@@ -228,4 +228,4 @@ To demonstrate the MIRAGE active containment workflow:
 - **LLM Threat Analysis**: Integrate small language models to dynamically generate fake code file outputs and command-line shell scripts based on real-time commands entered by the trapped attacker.
 - **AI Fingerprinting**: Implement behavioral graph clustering to identify repeat attackers even if they rotate IP addresses, User-Agents, and headers.
 - **Honeynet Orchestration**: Deploy Kubernetes operators to spin up temporary Docker container decoys on-demand for each flagged IP network scope.
-- **SIEM / SOC Connectors**: Out-of-the-box integrations with Splunk, Datadog, Slack, and PagerDuty to streamline notification flows.
+- **SIEM / SOC Connectors**: Out-of-the-box integrations with Splunk, Datadog, Slack, and PagerDuty to streamline notifications flows.
