@@ -1,0 +1,45 @@
+# Project MIRAGE — Docker Compose (placeholder)
+# This file will orchestrate the full platform stack in future iterations.
+
+version: "3.9"
+
+services:
+  # Frontend landing page + dashboard (Next.js)
+  web:
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://gateway:8000
+    depends_on:
+      - gateway
+
+  # FastAPI defense gateway (placeholder)
+  gateway:
+    build:
+      context: ../apps/gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/mirage
+      - AI_THRESHOLD=0.65
+    depends_on:
+      - db
+
+  # PostgreSQL database
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mirage
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
