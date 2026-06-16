@@ -114,27 +114,27 @@ graph TD
 
 ```
 project-mirage/
-├── backend/                  # API Gateway, Scorer, and Log Engine
-│   ├── app/
-│   │   ├── api/              # Route endpoints (Ingress, Logs, Stats)
-│   │   ├── core/             # Configuration and database connectivity
-│   │   ├── models/           # SQLAlchemy DB schema models
-│   │   ├── schemas/          # Pydantic validation schemas
-│   │   ├── services/         # AI Classifier, Decoy Router, logger
-│   │   └── main.py           # FastAPI server entry point
-│   ├── requirements.txt      # Python dependencies
-│   └── Dockerfile            # Backend container configuration
-├── frontend/                 # SOC Landing Page & Analytics Dashboard
-│   ├── src/
-│   │   ├── app/              # Next.js App Router root layout and pages
-│   │   ├── components/       # Visual widgets, charts, and video elements
-│   │   └── lib/              # Styling and framer-motion settings
-│   ├── package.json          # Node dependencies
-│   └── tsconfig.json         # TypeScript configuration
-├── decoy-pages/              # High-Fidelity Decoy API & Honeytokens
-│   ├── templates/            # Simulated folder structures & API responses
-│   └── honeytokens/          # Injected fake configs (.env, AWS yaml)
-└── docker-compose.yml        # Docker orchestrations config
+├── apps/
+│   ├── web/                  # Next.js frontend (landing page + dashboard)
+│   │   ├── src/app/          # App Router pages
+│   │   ├── src/components/   # UI components (landing, dashboard, layout, ui)
+│   │   └── src/lib/          # Utilities, mock data, constants
+│   ├── gateway/              # FastAPI backend (API gateway)
+│   │   ├── app/api/          # Route endpoints
+│   │   ├── app/core/         # Config, CORS
+│   │   ├── app/schemas/      # Pydantic models
+│   │   ├── app/services/     # Risk engine, decision, decoy, logger
+│   │   ├── app/storage/      # In-memory event store
+│   │   └── tests/            # pytest tests
+│   ├── decoy/                # Decoy environment (placeholder)
+│   └── real-app-demo/        # Demo protected app (placeholder)
+├── packages/
+│   └── shared/               # Shared types/config (placeholder)
+├── docs/                     # Architecture docs, demo flow
+├── infra/
+│   └── docker-compose.yml    # Docker orchestration
+├── .env.example              # Root environment template
+└── README.md
 ```
 
 ---
@@ -151,53 +151,36 @@ The MIRAGE landing page layout is inspired by **MotionSites AI** and high-end en
 ## Installation & Setup
 
 ### Prerequisites
-- Node.js LTS (v24+)
+- Node.js LTS (v18+)
 - Python (v3.11+)
-- Docker & Docker Compose
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/your-org/project-mirage.git
-cd project-mirage
+git clone https://github.com/rafienajwan/mirage.git
+cd mirage
 ```
 
-### 2. Environment Configurations
-Create a `.env` file in both the `/frontend` and `/backend` directories:
-
-**Backend (`backend/.env`):**
-```env
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/mirage
-SECRET_KEY=your_deception_secret_key_here
-AI_THRESHOLD=0.65
-DECOY_API_URL=http://localhost:8000/decoy
-```
-
-**Frontend (`frontend/.env.local`):**
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
-
-### 3. Running Backend Services
+### 2. Run the Backend (FastAPI Gateway)
 ```bash
-cd backend
+cd apps/gateway
 python -m venv venv
-source venv/bin/activate  # On Windows use: .\venv\Scripts\activate
-pip install -r requirements.txt
-python app/main.py
-```
+# Windows:
+venv\Scripts\activate
+# Linux/Mac: source venv/bin/activate
 
-### 4. Running Frontend Dashboard
+pip install -r requirements.txt
+cp .env.example .env
+uvicorn app.main:app --reload --port 8000
+```
+API docs: http://localhost:8000/docs
+
+### 3. Run the Frontend (Next.js)
 ```bash
-cd ../frontend
+cd apps/web
 npm install
 npm run dev
 ```
-
-### 5. Running with Docker Compose
-To launch the entire platform stack along with decoy API containers and PostgreSQL instances:
-```bash
-docker-compose up --build
-```
+Frontend: http://localhost:3000
 
 ---
 
