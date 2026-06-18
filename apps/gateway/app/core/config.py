@@ -31,6 +31,11 @@ class Settings:
     risk_threshold: float = field(
         default_factory=lambda: float(os.getenv("RISK_THRESHOLD", "60"))
     )
+    database_url: str = field(
+        default_factory=lambda: os.getenv(
+            "DATABASE_URL", "sqlite+aiosqlite:///./mirage.db"
+        )
+    )
     host: str = field(default_factory=lambda: os.getenv("HOST", "0.0.0.0"))
     port: int = field(default_factory=lambda: int(os.getenv("PORT", "8000")))
 
