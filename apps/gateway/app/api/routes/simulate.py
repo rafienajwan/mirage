@@ -1,5 +1,7 @@
 """Simulation endpoints — generate safe demo events for testing."""
 
+from __future__ import annotations
+
 import uuid
 
 from fastapi import APIRouter
@@ -16,7 +18,7 @@ from app.services.decoy_engine import _infer_decoy_type
 router = APIRouter(prefix="/simulate", tags=["simulate"])
 
 
-def _process_simulation(request: InspectRequest) -> InspectResponse:
+async def _process_simulation(request: InspectRequest) -> InspectResponse:
     """Shared logic for processing a simulated request."""
     fingerprint_hash = generate_fingerprint(
         ip_address=request.ip_address,
@@ -34,7 +36,7 @@ def _process_simulation(request: InspectRequest) -> InspectResponse:
         fingerprint_hash=fingerprint_hash,
         is_anomalous=anomaly.is_anomalous,
     )
-    log_inspection(request, risk.score, decision)
+    await log_inspection(request, risk.score, decision)
 
     decoy_type = None
     if decision == Decision.REDIRECT_TO_DECOY:
@@ -62,7 +64,7 @@ async def simulate_normal():
         request_count=3,
         payload_indicators=[],
     )
-    return _process_simulation(request)
+    return await _process_simulation(request)
 
 
 @router.post("/suspicious", response_model=InspectResponse)
@@ -76,4 +78,4 @@ async def simulate_suspicious():
         request_count=85,
         payload_indicators=["sql-like", "path-traversal"],
     )
-    return _process_simulation(request)
+    return await _process_simulation(request)

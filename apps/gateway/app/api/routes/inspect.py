@@ -43,7 +43,7 @@ async def inspect_request(request: InspectRequest):
     )
 
     # 5. Log the inspection
-    log_inspection(request, risk.score, decision)
+    await log_inspection(request, risk.score, decision)
 
     # 6. Determine decoy type if redirecting
     decoy_type = None

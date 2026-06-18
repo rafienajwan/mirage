@@ -8,7 +8,7 @@ from app.schemas.dashboard import AlertSeverity
 from app.schemas.decision import Decision
 from app.schemas.event import EventRecord
 from app.schemas.request import InspectRequest
-from app.storage.memory_store import store
+from app.storage import store
 from app.utils.time import utcnow
 
 
@@ -20,7 +20,7 @@ def _mask_ip(ip: str) -> str:
     return ip[:8] + "..."
 
 
-def log_inspection(
+async def log_inspection(
     request: InspectRequest,
     risk_score: float,
     decision: Decision,
@@ -37,11 +37,11 @@ def log_inspection(
         event_type="inspection",
         summary=f"{request.method} {request.path} → {decision.value} (score: {risk_score})",
     )
-    store.add_event(event)
+    await store.add_event(event)
 
     # Create alert for redirected traffic
     if decision == Decision.REDIRECT_TO_DECOY:
-        store.add_alert(
+        await store.add_alert(
             severity=AlertSeverity.CRITICAL,
             title=f"Decoy redirect: {request.path}",
             description=(
@@ -51,7 +51,7 @@ def log_inspection(
             recommended_action="Review threat fingerprint and consider IP block.",
         )
     elif decision == Decision.MONITOR:
-        store.add_alert(
+        await store.add_alert(
             severity=AlertSeverity.WARNING,
             title=f"Monitoring: {request.path}",
             description=(

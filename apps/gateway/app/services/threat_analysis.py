@@ -5,12 +5,12 @@ from __future__ import annotations
 from collections import Counter
 
 from app.schemas.decision import Decision
-from app.storage.memory_store import store
+from app.storage import store
 
 
-def get_threat_summary() -> dict:
+async def get_threat_summary() -> dict:
     """Generate a summary of threat activity from logged events."""
-    events = store.events
+    events = await store.get_recent_events(limit=10000)
 
     if not events:
         return {
