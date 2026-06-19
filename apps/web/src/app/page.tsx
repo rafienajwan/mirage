@@ -2,27 +2,28 @@
 
 import React from "react";
 import { motion } from "framer-motion";
-import Header from "@/components/Header";
-import VideoBackground from "@/components/VideoBackground";
-import HeroContent from "@/components/HeroContent";
-import FloatingIntelCard from "@/components/FloatingIntelCard";
-import { RiskScoreWidget, TrafficChartWidget } from "@/components/SecurityWidgets";
+import Header from "@/components/layout/Header";
+import VideoBackground from "@/components/landing/VideoBackground";
+import HeroContent from "@/components/landing/HeroContent";
+import FloatingIntelCard from "@/components/landing/FloatingIntelCard";
+import {
+  RiskScoreWidget,
+  TrafficChartWidget,
+} from "@/components/landing/SecurityWidgets";
 import { Activity, ShieldCheck, Terminal } from "lucide-react";
 
 export default function Home() {
   return (
     <div className="relative min-h-screen flex flex-col bg-[#060816] text-white selection:bg-brand-cyan/30 selection:text-white overflow-hidden">
-      
-      {/* 1. Fullscreen cinematic HLS video background */}
+      {/* Fullscreen cinematic HLS video background */}
       <VideoBackground />
 
-      {/* 2. Header */}
+      {/* Header */}
       <Header />
 
       {/* Main Container */}
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-6 relative z-10 flex flex-col justify-between pt-2 md:pt-4 pb-16 lg:pb-32">
-        
-        {/* Decorative Top Status Bar (Cyberpunk Subtlety) */}
+        {/* Decorative Top Status Bar */}
         <div className="hidden lg:flex items-center justify-between text-[8px] font-mono tracking-[0.2em] text-white/20 border-b border-white/5 pb-4 mb-6">
           <div className="flex items-center space-x-6">
             <span className="flex items-center text-brand-emerald/80">
@@ -43,10 +44,8 @@ export default function Home() {
 
         {/* Hero Section Container */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center lg:min-h-[calc(100vh-320px)] mt-0">
-          
-          {/* Left Column Widgets - Floating Panels for Desktop / Tablet */}
+          {/* Left Column Widgets */}
           <div className="hidden md:flex lg:col-span-3 flex-col items-center lg:items-start gap-8 order-2 lg:order-1 w-full max-w-[220px] lg:max-w-none mx-auto lg:mx-0">
-            {/* 1. Floating AI Intel Card */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -56,23 +55,13 @@ export default function Home() {
               <FloatingIntelCard />
             </motion.div>
 
-            {/* 2. Risk Score Widget */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
-              animate={{ 
-                opacity: 1, 
-                x: 0,
-                y: [0, -6, 0]
-              }}
+              animate={{ opacity: 1, x: 0, y: [0, -6, 0] }}
               transition={{
                 opacity: { duration: 1, delay: 0.45 },
                 x: { duration: 1, delay: 0.45 },
-                y: {
-                  duration: 8,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                  delay: 0.5
-                }
+                y: { duration: 8, repeat: Infinity, ease: "easeInOut", delay: 0.5 },
               }}
               className="w-full flex justify-center lg:justify-start"
             >
@@ -85,31 +74,21 @@ export default function Home() {
             <HeroContent />
           </div>
 
-          {/* Right Column Widgets - Floating Panels for Desktop / Tablet */}
-          <div className="hidden md:flex lg:col-span-3 flex-col items-center lg:items-end order-3 lg:order-3 w-full max-w-[220px] lg:max-w-none mx-auto lg:mx-0">
+          {/* Right Column Widgets */}
+          <div className="hidden md:flex lg:col-span-3 flex-col items-center lg:items-end order-3 w-full max-w-[220px] lg:max-w-none mx-auto lg:mx-0">
             <motion.div
               initial={{ opacity: 0, x: 20 }}
-              animate={{ 
-                opacity: 1, 
-                x: 0,
-                y: [0, 6, 0]
-              }}
+              animate={{ opacity: 1, x: 0, y: [0, 6, 0] }}
               transition={{
                 opacity: { duration: 1, delay: 0.45 },
                 x: { duration: 1, delay: 0.45 },
-                y: {
-                  duration: 8,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                  delay: 1.5
-                }
+                y: { duration: 8, repeat: Infinity, ease: "easeInOut", delay: 1.5 },
               }}
               className="w-full flex justify-center lg:justify-end"
             >
               <TrafficChartWidget />
             </motion.div>
           </div>
-
         </div>
 
         {/* Footer Technical Accents */}
@@ -124,7 +103,6 @@ export default function Home() {
             <span>ALL APIS SECURED</span>
           </div>
         </div>
-
       </main>
     </div>
   );

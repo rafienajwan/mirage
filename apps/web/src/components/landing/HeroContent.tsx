@@ -2,8 +2,7 @@
 
 import React from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, Code } from "lucide-react";
-import FloatingIntelCard from "./FloatingIntelCard";
+import { ArrowRight, Compass } from "lucide-react";
 
 export default function HeroContent() {
   return (
@@ -16,7 +15,7 @@ export default function HeroContent() {
         transition={{ duration: 0.6, delay: 0.2 }}
         className="font-display text-[9px] sm:text-[10px] md:text-xs font-bold tracking-[0.25em] sm:tracking-[0.3em] text-[#5ed29c] uppercase mb-3"
       >
-        AI-DRIVEN CYBER DEFENSE PLATFORM
+        AI-DRIVEN CYBER DECEPTION PLATFORM
       </motion.span>
 
       {/* Main Headline */}
@@ -40,9 +39,9 @@ export default function HeroContent() {
         transition={{ duration: 0.6, delay: 0.4 }}
         className="text-xs sm:text-sm lg:text-[15px] leading-relaxed text-white/60 max-w-[90%] sm:max-w-[550px] lg:max-w-[640px] font-sans font-light tracking-wide mb-8"
       >
-        Project MIRAGE is an autonomous cybersecurity platform that uses AI risk scoring, 
-        anomaly detection, and intelligent decoy environments to protect APIs and application 
-        infrastructures from advanced threats.
+        Project MIRAGE detects suspicious API requests, redirects attackers into safe decoy
+        environments, records their behavior, and helps defenders respond faster through a
+        security dashboard.
       </motion.p>
 
       {/* CTAs */}
@@ -57,17 +56,17 @@ export default function HeroContent() {
           href="#dashboard"
           className="group relative w-full sm:w-auto px-8 py-3.5 rounded-full bg-[#5ed29c] text-[#060816] font-display text-[10px] font-bold tracking-widest uppercase flex items-center justify-center space-x-2 transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_25px_rgba(94,210,156,0.4)]"
         >
-          <span>Launch Dashboard</span>
+          <span>View Dashboard</span>
           <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
         </a>
 
         {/* Secondary CTA */}
         <a
-          href="#architecture"
+          href="/dashboard#demo"
           className="relative w-full sm:w-auto px-8 py-3.5 rounded-full border border-white/5 hover:border-brand-cyan/20 bg-white/[0.01] hover:bg-brand-cyan/[0.02] backdrop-blur-sm font-display text-[10px] font-bold tracking-widest text-white/60 hover:text-brand-cyan uppercase flex items-center justify-center space-x-2 transition-all duration-300 hover:shadow-[0_0_15px_rgba(0,240,255,0.1)]"
         >
-          <Code className="w-4 h-4 text-white/40" />
-          <span>View Architecture</span>
+          <Compass className="w-4 h-4 text-white/40" />
+          <span>Explore Demo Flow</span>
         </a>
       </motion.div>
       

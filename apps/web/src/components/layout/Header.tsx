@@ -2,14 +2,13 @@
 
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Menu, X, Terminal } from "lucide-react";
+import { Shield, Menu, X, LayoutDashboard } from "lucide-react";
 
 const NAV_ITEMS = [
-  { name: "PLATFORM", href: "#platform" },
-  { name: "THREATS", href: "#threats" },
-  { name: "FEATURES", href: "#features" },
-  { name: "ARCHITECTURE", href: "#architecture" },
-  { name: "DOCUMENTATION", href: "#docs" },
+  { name: "Overview", href: "#overview" },
+  { name: "Features", href: "#features" },
+  { name: "Demo", href: "#demo" },
+  { name: "Dashboard", href: "/dashboard" },
 ];
 
 export default function Header() {
@@ -64,11 +63,11 @@ export default function Header() {
         {/* CTA Button */}
         <div className="hidden lg:flex items-center space-x-4">
           <a
-            href="#terminal"
+            href="/dashboard"
             className="flex items-center space-x-1.5 font-display text-[10px] tracking-widest text-brand-cyan hover:text-white transition-colors border border-brand-cyan/20 hover:border-brand-cyan/40 bg-brand-cyan/5 px-3 py-1.5 rounded"
           >
-            <Terminal className="w-3.5 h-3.5" />
-            <span>SYS_STATUS: ACTIVE</span>
+            <LayoutDashboard className="w-3.5 h-3.5" />
+            <span>OPEN DASHBOARD</span>
           </a>
         </div>
 
@@ -123,9 +122,13 @@ export default function Header() {
               transition={{ delay: 0.3 }}
               className="mt-16 w-full max-w-xs flex flex-col space-y-4"
             >
-              <div className="text-center font-display text-[10px] tracking-widest text-brand-emerald py-2 border border-brand-emerald/20 bg-brand-emerald/5 rounded">
-                SECURE ACCESS LOGGED
-              </div>
+              <a
+                href="/dashboard"
+                onClick={() => setIsOpen(false)}
+                className="font-display text-sm tracking-widest text-brand-cyan border border-brand-cyan/20 bg-brand-cyan/5 px-6 py-2.5 rounded-lg"
+              >
+                Open Dashboard
+              </a>
             </motion.div>
           </motion.div>
         )}

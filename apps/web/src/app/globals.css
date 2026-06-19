@@ -142,3 +142,21 @@ body {
   background: linear-gradient(to right, transparent, rgba(0, 240, 255, 0.3) 10%, rgba(94, 210, 156, 0.3) 50%, rgba(0, 240, 255, 0.3) 90%, transparent);
 }
 
+/* Custom scrollbar for dashboard feeds */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 240, 255, 0.3);
+}
+
