@@ -9,6 +9,7 @@ export default function VideoBackground() {
     const video = videoRef.current;
     if (!video) return;
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let hls: any = null;
     const streamUrl = "https://stream.mux.com/tLkHO1qZoaaQOUeVWo8hEBeGQfySP02EPS02BmnNFyXys.m3u8";
 

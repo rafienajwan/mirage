@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Cpu, Server, Activity } from "lucide-react";
+import { Cpu } from "lucide-react";
 
 export default function FloatingIntelCard() {
   const [redirectedCount, setRedirectedCount] = useState(48);

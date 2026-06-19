@@ -9,7 +9,7 @@ import { ShieldAlert, RefreshCw, Zap, Container, CheckCircle, Crosshair } from "
 // 1. RISK SCORE WIDGET
 // ==========================================
 export function RiskScoreWidget() {
-  const [pulse, setPulse] = useState(false);
+  const [, setPulse] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -240,6 +240,7 @@ export function TrafficChartWidget() {
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMounted(true);
     setData(generateData());
 
