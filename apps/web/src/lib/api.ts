@@ -1,0 +1,207 @@
+/**
+ * API client for MIRAGE backend gateway.
+ * All functions are safe to call from the browser (client components).
+ */
+
+import type { ThreatSeverity, ThreatStatus, AlertSeverity } from "@/lib/mock-data";
+
+// ─── Configuration ──────────────────────────────────────────────
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_PREFIX = `${API_URL}/api/v1`;
+
+// ─── Backend response types ─────────────────────────────────────
+
+interface BackendOverview {
+  total_requests: number;
+  suspicious_requests: number;
+  decoy_redirects: number;
+  active_alerts: number;
+  average_risk_score: number;
+}
+
+interface BackendEvent {
+  event_id: string;
+  timestamp: string;
+  ip_address: string;
+  path: string;
+  method: string;
+  risk_score: number;
+  decision: "allow" | "monitor" | "redirect_to_decoy";
+  event_type: string;
+  summary: string;
+}
+
+interface BackendAlert {
+  alert_id: string;
+  severity: "info" | "warning" | "critical";
+  title: string;
+  description: string;
+  recommended_action: string;
+  created_at: string;
+}
+
+interface BackendSimulationResult {
+  request_id: string;
+  risk_score: number;
+  risk_level: string;
+  decision: string;
+  reasons: string[];
+  fingerprint_hash: string;
+  decoy_type: string | null;
+}
+
+// ─── Frontend types (mapped from backend) ───────────────────────
+
+export interface OverviewMetrics {
+  totalRequests: number;
+  suspiciousRequests: number;
+  decoyRedirects: number;
+  activeAlerts: number;
+  averageRiskScore: number;
+}
+
+export interface FeedEvent {
+  id: string;
+  timestamp: string;
+  type: string;
+  sourceIp: string;
+  endpoint: string;
+  riskScore: number;
+  severity: ThreatSeverity;
+  status: ThreatStatus;
+  description: string;
+}
+
+export interface FeedAlert {
+  id: string;
+  message: string;
+  severity: AlertSeverity;
+  timestamp: string;
+  acknowledged: boolean;
+}
+
+export interface SimulationResult {
+  requestId: string;
+  riskScore: number;
+  riskLevel: string;
+  decision: string;
+  reasons: string[];
+  fingerprintHash: string;
+  decoyType: string | null;
+}
+
+// ─── Mapping helpers ────────────────────────────────────────────
+
+function mapDecision(decision: string): ThreatStatus {
+  switch (decision) {
+    case "redirect_to_decoy":
+      return "redirected";
+    case "monitor":
+      return "alert";
+    default:
+      return "alert";
+  }
+}
+
+function mapRiskLevelToSeverity(riskScore: number): ThreatSeverity {
+  if (riskScore >= 75) return "critical";
+  if (riskScore >= 50) return "high";
+  if (riskScore >= 25) return "medium";
+  return "low";
+}
+
+function mapEvent(e: BackendEvent): FeedEvent {
+  return {
+    id: e.event_id,
+    timestamp: e.timestamp,
+    type: e.event_type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+    sourceIp: e.ip_address,
+    endpoint: e.path,
+    riskScore: e.risk_score,
+    severity: mapRiskLevelToSeverity(e.risk_score),
+    status: mapDecision(e.decision),
+    description: e.summary || `${e.method} ${e.path}`,
+  };
+}
+
+function mapAlert(a: BackendAlert): FeedAlert {
+  return {
+    id: a.alert_id,
+    message: a.title,
+    severity: a.severity,
+    timestamp: a.created_at,
+    acknowledged: false,
+  };
+}
+
+// ─── Fetcher functions ──────────────────────────────────────────
+
+async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_PREFIX}${path}`, {
+    headers: { "Content-Type": "application/json" },
+    ...init,
+  });
+  if (!res.ok) {
+    throw new Error(`API error: ${res.status} ${res.statusText}`);
+  }
+  return res.json();
+}
+
+/** Fetch dashboard overview metrics. */
+export async function fetchOverview(): Promise<OverviewMetrics> {
+  const data = await apiFetch<BackendOverview>("/dashboard/overview");
+  return {
+    totalRequests: data.total_requests,
+    suspiciousRequests: data.suspicious_requests,
+    decoyRedirects: data.decoy_redirects,
+    activeAlerts: data.active_alerts,
+    averageRiskScore: data.average_risk_score,
+  };
+}
+
+/** Fetch recent activity events. */
+export async function fetchEvents(): Promise<FeedEvent[]> {
+  const { events } = await apiFetch<{ events: BackendEvent[] }>("/dashboard/events");
+  return events.map(mapEvent);
+}
+
+/** Fetch active alerts. */
+export async function fetchAlerts(): Promise<FeedAlert[]> {
+  const { alerts } = await apiFetch<{ alerts: BackendAlert[] }>("/dashboard/alerts");
+  return alerts.map(mapAlert);
+}
+
+// ─── Simulation triggers ────────────────────────────────────────
+
+/** Simulate a normal (low-risk) request. */
+export async function simulateNormal(): Promise<SimulationResult> {
+  const data = await apiFetch<BackendSimulationResult>("/simulate/normal", {
+    method: "POST",
+  });
+  return {
+    requestId: data.request_id,
+    riskScore: data.risk_score,
+    riskLevel: data.risk_level,
+    decision: data.decision,
+    reasons: data.reasons,
+    fingerprintHash: data.fingerprint_hash,
+    decoyType: data.decoy_type,
+  };
+}
+
+/** Simulate a suspicious (high-risk) request. */
+export async function simulateSuspicious(): Promise<SimulationResult> {
+  const data = await apiFetch<BackendSimulationResult>("/simulate/suspicious", {
+    method: "POST",
+  });
+  return {
+    requestId: data.request_id,
+    riskScore: data.risk_score,
+    riskLevel: data.risk_level,
+    decision: data.decision,
+    reasons: data.reasons,
+    fingerprintHash: data.fingerprint_hash,
+    decoyType: data.decoy_type,
+  };
+}
