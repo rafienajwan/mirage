@@ -1,22 +1,73 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import Header from "@/components/layout/Header";
 import MetricCard from "@/components/ui/MetricCard";
-import TrafficChart from "@/components/dashboard/TrafficChart";
-import RiskScoreWidget from "@/components/dashboard/RiskScoreWidget";
 import ThreatFeed from "@/components/dashboard/ThreatFeed";
 import DecoyStatusCard from "@/components/dashboard/DecoyStatusCard";
 import AlertPanel from "@/components/dashboard/AlertPanel";
-import { currentMetrics } from "@/lib/mock-data";
-import {
-  Globe,
-  ShieldAlert,
-  ArrowRightLeft,
-  Bell,
-} from "lucide-react";
+import SimulationPanel from "@/components/dashboard/SimulationPanel";
+import { fetchOverview, fetchEvents, fetchAlerts } from "@/lib/api";
+import type { OverviewMetrics, FeedEvent, FeedAlert } from "@/lib/api";
+import { Globe, ShieldAlert, ArrowRightLeft, Bell, Loader2, WifiOff } from "lucide-react";
+
+// Charts use Recharts ResponsiveContainer — must be client-only to avoid SSR dimension warnings
+const TrafficChart = dynamic(() => import("@/components/dashboard/TrafficChart"), { ssr: false });
+const RiskScoreWidget = dynamic(() => import("@/components/dashboard/RiskScoreWidget"), { ssr: false });
+
+const POLL_INTERVAL = 10_000; // 10 seconds
 
 export default function DashboardPage() {
+  const [overview, setOverview] = useState<OverviewMetrics | null>(null);
+  const [events, setEvents] = useState<FeedEvent[]>([]);
+  const [alerts, setAlerts] = useState<FeedAlert[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const [ov, ev, al] = await Promise.all([
+        fetchOverview(),
+        fetchEvents(),
+        fetchAlerts(),
+      ]);
+      setOverview(ov);
+      setEvents(ev);
+      setAlerts(al);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch data");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Fetch on mount + poll every POLL_INTERVAL ms
+  useEffect(() => {
+    async function refresh() {
+      try {
+        const [ov, ev, al] = await Promise.all([
+          fetchOverview(),
+          fetchEvents(),
+          fetchAlerts(),
+        ]);
+        setOverview(ov);
+        setEvents(ev);
+        setAlerts(al);
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to fetch data");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    refresh();
+    const interval = setInterval(refresh, POLL_INTERVAL);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col bg-[#060816] text-white">
       <Header />
@@ -32,32 +83,65 @@ export default function DashboardPage() {
           </p>
         </div>
 
+        {/* Error banner */}
+        {error && (
+          <div className="mb-6 flex items-center gap-3 p-4 rounded-lg border border-amber-500/20 bg-amber-500/5 text-[11px] font-mono text-amber-400">
+            <WifiOff className="w-4 h-4 flex-shrink-0" />
+            <div>
+              <span className="font-bold">Backend unreachable</span>
+              <span className="text-white/40 ml-2">
+                — {error}. Start the gateway with{" "}
+                <code className="text-white/60">uvicorn app.main:app --reload</code>
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Simulation panel */}
+        <div className="mb-6">
+          <SimulationPanel onRefresh={load} />
+        </div>
+
         {/* Metric cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <MetricCard
-            label="Total Requests"
-            value={currentMetrics.totalRequests}
-            icon={Globe}
-            accentColor="cyan"
-          />
-          <MetricCard
-            label="Suspicious Requests"
-            value={currentMetrics.suspiciousRequests}
-            icon={ShieldAlert}
-            accentColor="amber"
-          />
-          <MetricCard
-            label="Decoy Redirects"
-            value={currentMetrics.decoyRedirects}
-            icon={ArrowRightLeft}
-            accentColor="emerald"
-          />
-          <MetricCard
-            label="Active Alerts"
-            value={currentMetrics.activeAlerts}
-            icon={Bell}
-            accentColor="red"
-          />
+          {loading && !overview ? (
+            // Skeleton while first load
+            Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-28 rounded-xl border border-white/5 bg-white/[0.02] flex items-center justify-center"
+              >
+                <Loader2 className="w-4 h-4 text-white/20 animate-spin" />
+              </div>
+            ))
+          ) : (
+            <>
+              <MetricCard
+                label="Total Requests"
+                value={overview?.totalRequests ?? 0}
+                icon={Globe}
+                accentColor="cyan"
+              />
+              <MetricCard
+                label="Suspicious Requests"
+                value={overview?.suspiciousRequests ?? 0}
+                icon={ShieldAlert}
+                accentColor="amber"
+              />
+              <MetricCard
+                label="Decoy Redirects"
+                value={overview?.decoyRedirects ?? 0}
+                icon={ArrowRightLeft}
+                accentColor="emerald"
+              />
+              <MetricCard
+                label="Active Alerts"
+                value={overview?.activeAlerts ?? 0}
+                icon={Bell}
+                accentColor="red"
+              />
+            </>
+          )}
         </div>
 
         {/* Charts row */}
@@ -72,13 +156,13 @@ export default function DashboardPage() {
 
         {/* Threat feed */}
         <div className="mb-8">
-          <ThreatFeed />
+          <ThreatFeed events={events} />
         </div>
 
         {/* Bottom row: Decoy + Alerts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <DecoyStatusCard />
-          <AlertPanel />
+          <AlertPanel alerts={alerts} />
         </div>
       </main>
 
