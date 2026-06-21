@@ -1,15 +1,15 @@
-"""In-memory storage for events, alerts, and decoy state.
+"""In-memory async storage for events, alerts, and decoy state.
 
-This module provides a simple, replaceable store. In future iterations it can
-be swapped for PostgreSQL, Redis, or any persistent backend.
+Drop-in replacement for DatabaseStore — all methods are async.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional
+from collections import defaultdict
 
 from app.schemas.dashboard import AlertRecord, AlertSeverity
+from app.schemas.decision import Decision
 from app.schemas.event import EventRecord
 
 
@@ -23,15 +23,15 @@ class MemoryStore:
 
     # ── Events ─────────────────────────────────────────────────
 
-    def add_event(self, event: EventRecord) -> None:
+    async def add_event(self, event: EventRecord) -> None:
         self.events.append(event)
 
-    def get_recent_events(self, limit: int = 50) -> list[EventRecord]:
+    async def get_recent_events(self, limit: int = 50) -> list[EventRecord]:
         return list(reversed(self.events[-limit:]))
 
     # ── Alerts ─────────────────────────────────────────────────
 
-    def add_alert(
+    async def add_alert(
         self,
         severity: AlertSeverity,
         title: str,
@@ -49,38 +49,59 @@ class MemoryStore:
         )
         self.alerts.append(alert)
 
-    def get_alerts(self) -> list[AlertRecord]:
+    async def get_alerts(self) -> list[AlertRecord]:
         return list(reversed(self.alerts))
 
-    @property
-    def active_alert_count(self) -> int:
+    async def get_active_alert_count(self) -> int:
         return len([a for a in self.alerts if a.severity != AlertSeverity.INFO])
 
     # ── Aggregate stats ────────────────────────────────────────
 
-    @property
-    def total_requests(self) -> int:
+    async def get_total_requests(self) -> int:
         return len(self.events)
 
-    @property
-    def suspicious_requests(self) -> int:
-        from app.schemas.decision import Decision
-
+    async def get_suspicious_requests(self) -> int:
         return len([e for e in self.events if e.decision != Decision.ALLOW])
 
-    @property
-    def decoy_redirects(self) -> int:
-        from app.schemas.decision import Decision
-
+    async def get_decoy_redirects(self) -> int:
         return len(
             [e for e in self.events if e.decision == Decision.REDIRECT_TO_DECOY]
         )
 
-    @property
-    def average_risk_score(self) -> float:
+    async def get_average_risk_score(self) -> float:
         if not self.events:
             return 0.0
         return sum(e.risk_score for e in self.events) / len(self.events)
+
+    # ── Chart data ────────────────────────────────────────────
+
+    async def get_traffic_breakdown(self) -> list[dict]:
+        """Group events by hour into normal/suspicious buckets."""
+        buckets: dict[int, dict] = defaultdict(lambda: {"normal": 0, "suspicious": 0})
+        for e in self.events:
+            hour = e.timestamp.hour
+            if e.decision == Decision.ALLOW:
+                buckets[hour]["normal"] += 1
+            else:
+                buckets[hour]["suspicious"] += 1
+        return [
+            {"hour": h, **buckets[h]} for h in sorted(buckets.keys())
+        ]
+
+    async def get_risk_history(self, limit: int = 20) -> list[dict]:
+        """Recent risk scores ordered chronologically for sparkline chart."""
+        recent = self.events[:limit]
+        return [
+            {"timestamp": e.timestamp.isoformat(), "risk_score": e.risk_score}
+            for e in recent
+        ]
+
+    async def get_last_decoy_trigger(self) -> datetime | None:
+        """Timestamp of the most recent decoy redirect event."""
+        for e in reversed(self.events):
+            if e.decision == Decision.REDIRECT_TO_DECOY:
+                return e.timestamp
+        return None
 
 
 # Global singleton — fine for demo; replace with DI in production.
