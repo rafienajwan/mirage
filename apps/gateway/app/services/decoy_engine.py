@@ -63,6 +63,15 @@ _DECOY_MAP: dict[str, dict] = {
     "database": _FAKE_DATABASE,
 }
 
+# Protected fake endpoints served by the decoy system
+FAKE_ENDPOINTS: list[str] = [
+    "/api/admin/users",
+    "/api/config/settings",
+    "/api/auth/login",
+    "/api/internal/debug",
+    "/api/token/refresh",
+]
+
 
 def _infer_decoy_type(path: str) -> str:
     """Guess the best decoy type from the request path."""
