@@ -91,6 +91,17 @@ export interface SimulationResult {
   decoyType: string | null;
 }
 
+export interface TrafficPoint {
+  hour: number;
+  normal: number;
+  suspicious: number;
+}
+
+export interface RiskHistoryPoint {
+  timestamp: string;
+  riskScore: number;
+}
+
 // ─── Mapping helpers ────────────────────────────────────────────
 
 function mapDecision(decision: string): ThreatStatus {
@@ -204,4 +215,18 @@ export async function simulateSuspicious(): Promise<SimulationResult> {
     fingerprintHash: data.fingerprint_hash,
     decoyType: data.decoy_type,
   };
+}
+
+// ─── Chart data fetchers ────────────────────────────────────────
+
+/** Fetch traffic breakdown by hour for the traffic chart. */
+export async function fetchTraffic(): Promise<TrafficPoint[]> {
+  const { traffic } = await apiFetch<{ traffic: TrafficPoint[] }>("/dashboard/traffic");
+  return traffic;
+}
+
+/** Fetch recent risk scores for the sparkline chart. */
+export async function fetchRiskHistory(): Promise<RiskHistoryPoint[]> {
+  const { history } = await apiFetch<{ history: { timestamp: string; risk_score: number }[] }>("/dashboard/risk-history");
+  return history.map((h) => ({ timestamp: h.timestamp, riskScore: h.risk_score }));
 }

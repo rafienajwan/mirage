@@ -39,3 +39,15 @@ async def dashboard_alerts():
 async def dashboard_threat_analysis():
     """Threat analysis summary from logged events."""
     return await get_threat_summary()
+
+
+@router.get("/traffic")
+async def dashboard_traffic():
+    """Traffic breakdown by hour for the traffic chart."""
+    return {"traffic": await store.get_traffic_breakdown()}
+
+
+@router.get("/risk-history")
+async def dashboard_risk_history(limit: int = 20):
+    """Recent risk scores for the sparkline chart."""
+    return {"history": await store.get_risk_history(limit=limit)}

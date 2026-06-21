@@ -8,8 +8,8 @@ import ThreatFeed from "@/components/dashboard/ThreatFeed";
 import DecoyStatusCard from "@/components/dashboard/DecoyStatusCard";
 import AlertPanel from "@/components/dashboard/AlertPanel";
 import SimulationPanel from "@/components/dashboard/SimulationPanel";
-import { fetchOverview, fetchEvents, fetchAlerts } from "@/lib/api";
-import type { OverviewMetrics, FeedEvent, FeedAlert } from "@/lib/api";
+import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory } from "@/lib/api";
+import type { OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint } from "@/lib/api";
 import { Globe, ShieldAlert, ArrowRightLeft, Bell, Loader2, WifiOff } from "lucide-react";
 
 // Charts use Recharts ResponsiveContainer — must be client-only to avoid SSR dimension warnings
@@ -22,19 +22,25 @@ export default function DashboardPage() {
   const [overview, setOverview] = useState<OverviewMetrics | null>(null);
   const [events, setEvents] = useState<FeedEvent[]>([]);
   const [alerts, setAlerts] = useState<FeedAlert[]>([]);
+  const [traffic, setTraffic] = useState<TrafficPoint[]>([]);
+  const [riskHistory, setRiskHistory] = useState<RiskHistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [ov, ev, al] = await Promise.all([
+      const [ov, ev, al, tr, rh] = await Promise.all([
         fetchOverview(),
         fetchEvents(),
         fetchAlerts(),
+        fetchTraffic(),
+        fetchRiskHistory(),
       ]);
       setOverview(ov);
       setEvents(ev);
       setAlerts(al);
+      setTraffic(tr);
+      setRiskHistory(rh);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch data");
@@ -47,14 +53,18 @@ export default function DashboardPage() {
   useEffect(() => {
     async function refresh() {
       try {
-        const [ov, ev, al] = await Promise.all([
+        const [ov, ev, al, tr, rh] = await Promise.all([
           fetchOverview(),
           fetchEvents(),
           fetchAlerts(),
+          fetchTraffic(),
+          fetchRiskHistory(),
         ]);
         setOverview(ov);
         setEvents(ev);
         setAlerts(al);
+        setTraffic(tr);
+        setRiskHistory(rh);
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to fetch data");
@@ -147,10 +157,10 @@ export default function DashboardPage() {
         {/* Charts row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-8">
           <div className="lg:col-span-2">
-            <TrafficChart />
+            <TrafficChart data={traffic} />
           </div>
           <div>
-            <RiskScoreWidget />
+            <RiskScoreWidget score={overview?.averageRiskScore ?? 0} history={riskHistory} />
           </div>
         </div>
 
