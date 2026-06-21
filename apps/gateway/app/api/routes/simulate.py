@@ -35,6 +35,7 @@ async def _process_simulation(request: InspectRequest) -> InspectResponse:
         risk=risk,
         fingerprint_hash=fingerprint_hash,
         is_anomalous=anomaly.is_anomalous,
+        anomaly_confidence=anomaly.confidence,
     )
     await log_inspection(request, risk.score, decision)
 
