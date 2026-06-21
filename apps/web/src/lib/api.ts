@@ -110,15 +110,18 @@ function mapDecision(decision: string): ThreatStatus {
       return "redirected";
     case "monitor":
       return "alert";
+    case "allow":
+      return "contained";
     default:
       return "alert";
   }
 }
 
-function mapRiskLevelToSeverity(riskScore: number): ThreatSeverity {
-  if (riskScore >= 75) return "critical";
-  if (riskScore >= 50) return "high";
-  if (riskScore >= 25) return "medium";
+function mapRiskLevel(riskScore: number): ThreatSeverity {
+  // Thresholds match backend risk_engine.py: <30 low, <60 medium, <80 high, ≥80 critical
+  if (riskScore >= 80) return "critical";
+  if (riskScore >= 60) return "high";
+  if (riskScore >= 30) return "medium";
   return "low";
 }
 
@@ -130,7 +133,7 @@ function mapEvent(e: BackendEvent): FeedEvent {
     sourceIp: e.ip_address,
     endpoint: e.path,
     riskScore: e.risk_score,
-    severity: mapRiskLevelToSeverity(e.risk_score),
+    severity: mapRiskLevel(e.risk_score),
     status: mapDecision(e.decision),
     description: e.summary || `${e.method} ${e.path}`,
   };
@@ -229,4 +232,27 @@ export async function fetchTraffic(): Promise<TrafficPoint[]> {
 export async function fetchRiskHistory(): Promise<RiskHistoryPoint[]> {
   const { history } = await apiFetch<{ history: { timestamp: string; risk_score: number }[] }>("/dashboard/risk-history");
   return history.map((h) => ({ timestamp: h.timestamp, riskScore: h.risk_score }));
+}
+
+/** Fetch decoy environment status. */
+export async function fetchDecoyStatus(): Promise<DecoyStatusData> {
+  const data = await apiFetch<{
+    active_decoys: number;
+    fake_endpoints: string[];
+    captured_interactions: number;
+    last_decoy_trigger: string | null;
+  }>("/decoy/status");
+  return {
+    activeDecoys: data.active_decoys,
+    fakeEndpoints: data.fake_endpoints,
+    capturedInteractions: data.captured_interactions,
+    lastDecoyTrigger: data.last_decoy_trigger,
+  };
+}
+
+export interface DecoyStatusData {
+  activeDecoys: number;
+  fakeEndpoints: string[];
+  capturedInteractions: number;
+  lastDecoyTrigger: string | null;
 }
