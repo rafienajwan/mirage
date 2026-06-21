@@ -16,7 +16,7 @@ services:
     depends_on:
       - gateway
 
-  # FastAPI defense gateway (placeholder)
+  # FastAPI defense gateway
   gateway:
     build:
       context: ../apps/gateway
@@ -25,7 +25,7 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      - AI_THRESHOLD=0.65
+      - RISK_THRESHOLD=60
     depends_on:
       - db
 

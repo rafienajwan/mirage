@@ -13,7 +13,7 @@ GET /api/v1/users
 User-Agent: NormalBrowser
 ```
 
-**Expected result**: The AI Risk Scorer evaluates the request as normal (score < 0.65). The request is routed to the production application and returns real data.
+**Expected result**: The AI Risk Scorer evaluates the request as normal (score < 60). The request is routed to the production application and returns real data.
 
 ### Step 2: Suspicious Request
 
@@ -24,7 +24,7 @@ GET /api/v1/users?id=suspicious-parameter
 User-Agent: UnknownScript
 ```
 
-**Expected result**: The AI Risk Scorer flags the request as suspicious (score >= 0.65). The request is transparently redirected to the Decoy Environment.
+**Expected result**: The AI Risk Scorer flags the request as suspicious (score >= 60). The request is transparently redirected to the Decoy Environment.
 
 ### Step 3: Decoy Engagement
 

@@ -4,7 +4,7 @@
 
 Project MIRAGE is an AI-powered cyber deception defense platform for API security. The platform detects suspicious API requests, calculates risk scores, redirects attackers into safe decoy environments, records attacker behavior, and visualizes threats through a security dashboard.
 
-## Planned Architecture
+## Architecture
 
 ```mermaid
 graph TD
@@ -25,7 +25,7 @@ graph TD
 | Component | Directory | Status | Description |
 |-----------|-----------|--------|-------------|
 | Web (Frontend) | `apps/web` | Active | Next.js landing page + security dashboard |
-| Gateway | `apps/gateway` | Planned | FastAPI defense gateway with AI risk scoring |
+| Gateway | `apps/gateway` | Active | FastAPI defense gateway with risk scoring, anomaly detection, and decoy routing |
 | Decoy Service | `apps/decoy` | Planned | Decoy routing and fake environment management |
 | Demo App | `apps/real-app-demo` | Planned | Protected demo application |
 | Shared | `packages/shared` | Planned | Shared types and constants |
