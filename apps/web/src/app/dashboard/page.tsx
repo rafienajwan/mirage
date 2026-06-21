@@ -1,10 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import Header from "@/components/layout/Header";
 import MetricCard from "@/components/ui/MetricCard";
-import TrafficChart from "@/components/dashboard/TrafficChart";
-import RiskScoreWidget from "@/components/dashboard/RiskScoreWidget";
 import ThreatFeed from "@/components/dashboard/ThreatFeed";
 import DecoyStatusCard from "@/components/dashboard/DecoyStatusCard";
 import AlertPanel from "@/components/dashboard/AlertPanel";
@@ -12,6 +11,10 @@ import SimulationPanel from "@/components/dashboard/SimulationPanel";
 import { fetchOverview, fetchEvents, fetchAlerts } from "@/lib/api";
 import type { OverviewMetrics, FeedEvent, FeedAlert } from "@/lib/api";
 import { Globe, ShieldAlert, ArrowRightLeft, Bell, Loader2, WifiOff } from "lucide-react";
+
+// Charts use Recharts ResponsiveContainer — must be client-only to avoid SSR dimension warnings
+const TrafficChart = dynamic(() => import("@/components/dashboard/TrafficChart"), { ssr: false });
+const RiskScoreWidget = dynamic(() => import("@/components/dashboard/RiskScoreWidget"), { ssr: false });
 
 const POLL_INTERVAL = 10_000; // 10 seconds
 
