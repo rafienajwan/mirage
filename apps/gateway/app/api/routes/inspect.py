@@ -40,6 +40,7 @@ async def inspect_request(request: InspectRequest):
         risk=risk,
         fingerprint_hash=fingerprint_hash,
         is_anomalous=anomaly.is_anomalous,
+        anomaly_confidence=anomaly.confidence,
     )
 
     # 5. Log the inspection
