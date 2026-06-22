@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -55,8 +56,8 @@ class DecoyStatus(BaseModel):
 class DecoyResponseRequest(BaseModel):
     """Input for generating a decoy response."""
 
-    path: str
-    decoy_type: str = Field(
+    path: str = Field(min_length=1, max_length=2048, pattern=r"^/")
+    decoy_type: Literal["auto", "login", "admin", "config", "token", "database"] = Field(
         default="auto",
         description="Type of decoy: auto, login, admin, config, token, database",
     )

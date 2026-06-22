@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Float, Integer, String, Text
+from sqlalchemy import JSON, DateTime, Float, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.storage.db.database import Base
@@ -27,6 +27,7 @@ class EventModel(Base):
     decision: Mapped[str] = mapped_column(String(32))
     event_type: Mapped[str] = mapped_column(String(64), default="inspection")
     summary: Mapped[str] = mapped_column(Text, default="")
+    feature_vector: Mapped[dict] = mapped_column(JSON, default=dict)
 
 
 class AlertModel(Base):

@@ -34,6 +34,7 @@ class DatabaseStore:
                 decision=event.decision.value,
                 event_type=event.event_type,
                 summary=event.summary,
+                feature_vector=event.feature_vector,
             )
             session.add(row)
 
@@ -57,6 +58,7 @@ class DatabaseStore:
                     decision=Decision(r.decision),
                     event_type=r.event_type,
                     summary=r.summary,
+                    feature_vector=r.feature_vector or {},
                 )
                 for r in rows
             ]
@@ -86,9 +88,9 @@ class DatabaseStore:
             )
             session.add(alert)
 
-    async def get_alerts(self) -> list[AlertRecord]:
+    async def get_alerts(self, limit: int = 100) -> list[AlertRecord]:
         async with get_session() as session:
-            stmt = select(AlertModel).order_by(AlertModel.id.desc())
+            stmt = select(AlertModel).order_by(AlertModel.id.desc()).limit(limit)
             result = await session.execute(stmt)
             rows = result.scalars().all()
             return [
@@ -172,15 +174,16 @@ class DatabaseStore:
     async def get_risk_history(self, limit: int = 20) -> list[dict]:
         """Recent risk scores ordered chronologically for sparkline chart."""
         async with get_session() as session:
-            stmt = (
+            recent_stmt = (
                 select(EventModel.timestamp, EventModel.risk_score)
-                .order_by(EventModel.id.asc())
+                .order_by(EventModel.id.desc())
                 .limit(limit)
             )
-            result = await session.execute(stmt)
+            result = await session.execute(recent_stmt)
+            rows = list(reversed(result.all()))
             return [
                 {"timestamp": r.timestamp.isoformat(), "risk_score": r.risk_score}
-                for r in result.all()
+                for r in rows
             ]
 
     async def get_last_decoy_trigger(self) -> datetime | None:

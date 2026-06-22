@@ -1,10 +1,11 @@
 """Decoy environment endpoints."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from app.schemas.dashboard import DecoyResponse, DecoyResponseRequest, DecoyStatus
 from app.services.decoy_engine import generate_decoy_response, FAKE_ENDPOINTS
 from app.storage import store
+from app.core.security import require_api_key
 
 router = APIRouter(prefix="/decoy", tags=["decoy"])
 
@@ -20,7 +21,11 @@ async def decoy_status():
     )
 
 
-@router.post("/respond", response_model=DecoyResponse)
+@router.post(
+    "/respond",
+    response_model=DecoyResponse,
+    dependencies=[Depends(require_api_key)],
+)
 async def decoy_respond(request: DecoyResponseRequest):
     """Generate a safe fake response for a suspicious request."""
     return generate_decoy_response(path=request.path, decoy_type=request.decoy_type)

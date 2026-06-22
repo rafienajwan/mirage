@@ -2,7 +2,7 @@
 
 import uuid
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from app.schemas.decision import Decision, InspectResponse
 from app.schemas.request import InspectRequest
@@ -12,11 +12,17 @@ from app.services.fingerprint import generate_fingerprint
 from app.services.logger import log_inspection
 from app.services.risk_engine import calculate_risk
 from app.services.decoy_engine import _infer_decoy_type
+from app.services.feature_extraction import extract_features
+from app.core.security import require_api_key
 
 router = APIRouter()
 
 
-@router.post("/inspect", response_model=InspectResponse)
+@router.post(
+    "/inspect",
+    response_model=InspectResponse,
+    dependencies=[Depends(require_api_key)],
+)
 async def inspect_request(request: InspectRequest):
     """Inspect a simulated API request and return a security decision."""
     # 1. Generate fingerprint
@@ -28,6 +34,7 @@ async def inspect_request(request: InspectRequest):
     )
 
     # 2. Calculate risk score
+    feature_vector = extract_features(request)
     risk = calculate_risk(request)
 
     # 3. Detect anomalies
@@ -44,7 +51,7 @@ async def inspect_request(request: InspectRequest):
     )
 
     # 5. Log the inspection
-    await log_inspection(request, risk.score, decision)
+    await log_inspection(request, risk.score, decision, feature_vector)
 
     # 6. Determine decoy type if redirecting
     decoy_type = None

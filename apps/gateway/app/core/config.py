@@ -38,6 +38,12 @@ class Settings:
     )
     host: str = field(default_factory=lambda: os.getenv("HOST", "0.0.0.0"))
     port: int = field(default_factory=lambda: int(os.getenv("PORT", "8000")))
+    api_key: str | None = field(
+        default_factory=lambda: os.getenv("MIRAGE_API_KEY") or None
+    )
+    rate_limit_per_minute: int = field(
+        default_factory=lambda: int(os.getenv("RATE_LIMIT_PER_MINUTE", "120"))
+    )
 
 
 settings = Settings()

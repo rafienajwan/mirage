@@ -49,8 +49,8 @@ class MemoryStore:
         )
         self.alerts.append(alert)
 
-    async def get_alerts(self) -> list[AlertRecord]:
-        return list(reversed(self.alerts))
+    async def get_alerts(self, limit: int = 100) -> list[AlertRecord]:
+        return list(reversed(self.alerts[-limit:]))
 
     async def get_active_alert_count(self) -> int:
         return len([a for a in self.alerts if a.severity != AlertSeverity.INFO])
@@ -90,7 +90,7 @@ class MemoryStore:
 
     async def get_risk_history(self, limit: int = 20) -> list[dict]:
         """Recent risk scores ordered chronologically for sparkline chart."""
-        recent = self.events[:limit]
+        recent = self.events[-limit:]
         return [
             {"timestamp": e.timestamp.isoformat(), "risk_score": e.risk_score}
             for e in recent
