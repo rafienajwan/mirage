@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { cn } from "@/lib/utils";
 import GlassPanel from "@/components/ui/GlassPanel";
 import { formatNumber } from "@/lib/utils";
@@ -21,6 +21,7 @@ const accentMap = {
 
 /**
  * Dashboard metric card showing a single KPI with icon and label.
+ * Animates value changes smoothly using requestAnimationFrame.
  */
 export default function MetricCard({
   label,
@@ -30,6 +31,43 @@ export default function MetricCard({
   className,
 }: MetricCardProps) {
   const accent = accentMap[accentColor];
+  const [displayValue, setDisplayValue] = useState(value);
+  const prevValueRef = useRef(value);
+
+  useEffect(() => {
+    const start = prevValueRef.current;
+    const end = value;
+    if (start === end) {
+      setDisplayValue(end);
+      return;
+    }
+
+    const duration = 1200; // 1.2s transition
+    const startTime = performance.now();
+    let animId: number;
+
+    const tick = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease out quad
+      const ease = progress * (2 - progress);
+      const currentVal = Math.round(start + (end - start) * ease);
+      
+      setDisplayValue(currentVal);
+
+      if (progress < 1) {
+        animId = requestAnimationFrame(tick);
+      } else {
+        prevValueRef.current = end;
+      }
+    };
+
+    animId = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(animId);
+    };
+  }, [value]);
 
   return (
     <GlassPanel className={cn("p-5 flex flex-col justify-between h-full", className)}>
@@ -42,7 +80,7 @@ export default function MetricCard({
         </div>
       </div>
       <span className={cn("text-2xl font-bold font-display", accent.text)}>
-        {formatNumber(value)}
+        {formatNumber(displayValue)}
       </span>
     </GlassPanel>
   );
