@@ -14,12 +14,12 @@ the beginning of a real ML pipeline.
 
 | Proposal capability | Status | Repository reality |
 | --- | --- | --- |
-| FastAPI defense gateway | Partial | Accepts request metadata for inspection; it is not yet a transparent reverse proxy to a real application. |
+| FastAPI defense gateway | Partial | `/api/v1/proxy/*` inspects and forwards traffic, but arbitrary application ingress is not intercepted. |
 | Hybrid risk scoring | Partial | Heuristic risk scoring is active. A Random Forest training/inference path exists but is not yet used for live decisions. |
 | Scikit-learn anomaly detection | Partial | Scikit-learn is configured and training is implemented; runtime anomaly detection remains heuristic. |
 | Threat fingerprint matching | Partial | Stable request fingerprints exist; persistent actor profiles and clustering do not. |
-| Automated real/decoy routing | Partial | Decisions and safe fake responses exist; no isolated real-app and decoy services are being transparently routed. |
-| Fake endpoints and fake data | Implemented for demo | Static safe templates are available through the decoy response API. |
+| Automated real/decoy routing | Implemented for demo | The proxy routes to separate real-app and decoy services using the live decision engine. |
+| Fake endpoints and fake data | Implemented for demo | The isolated decoy service exposes static, synthetic responses without real secrets. |
 | Honeytoken detection | Not implemented | Fake credential strings exist, but issuance, tracking, and use-triggered alerts do not. |
 | PostgreSQL/Supabase storage | Partial | Async PostgreSQL and Alembic are supported; Supabase deployment and actor/honeytoken tables are pending. |
 | Feature-vector storage | Implemented | Request and optional CICIDS-style flow features are stored with events. |
@@ -36,14 +36,14 @@ the beginning of a real ML pipeline.
 
 The current demo can accurately claim that MIRAGE:
 
-- analyzes simulated API request metadata;
+- analyzes submitted metadata and requests on the guarded proxy route;
 - combines heuristic risk scoring and anomaly signals;
 - automatically decides allow, monitor, or redirect-to-decoy;
-- produces safe fake decoy responses;
+- forwards demo traffic to isolated real-app or static decoy services;
 - stores events, alerts, and ML-ready feature vectors;
 - displays live backend data on a dashboard;
 - can train and evaluate a Random Forest model from labeled feature records.
 
-It should not yet claim transparent traffic forwarding, a production ML model,
+It should not yet claim arbitrary ingress interception, a production ML model,
 adaptive decoys, active honeytoken monitoring, WebSocket updates, or deployed
 Supabase/Railway/Vercel infrastructure.

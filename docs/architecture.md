@@ -4,20 +4,20 @@
 
 ```mermaid
 graph TD
-    A[Client or simulator] --> B[FastAPI inspection API]
+    A[Client or simulator] --> B[FastAPI inspection and proxy API]
     B --> C[Feature extraction]
     C --> D[Heuristic risk and anomaly engines]
     D --> E{Decision engine}
-    E -->|Allow or monitor| F[Event and alert storage]
-    E -->|Redirect| G[Safe decoy response templates]
-    G --> F
-    F --> H[Polling security dashboard]
+    E -->|Allow or monitor| F[Isolated demo application]
+    E -->|Redirect| G[Isolated static decoy service]
+    E --> H[Event and alert storage]
+    H --> K[Polling security dashboard]
     C --> I[ML-ready feature vectors]
     I --> J[Offline Random Forest trainer]
 ```
 
-The gateway currently evaluates submitted request metadata. It does not yet
-forward arbitrary traffic to a protected application or isolated decoy service.
+The gateway evaluates submitted metadata and forwards requests received under
+`/api/v1/proxy/*`. It does not yet intercept arbitrary application ingress.
 
 ## Target Architecture From The Proposal
 
