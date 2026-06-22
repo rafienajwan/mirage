@@ -34,5 +34,10 @@ Thumbs.db
 dist/
 build/
 
+# ML artifacts and local datasets
+artifacts/
+data/
+*.joblib
+
 # Logs
 *.log
