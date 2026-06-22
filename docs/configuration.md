@@ -1,0 +1,65 @@
+# MIRAGE Configuration
+
+## Files
+
+| File | Use |
+| --- | --- |
+| `.env.example` | Canonical template for the complete Docker stack |
+| `.env` | Local Docker values; ignored by Git |
+| `apps/gateway/.env.example` | Standalone gateway template |
+| `apps/gateway/.env` | Standalone gateway values; ignored by Git |
+| `apps/web/.env.example` | Standalone web template |
+| `apps/web/.env.local` | Standalone web values; ignored by Git |
+
+Never commit a populated environment file. When adding a variable, update the
+appropriate example and this reference in the same change.
+
+## Docker Variables
+
+| Variable | Required | Scope | Purpose |
+| --- | --- | --- | --- |
+| `NEXT_PUBLIC_API_URL` | No | Browser | Public gateway URL used for dashboard reads |
+| `MIRAGE_INTERNAL_API_URL` | No | Web server | Internal gateway URL used by the simulation bridge |
+| `MIRAGE_API_KEY` | Yes | Gateway and web server | Protects operator writes and authenticates simulations |
+| `DATABASE_URL` | Yes | Gateway | Async PostgreSQL connection used by SQLAlchemy |
+| `POSTGRES_USER` | No | PostgreSQL | Database user; defaults to `mirage` |
+| `POSTGRES_PASSWORD` | Yes | PostgreSQL | Strong URL-safe database password |
+| `POSTGRES_DB` | No | PostgreSQL | Database name; defaults to `mirage` |
+| `FRONTEND_ORIGIN` | No | Gateway | Allowed browser origin |
+| `RISK_THRESHOLD` | No | Gateway | Heuristic redirect threshold |
+| `ANOMALY_REDIRECT_CONFIDENCE` | No | Gateway | Confidence threshold for anomaly escalation |
+| `RATE_LIMIT_PER_MINUTE` | No | Gateway | Per-client API request limit |
+| `PROXY_TIMEOUT_SECONDS` | No | Gateway | Upstream HTTP timeout |
+| `PROXY_MAX_BODY_BYTES` | No | Gateway | Maximum forwarded request body |
+| `DECOY_LOGIN_TOKEN` | Yes | Gateway and decoy | Synthetic login token shown in decoy data |
+| `DECOY_OAUTH_TOKEN` | Yes | Gateway and decoy | Synthetic OAuth token shown in decoy data |
+| `DECOY_SERVICE_TOKEN` | Yes | Gateway and decoy | Synthetic service token shown in decoy data |
+| `DECOY_DATABASE_URL` | Yes | Gateway and decoy | Synthetic database location shown in decoy data |
+
+`DATABASE_URL` must use the `postgresql+asyncpg` driver and Docker host `db`.
+Its user, password, and database components must match the corresponding
+`POSTGRES_*` values. Keep the populated connection string only in `.env`.
+
+All `DECOY_*` values are attacker-facing demo material. They must never be valid
+credentials or locations for a real environment.
+
+## Standalone-Only Gateway Variables
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `APP_NAME` | `Project MIRAGE Gateway` | OpenAPI service name |
+| `API_VERSION` | `0.1.0` | Reported API version |
+| `HOST` | `0.0.0.0` | Uvicorn bind host |
+| `PORT` | `8000` | Uvicorn port |
+| `REAL_APP_URL` | `http://localhost:8001` | Allowed/monitored upstream |
+| `DECOY_SERVICE_URL` | `http://localhost:8002` | Redirected upstream |
+
+Docker Compose sets service-to-service upstream URLs directly and does not use
+the localhost values from the root template.
+
+## Browser Exposure
+
+Only variables beginning with `NEXT_PUBLIC_` are safe to expose to browser code.
+`MIRAGE_API_KEY`, `DATABASE_URL`, `POSTGRES_PASSWORD`, and `DECOY_*` must remain
+server-side. Dashboard simulations use the Next.js server route
+`/api/simulate/{kind}` to avoid exposing the operator key.

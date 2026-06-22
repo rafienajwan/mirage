@@ -1,9 +1,13 @@
-# Project MIRAGE Gateway
+# MIRAGE Gateway
 
-FastAPI backend for request inspection, hybrid defense experimentation, safe
-decoy routing, event persistence, dashboard APIs, and ML data preparation.
+FastAPI service for request inspection, guarded proxy routing, persistence,
+dashboard APIs, and offline ML preparation.
 
-## Quick Start
+Use the root Docker workflow for a complete stack. Running this service alone
+supports inspection and dashboard development, but proxy requests require the
+protected demo app on port `8001` and decoy service on port `8002`.
+
+## Standalone Setup
 
 ```bash
 cd apps/gateway
@@ -17,48 +21,66 @@ python -m alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
-API documentation is available at `http://localhost:8000/docs`.
+Open `http://localhost:8000/docs` for the generated API reference.
 
-## Test
+## Configuration
 
-```bash
-python -m pytest tests -v
-```
+`apps/gateway/.env.example` is the standalone template. Important variables:
 
-## Proxy Route
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | Async SQLite or PostgreSQL connection |
+| `MIRAGE_API_KEY` | Protects inspection, simulation, and decoy-write endpoints |
+| `REAL_APP_URL` | Upstream for allowed or monitored requests |
+| `DECOY_SERVICE_URL` | Upstream for redirected requests |
+| `RISK_THRESHOLD` | Heuristic risk escalation threshold |
+| `ANOMALY_REDIRECT_CONFIDENCE` | Anomaly-confidence escalation threshold |
+| `RATE_LIMIT_PER_MINUTE` | Rolling per-client request limit |
+| `PROXY_TIMEOUT_SECONDS` | Upstream timeout |
+| `PROXY_MAX_BODY_BYTES` | Maximum forwarded request body |
+| `DECOY_*` | Synthetic values only; never real credentials |
 
-Requests sent to `/api/v1/proxy/{path}` are inspected and forwarded to either
-`REAL_APP_URL` or `DECOY_SERVICE_URL`. The proxy enforces a body-size limit,
-filters hop-by-hop headers, and removes credentials before decoy forwarding.
+Docker Compose requires `MIRAGE_API_KEY`; standalone development permits it to
+be empty. Send protected requests with `X-Mirage-API-Key`.
 
-## Security Configuration
-
-- Set `MIRAGE_API_KEY` to protect inspection, simulation, and decoy-write endpoints.
-- Send the key in `X-Mirage-API-Key`.
-- Set `RATE_LIMIT_PER_MINUTE` to control per-client API traffic.
-- Restrict `FRONTEND_ORIGIN` to the deployed dashboard origin.
-- Keep operational credentials only in `.env`; the file is ignored by Git.
-- Configure `DECOY_*` with synthetic values that are invalid on real systems.
-- Update `.env.example` whenever a new environment variable is introduced.
-
-## ML Pipeline
-
-Every inspection produces a stable numeric feature vector. Labeled JSON Lines
-records can be trained with:
+## Proxy Example
 
 ```bash
-python scripts/train_model.py \
-  --input data/training_events.jsonl \
-  --output artifacts/risk_model.joblib
+curl -H "User-Agent: Mozilla/5.0" http://localhost:8000/api/v1/proxy/api/products
 ```
 
-Runtime routing still uses heuristic scoring until a trained artifact is
-reviewed and enabled through a shadow-deployment phase.
+The gateway strips hop-by-hop headers for every upstream and removes credentials
+before decoy forwarding. It returns a generic `502` when an upstream is
+unavailable and rejects request bodies above the configured limit.
 
-## Current Limitations
+## Database Migrations
 
-- Proxying is limited to `/api/v1/proxy/*`; arbitrary ingress is not intercepted.
-- The isolated decoy service is static rather than adaptive.
-- Dashboard updates use HTTP polling rather than WebSocket.
-- Honeytoken-use tracking and persistent actor profiles are not implemented.
-- API-key protection is disabled when `MIRAGE_API_KEY` is unset.
+```bash
+python -m alembic upgrade head
+```
+
+For a legacy database created before Alembic, back it up before stamping the
+baseline revision. See `docs/CONTINUATION.md` in local development context for
+the current migration note.
+
+## Tests
+
+```bash
+python -m pytest tests -q
+```
+
+## Offline Model Training
+
+```bash
+python scripts/train_model.py --input data/training_events.jsonl --output artifacts/risk_model.joblib
+```
+
+Training computes precision, recall, F1, and false-positive rate. Runtime
+routing remains heuristic until a reviewed artifact is enabled in shadow mode.
+
+## Known Limitations
+
+- proxy coverage is limited to `/api/v1/proxy/*`;
+- no trained artifact participates in live decisions;
+- actor profiles and honeytoken-use tracking are not implemented;
+- dashboard APIs are polled rather than streamed.
