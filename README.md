@@ -1,269 +1,260 @@
 # Project MIRAGE
-### Autonomous AI-Driven Cyber Deception & Threat Mitigation Platform
 
-[![Next.js](https://img.shields.io/badge/Next.js-16.2-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://nextjs.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.110-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![AI/ML](https://img.shields.io/badge/AI%2FML-Scikit--Learn-FF6F00?style=for-the-badge&logo=scikitlearn&logoColor=white)](https://scikit-learn.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4.0-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
-[![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+Project MIRAGE is an experimental cyber-deception platform for API traffic. The
+current repository is a local MVP: a guarded FastAPI proxy scores requests with
+heuristics, forwards normal traffic to a protected demo app, redirects suspicious
+traffic to an isolated static decoy, persists security events, and exposes them
+through a polling Next.js dashboard.
 
----
+The broader adaptive-ML, honeytoken tracking, WebSocket, and cloud-deployment
+capabilities remain proposal targets. See `docs/PROPOSAL_ALIGNMENT.md` for the
+exact implementation gap.
 
-Project MIRAGE is an autonomous cybersecurity defense platform that secures modern APIs and application infrastructures. By combining real-time AI risk scoring with dynamic decoy containment, MIRAGE doesn't just block attacks—it absorbs, analyzes, and neutralizes them inside simulated execution sandboxes. The system dynamically redirects suspicious vectors into high-fidelity synthetic environments, exposing decoy databases and honeytoken credentials while generating threat intelligence to harden production systems.
+## What Works
 
----
+- guarded reverse proxy at `/api/v1/proxy/*`;
+- heuristic risk scoring, anomaly signals, fingerprints, and payload indicators;
+- isolated protected-demo and static-decoy services;
+- bounded request bodies, upstream timeouts, credential filtering, and rate limits;
+- SQLite development storage and PostgreSQL/Alembic support;
+- dashboard metrics, events, alerts, traffic history, and simulation controls;
+- ML-ready feature vectors and an offline Random Forest training pipeline;
+- Docker Compose configuration for the five-service demo stack.
 
-## Implementation Status
+## Current Boundaries
 
-As of 2026-06-22, this repository is a local MVP rather than the complete target
-platform described in the proposal. It provides request metadata inspection,
-heuristic scoring, a guarded reverse-proxy route, isolated real and static decoy
-services, persistent logging, dashboard polling, ML-ready feature storage, and
-an offline Random Forest training pipeline.
+- The gateway only proxies its explicit `/api/v1/proxy/*` route.
+- Runtime routing uses heuristics, not a trained ML artifact.
+- Decoy responses are static and do not track honeytoken use.
+- Dashboard updates use 10-second HTTP polling rather than WebSocket.
+- Docker image builds and cloud deployment are not yet verified in CI.
 
-Arbitrary ingress proxying, a deployed ML artifact, adaptive decoys,
-honeytoken-use tracking, WebSocket updates, and cloud deployment remain planned.
-See `docs/PROPOSAL_ALIGNMENT.md` for the detailed comparison.
-
-## Technical Overview
-
-### The Problem: Passive Firewalls & Alert Fatigue
-Modern enterprise infrastructures face massive automated probes, zero-day vulnerabilities, and credential stuffing vectors. Traditional firewalls and intrusion prevention systems (IPS) operate on static blacklists, blocking requests flatly. This provides attackers with immediate feedback, allowing them to cycle payloads, rotating IPs, and mutate payloads until they bypass static rules. Concurrently, SOC analysts suffer from alert fatigue, sorting through millions of blocked requests to identify high-risk advanced persistent threats (APTs).
-
-### The MIRAGE Approach: Active Cyber Deception
-Project MIRAGE transforms cybersecurity from a passive defense posture to an **active deception campaign**. Instead of rejecting suspicious traffic with a `403 Forbidden` response, MIRAGE routes anomalies to an isolated container network:
-- **Intrusion Detention**: Attackers believe they have successfully breached an endpoint. They waste resources exploring fake directories, scraping synthetically generated tables, and testing invalid API tokens.
-- **Signal Hardening**: While the attacker is trapped, MIRAGE logs behavioral fingerprints, tracks command payloads, and flags their IP ranges across the network.
-- **Honeytoken Traps**: Dynamic honeytoken files (e.g., false `.env` configurations or AWS credential keys) are leaked to the attacker. If the attacker attempts to use these credentials on actual cloud infrastructure, alert systems trigger immediate lockouts.
-
----
-
-## Core Features
-
-### 🧠 AI Risk Scoring & Anomaly Detection
-Analyzes incoming headers, body payload signatures, routing behaviors, and request frequencies.
-* **Security Purpose**: Employs isolation scoring to isolate zero-day exploit patterns and credential stuffing attempts that bypass traditional signature-based Web Application Firewalls (WAF).
-
-### 🕸️ Dynamic Decoy Environments
-Constructs a sandboxed network mimic layer loaded with fake schemas and endpoints.
-* **Security Purpose**: Distracts and detains attackers inside a synthetic system, exhausting their time and resources while tracking their manual exploitation flows.
-
-### 🔑 Canary Token System
-Injects dynamically generated false credentials, dummy database strings, and honeytoken environment configs (`.env`) into decoy filesystems.
-* **Security Purpose**: Generates high-confidence alert signals the moment canary credentials are exfiltrated and tested against actual system endpoints.
-
-### 🔬 Threat Analysis Engine
-Generates detailed command footprints, fingerprint logs, and payloads from trapped attackers.
-* **Security Purpose**: Transforms active attacks into structured intelligence data, allowing operators to patch production gaps before real damage can occur.
-
-### 📡 SOC Analytics Dashboard & Real-Time Alerts
-A unified dashboard built on high-fidelity animations, real-time threat maps, and visual system states.
-* **Security Purpose**: Streamlines security operations by highlighting critical risk anomalies and decoy redirect events while silencing standard noise.
-
----
-
-## Architecture Flow
-
-The diagram below outlines how the MIRAGE API Gateway routes traffic dynamically based on AI evaluation:
+## Architecture
 
 ```mermaid
-graph TD
-    A[User / Attacker] --> B[API Gateway / Proxy]
-    B --> C{AI Risk & Anomaly Analyzer}
-    
-    C -- "Allowed or monitored" --> D[Demo Core App]
-    D --> E[(Production PostgreSQL Database)]
-    
-    C -- "Redirect to decoy" --> F[MIRAGE Decoy Service]
-    F --> G[Fake API Endpoint Templates]
-    F --> H[Fake Database / Seed Data]
-    F --> I[Honeytoken Canary Keys]
-    
-    F --> J[Deception Log Manager]
-    J --> K[Real-time SOC Dashboard]
-    J --> L[Automated Incident Response & SOC Alerts]
+graph LR
+    A[Client] --> B[FastAPI Gateway]
+    B --> C[Feature and Risk Analysis]
+    C --> D{Decision}
+    D -->|Allow or monitor| E[Protected Demo App]
+    D -->|Redirect| F[Static Decoy Service]
+    C --> G[(Event and Alert Storage)]
+    G --> H[Next.js Polling Dashboard]
+    C --> I[ML-ready Features]
+    I --> J[Offline Model Trainer]
 ```
 
-### Request Lifecycle
-1. **Ingress**: Traffic hits the API Gateway.
-2. **Analysis**: Request metadata is evaluated by the AI Risk Scorer.
-3. **Branching**:
-   - **Allowed**: Routed directly to production databases and APIs.
-   - **Redirected**: Routed to the Decoy Container without dropping the connection, keeping the HTTP headers indistinguishable to the attacker.
-4. **Deception**: The attacker interacts with mock endpoints, extracting fake data.
-5. **Mitigation**: Logs are pushed to the security dashboard, and alerts are dispatched via secure webhooks.
+| Service | Local port | Purpose |
+| --- | ---: | --- |
+| Web | `3000` | Landing page, dashboard, and server-side simulation bridge |
+| Gateway | `8000` | Inspection, proxy routing, dashboard API, and persistence |
+| Protected demo app | `8001` | Upstream for allowed or monitored traffic |
+| Decoy | `8002` | Upstream with static synthetic responses |
+| PostgreSQL | internal | Compose persistence backend |
 
----
-
-## Technology Stack
-
-```
-   ┌─────────────────────────────────────────────────────────────┐
-   │                       PROJECT MIRAGE                        │
-   └─────────────────────────────────────────────────────────────┘
-          │                           │                       │
-          ▼                           ▼                       ▼
-   ┌──────────────┐            ┌──────────────┐        ┌──────────────┐
-   │   FRONTEND   │            │   BACKEND    │        │ DATA & DEPLOY│
-   ├──────────────┤            ├──────────────┤        ├──────────────┤
-   │ Next.js      │            │ FastAPI      │        │ SQLite       │
-   │ Tailwind v4  │            │ Uvicorn      │        │ PostgreSQL   │
-   │ Framer Motion│            │ SQLAlchemy   │        │ Docker       │
-   │ Recharts     │            │ Pydantic     │        │ Vercel       │
-   │ TypeScript   │            │ pytest       │        │ Railway      │
-   └──────────────┘            └──────────────┘        └──────────────┘
-```
-
-- **Frontend Dashboard**: React and Next.js App Router for server-rendered page assets. Styled with Tailwind CSS v4, Framer Motion transitions, and Recharts graph animations.
-- **Backend Services**: FastAPI implementation utilizing Uvicorn for asynchronous high-throughput request handling. Database interactions managed via SQLAlchemy models and Pydantic schemas with SQLite (development) and PostgreSQL (production) support.
-- **AI Core**: Heuristic-based risk scoring and anomaly detection engine. Scikit-Learn classification planned for future enhancement.
-- **Infrastructure**: Containerized using Docker Compose for staging multi-container decoy clusters.
-
----
-
-## Project Structure
-
-```
-mirage/
-├── apps/
-│   ├── web/                  # Next.js frontend (landing page + dashboard)
-│   │   ├── src/app/          # App Router pages
-│   │   ├── src/components/   # UI components (landing, dashboard, layout, ui)
-│   │   └── src/lib/          # Utilities, mock data, constants
-│   ├── gateway/              # FastAPI backend (API gateway)
-│   │   ├── app/api/          # Route endpoints (inspect, dashboard, decoy, simulate)
-│   │   ├── app/core/         # Config, CORS
-│   │   ├── app/schemas/      # Pydantic models
-│   │   ├── app/services/     # Risk engine, decision, decoy, logger
-│   │   ├── app/storage/      # Database (SQLite/PostgreSQL) + memory fallback
-│   │   └── tests/            # pytest tests
-│   ├── decoy/                # Decoy environment (placeholder)
-│   └── real-app-demo/        # Demo protected app (placeholder)
-├── packages/
-│   └── shared/               # Shared types/config (placeholder)
-├── docs/                     # Architecture docs, demo flow
-├── infra/
-│   └── docker-compose.yml    # Docker orchestration
-├── .env.example              # Root environment template
-└── README.md
-```
-
----
-
-## Landing Page Philosophy
-The MIRAGE landing page layout is inspired by **MotionSites AI** and high-end enterprise SaaS architectures:
-- **Cinematic Backdrop**: Replaced traditional static grids with a fullscreen HLS video background running an active cybernetic topology feed.
-- **Cyberpunk Minimalism**: Uses HSL colors, cyan and emerald accents, and glassmorphic panels built on `backdrop-blur-xl` and low opacity borders.
-- **Asymmetrical Balance**: Visual components are arranged to frame the typography organically, avoiding rigid grids.
-- **Focused Hierarchy**: The screen centers on the primary headline `DETECT. DECEIVE. DEFEND.` while the active gauges and anomaly chart widgets drift slowly in the background as ambient HUD indicators.
-
----
-
-## Installation & Setup
+## Quick Start
 
 ### Prerequisites
-- Node.js v20+
-- Python v3.11+
 
-### 1. Clone the Repository
+- Docker Desktop with Docker Compose; or
+- Node.js 20+ and Python 3.11+ for standalone development.
+
+### Full Stack With Docker
+
+From the repository root:
+
 ```bash
-git clone https://github.com/rafienajwan/mirage.git
-cd mirage
+# Windows
+Copy-Item .env.example .env
+
+# Linux/macOS
+cp .env.example .env
 ```
 
-### 2. Run the Backend (FastAPI Gateway)
-```bash
-cd apps/gateway
-python -m venv venv
-# Windows:
-venv\Scripts\activate
-# Linux/Mac: source venv/bin/activate
+Fill every variable marked `REQUIRED` in `.env`:
 
-python -m pip install -e ".[dev,ml,postgres]"
-# Windows: Copy-Item .env.example .env
-# Linux/macOS: cp .env.example .env
-# Fill MIRAGE_API_KEY and the DECOY_* values in apps/gateway/.env.
-python -m alembic upgrade head
-uvicorn app.main:app --reload --port 8000
-```
-API docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+- `POSTGRES_PASSWORD` must be strong and URL-safe.
+- `DATABASE_URL` must use the `postgresql+asyncpg` driver, host `db`, and the
+  same user, password, and database configured by `POSTGRES_*`.
+- `MIRAGE_API_KEY` protects operator write endpoints and the dashboard simulation bridge.
+- `DECOY_*` values must be synthetic and invalid on every real system.
 
-### 3. Run the Frontend (Next.js)
-```bash
-cd apps/web
-npm install
-npm run dev
-```
-Frontend: [http://localhost:3000](http://localhost:3000)
-
-### 4. Run the Full Docker Stack
-
-Copy the root template and fill every variable marked `REQUIRED`. The
-`POSTGRES_PASSWORD` value must be URL-safe and must match the password embedded
-in `DATABASE_URL`. Decoy variables must contain synthetic values only; never put
-credentials from a real system in them.
+Then start the stack:
 
 ```bash
-# Windows: Copy-Item .env.example .env
-# Linux/macOS: cp .env.example .env
-
 docker compose --env-file .env -f infra/docker-compose.yml up --build
 ```
 
-The root `.env` is ignored by Git. Share configuration names through
-`.env.example`, never by committing `.env`.
+Open:
 
----
+- dashboard: `http://localhost:3000/dashboard`;
+- gateway docs: `http://localhost:8000/docs`;
+- gateway health: `http://localhost:8000/health`.
 
-## MVP Demonstration Flow
+Stop the stack with:
 
-To demonstrate the MIRAGE active containment workflow:
+```bash
+docker compose --env-file .env -f infra/docker-compose.yml down
+```
 
-1. **Traffic Entry**: Simulate a normal API request:
-   ```bash
-   curl -X POST http://localhost:8000/api/v1/simulate/normal
-   ```
-   *Response*: Returns `decision: allow` with a low risk score.
+The root `.env` is ignored by Git. Commit variable names and documentation only
+through `.env.example`.
 
-2. **Attack Probe**: Simulate a suspicious request:
-   ```bash
-   curl -X POST http://localhost:8000/api/v1/simulate/suspicious
-   ```
-   *Response*: The AI Risk Scorer evaluates the request as highly anomalous. Returns `decision: redirect_to_decoy`.
+## Demo
 
-3. **Dashboard Check**: Open [http://localhost:3000/dashboard](http://localhost:3000/dashboard) to see the real-time security dashboard with logged events, risk scores, and active alerts.
+With the full stack running, send normal traffic through the proxy:
 
-4. **Inspect Endpoint**: Send a custom request for analysis:
-   ```bash
-   curl -X POST http://localhost:8000/api/v1/inspect \
-     -H "Content-Type: application/json" \
-     -d '{"ip_address": "10.0.0.1", "method": "GET", "path": "/api/users", "user_agent": "Mozilla/5.0", "request_count": 5, "payload_indicators": []}'
-   ```
+```bash
+curl -H "User-Agent: Mozilla/5.0" http://localhost:8000/api/v1/proxy/api/products
+```
 
----
+Send a suspicious probe to exercise decoy routing:
 
-## Running Tests
+```bash
+curl -H "User-Agent: sqlmap/1.8" http://localhost:8000/api/v1/proxy/.env
+```
+
+Open `http://localhost:3000/dashboard` to inspect the resulting events and
+alerts. The dashboard simulation buttons call a server-side Next.js route, so
+`MIRAGE_API_KEY` is never exposed in the browser bundle.
+
+For a direct operator simulation call:
+
+```bash
+curl -X POST -H "X-Mirage-API-Key: YOUR_LOCAL_MIRAGE_API_KEY" http://localhost:8000/api/v1/simulate/suspicious
+```
+
+## Standalone Development
+
+Run each backend service in a separate terminal from the repository root.
+
+### Gateway
 
 ```bash
 cd apps/gateway
-pytest tests/ -v
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# Linux/macOS: source .venv/bin/activate
+python -m pip install -e ".[dev,ml,postgres]"
+# Windows: Copy-Item .env.example .env
+# Linux/macOS: cp .env.example .env
+python -m alembic upgrade head
+uvicorn app.main:app --reload --port 8000
 ```
 
----
+### Protected Demo App
 
-## Future Roadmap
+```bash
+cd apps/real-app-demo
+python -m pip install -e .
+uvicorn app.main:app --reload --port 8001
+```
 
-- **Frontend ↔ Backend Integration**: Connect the dashboard to live backend API endpoints for real-time event data.
-- **Canary/Honeytoken System**: Inject fake credentials (AWS keys, DB strings) into decoy responses.
-- **ML Model Integration**: Replace heuristic scoring with a trained Scikit-Learn classifier.
-- **Rate Limiting & API Auth**: Add `slowapi` middleware and optional API key authentication.
-- **LLM Threat Analysis**: Integrate small language models to dynamically generate fake code outputs based on attacker commands.
-- **AI Fingerprinting**: Implement behavioral graph clustering to identify repeat attackers across rotated IPs and User-Agents.
-- **Honeynet Orchestration**: Deploy Kubernetes operators to spin up temporary Docker container decoys on-demand.
-- **SIEM / SOC Connectors**: Out-of-the-box integrations with Splunk, Datadog, Slack, and PagerDuty.
+### Decoy
 
----
+```bash
+cd apps/decoy
+python -m pip install -e .
+uvicorn app.main:app --reload --port 8002
+```
+
+### Web
+
+Copy `apps/web/.env.example` to `apps/web/.env.local`. Set
+`MIRAGE_INTERNAL_API_URL` to the standalone gateway and use the same
+`MIRAGE_API_KEY` configured by the gateway.
+
+```bash
+cd apps/web
+npm install
+# Windows: Copy-Item .env.example .env.local
+# Linux/macOS: cp .env.example .env.local
+npm run dev
+```
+
+## Gateway API
+
+All paths below use the `http://localhost:8000` base URL.
+
+| Method and path | Auth | Purpose |
+| --- | --- | --- |
+| `GET /health` | Public | Health check |
+| `POST /api/v1/inspect` | API key | Inspect submitted request metadata |
+| `* /api/v1/proxy/{path}` | Public | Inspect and forward real HTTP traffic |
+| `POST /api/v1/simulate/normal` | API key | Generate a normal demo event |
+| `POST /api/v1/simulate/suspicious` | API key | Generate a suspicious demo event |
+| `GET /api/v1/dashboard/*` | Public | Dashboard metrics, events, alerts, and charts |
+| `GET /api/v1/decoy/status` | Public | Current decoy metrics |
+| `POST /api/v1/decoy/respond` | API key | Generate an in-process synthetic response |
+
+Send protected requests with `X-Mirage-API-Key`. Docker Compose refuses to start
+without `MIRAGE_API_KEY`; standalone development permits it to be unset.
+
+## Tests and Checks
+
+```bash
+cd apps/gateway
+python -m pytest tests -q
+```
+
+```bash
+cd apps/web
+npm run lint
+npm run build
+```
+
+Validate Compose after filling `.env`:
+
+```bash
+docker compose --env-file .env -f infra/docker-compose.yml config --quiet
+```
+
+## Offline ML Pipeline
+
+Runtime decisions remain heuristic. Training accepts JSON Lines records with a
+numeric `features` object and binary `label` (`0` normal, `1` suspicious):
+
+```bash
+cd apps/gateway
+python scripts/train_model.py --input data/training_events.jsonl --output artifacts/risk_model.joblib
+```
+
+Do not promote an artifact without reviewing dataset provenance, holdout
+behavior, precision, recall, F1, and false-positive rate.
+
+## Repository Layout
+
+```text
+apps/
+  web/             Next.js dashboard and server-side simulation bridge
+  gateway/         FastAPI gateway, persistence, migrations, ML tooling, tests
+  real-app-demo/   Protected upstream used by the proxy demo
+  decoy/           Isolated static synthetic upstream
+docs/
+  architecture.md
+  demo-flow.md
+  PROPOSAL_ALIGNMENT.md
+infra/
+  docker-compose.yml
+```
+
+## Documentation
+
+- `docs/architecture.md`: implemented and target architecture boundaries;
+- `docs/configuration.md`: environment files, variable scopes, and secret handling;
+- `docs/demo-flow.md`: concise end-to-end demonstration;
+- `docs/PROPOSAL_ALIGNMENT.md`: proposal capability matrix and safe claims;
+- `apps/gateway/README.md`: gateway-specific development notes;
+- `apps/web/README.md`: frontend-specific commands.
+
+## Next Priorities
+
+1. Prepare versioned CICIDS2017 and custom API-log datasets.
+2. Run trained models in shadow mode before changing routing decisions.
+3. Add analyst label correction and retraining workflows.
+4. Replace dashboard polling with authenticated WebSocket updates.
+5. Add adaptive decoys, honeytoken-use detection, and actor profiles.
+6. Verify Docker image builds and deploy the stack.
 
 ## License
 
