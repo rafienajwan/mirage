@@ -87,7 +87,7 @@ export default function DashboardPage() {
     <div className="min-h-screen flex flex-col bg-[#060816] text-white">
       <Header />
 
-      <main className="flex-1 w-full max-w-[1400px] mx-auto px-6 py-8 lg:py-12">
+      <main className="flex-1 w-full max-w-[1400px] mx-auto px-6 pt-28 pb-8 lg:pt-32 lg:pb-12">
         {/* Page title */}
         <div className="mb-8">
           <h1 className="font-display text-2xl lg:text-3xl font-bold tracking-tight text-white">
