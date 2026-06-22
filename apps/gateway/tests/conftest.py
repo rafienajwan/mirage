@@ -1,10 +1,11 @@
 """Shared test fixtures."""
 
 import os
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-# Force in-memory SQLite for tests BEFORE any app imports
+# Configure storage before importing the application singleton.
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 
 from app.main import app  # noqa: E402
@@ -26,24 +27,3 @@ async def client():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
-"""Shared test fixtures."""
-
-import pytest
-from fastapi.testclient import TestClient
-
-from app.main import app
-from app.storage.memory_store import store
-
-
-@pytest.fixture(autouse=True)
-def clear_store():
-    """Reset in-memory store between tests."""
-    store.events.clear()
-    store.alerts.clear()
-    store._alert_counter = 0
-    yield
-
-
-@pytest.fixture
-def client():
-    return TestClient(app)

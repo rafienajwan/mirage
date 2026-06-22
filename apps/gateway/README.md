@@ -1,99 +1,53 @@
-# Project MIRAGE — Gateway
+# Project MIRAGE Gateway
 
-FastAPI backend for the MIRAGE AI-powered cyber deception defense platform.
-
-## Purpose
-
-The gateway receives simulated API request metadata, calculates risk scores, detects anomalies, decides whether traffic is normal or suspicious, routes suspicious traffic to safe decoy responses, logs activity, and exposes dashboard-ready API endpoints.
-
-**No real offensive functionality is implemented.** All data is simulated and safe.
-
-## Folder Structure
-
-```txt
-apps/gateway/
-├── app/
-│   ├── main.py              # FastAPI application entry point
-│   ├── core/
-│   │   ├── config.py         # Environment configuration
-│   │   └── cors.py           # CORS middleware
-│   ├── api/
-│   │   ├── router.py         # Route registration
-│   │   └── routes/
-│   │       ├── health.py     # GET /health
-│   │       ├── inspect.py    # POST /api/v1/inspect
-│   │       ├── dashboard.py  # GET /api/v1/dashboard/*
-│   │       ├── decoy.py      # GET/POST /api/v1/decoy/*
-│   │       └── simulate.py   # POST /api/v1/simulate/*
-│   ├── schemas/              # Pydantic models
-│   ├── services/             # Business logic engines
-│   │   ├── risk_engine.py    # Risk scoring (0–100)
-│   │   ├── anomaly_engine.py # Heuristic anomaly detection
-│   │   ├── fingerprint.py    # Privacy-safe hashing
-│   │   ├── decision_engine.py# Allow/monitor/redirect logic
-│   │   ├── decoy_engine.py   # Safe fake response generator
-│   │   ├── logger.py         # Activity logging + alerts
-│   │   └── threat_analysis.py# Summary statistics
-│   ├── storage/
-│   │   └── memory_store.py   # In-memory event store
-│   └── utils/
-│       └── time.py           # Time utilities
-├── tests/                    # pytest tests
-├── requirements.txt
-├── .env.example
-└── README.md
-```
-
-## API Endpoints
-
-| Method | Path                          | Description                          |
-|--------|-------------------------------|--------------------------------------|
-| GET    | `/health`                     | Service health check                 |
-| POST   | `/api/v1/inspect`             | Inspect request and get decision     |
-| GET    | `/api/v1/dashboard/overview`  | Aggregate dashboard stats            |
-| GET    | `/api/v1/dashboard/events`    | Recent activity events               |
-| GET    | `/api/v1/dashboard/alerts`    | Security alerts                      |
-| GET    | `/api/v1/dashboard/threat-analysis` | Threat analysis summary        |
-| GET    | `/api/v1/decoy/status`        | Decoy environment status             |
-| POST   | `/api/v1/decoy/respond`       | Generate safe fake decoy response    |
-| POST   | `/api/v1/simulate/normal`     | Generate safe normal traffic event   |
-| POST   | `/api/v1/simulate/suspicious` | Generate safe suspicious traffic     |
+FastAPI backend for request inspection, hybrid defense experimentation, safe
+decoy responses, event persistence, dashboard APIs, and ML data preparation.
 
 ## Quick Start
 
 ```bash
 cd apps/gateway
-python -m venv venv
-# Windows:
-venv\Scripts\activate
-# Linux/Mac:
-# source venv/bin/activate
-
-pip install -r requirements.txt
-cp .env.example .env
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# Linux/macOS: source .venv/bin/activate
+python -m pip install -e ".[dev,ml,postgres]"
+python -m alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
-Interactive API docs: http://localhost:8000/docs
+API documentation is available at `http://localhost:8000/docs`.
 
-## Running Tests
+## Test
 
 ```bash
-cd apps/gateway
-pytest tests/ -v
+python -m pytest tests -v
 ```
+
+## Security Configuration
+
+- Set `MIRAGE_API_KEY` to protect inspection, simulation, and decoy-write endpoints.
+- Send the key in `X-Mirage-API-Key`.
+- Set `RATE_LIMIT_PER_MINUTE` to control per-client API traffic.
+- Restrict `FRONTEND_ORIGIN` to the deployed dashboard origin.
+
+## ML Pipeline
+
+Every inspection produces a stable numeric feature vector. Labeled JSON Lines
+records can be trained with:
+
+```bash
+python scripts/train_model.py \
+  --input data/training_events.jsonl \
+  --output artifacts/risk_model.joblib
+```
+
+Runtime routing still uses heuristic scoring until a trained artifact is
+reviewed and enabled through a shadow-deployment phase.
 
 ## Current Limitations
 
-- **In-memory storage only** — events and alerts are lost on restart.
-- **Heuristic detection only** — no real ML model yet.
-- **Single-process** — not designed for production concurrency.
-- **No authentication** — API is open for local development.
-
-## Future Scope
-
-- Real anomaly detection model (scikit-learn / PyTorch)
-- PostgreSQL / Supabase persistent logging
-- WebSocket live event streaming to frontend
-- Authentication and rate limiting
-- Production Docker deployment
+- `/inspect` accepts metadata; it is not yet a transparent reverse proxy.
+- Decoy responses are static templates rather than isolated adaptive services.
+- Dashboard updates use HTTP polling rather than WebSocket.
+- Honeytoken-use tracking and persistent actor profiles are not implemented.
+- API-key protection is disabled when `MIRAGE_API_KEY` is unset.

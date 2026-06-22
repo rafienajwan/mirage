@@ -21,3 +21,4 @@ class EventRecord(BaseModel):
     decision: Decision
     event_type: str = Field(default="inspection")
     summary: str = ""
+    feature_vector: dict[str, float] = Field(default_factory=dict)

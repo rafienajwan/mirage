@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import case, extract, func, select
 
 from app.schemas.dashboard import AlertRecord, AlertSeverity
 from app.schemas.decision import Decision
@@ -34,6 +34,7 @@ class DatabaseStore:
                 decision=event.decision.value,
                 event_type=event.event_type,
                 summary=event.summary,
+                feature_vector=event.feature_vector,
             )
             session.add(row)
 
@@ -57,6 +58,7 @@ class DatabaseStore:
                     decision=Decision(r.decision),
                     event_type=r.event_type,
                     summary=r.summary,
+                    feature_vector=r.feature_vector or {},
                 )
                 for r in rows
             ]
@@ -86,9 +88,9 @@ class DatabaseStore:
             )
             session.add(alert)
 
-    async def get_alerts(self) -> list[AlertRecord]:
+    async def get_alerts(self, limit: int = 100) -> list[AlertRecord]:
         async with get_session() as session:
-            stmt = select(AlertModel).order_by(AlertModel.id.desc())
+            stmt = select(AlertModel).order_by(AlertModel.id.desc()).limit(limit)
             result = await session.execute(stmt)
             rows = result.scalars().all()
             return [
@@ -147,3 +149,49 @@ class DatabaseStore:
             result = await session.execute(stmt)
             avg = result.scalar()
             return float(avg) if avg is not None else 0.0
+
+    # ── Chart data ────────────────────────────────────────────
+
+    async def get_traffic_breakdown(self) -> list[dict]:
+        """Group events by hour into normal/suspicious buckets (last 12 hours)."""
+        async with get_session() as session:
+            is_suspicious = EventModel.decision != Decision.ALLOW.value
+            stmt = (
+                select(
+                    extract("hour", EventModel.timestamp).label("hour"),
+                    func.sum(case((~is_suspicious, 1), else_=0)).label("normal"),
+                    func.sum(case((is_suspicious, 1), else_=0)).label("suspicious"),
+                )
+                .group_by("hour")
+                .order_by("hour")
+            )
+            result = await session.execute(stmt)
+            return [
+                {"hour": int(r.hour), "normal": int(r.normal), "suspicious": int(r.suspicious)}
+                for r in result.all()
+            ]
+
+    async def get_risk_history(self, limit: int = 20) -> list[dict]:
+        """Recent risk scores ordered chronologically for sparkline chart."""
+        async with get_session() as session:
+            recent_stmt = (
+                select(EventModel.timestamp, EventModel.risk_score)
+                .order_by(EventModel.id.desc())
+                .limit(limit)
+            )
+            result = await session.execute(recent_stmt)
+            rows = list(reversed(result.all()))
+            return [
+                {"timestamp": r.timestamp.isoformat(), "risk_score": r.risk_score}
+                for r in rows
+            ]
+
+    async def get_last_decoy_trigger(self) -> datetime | None:
+        """Timestamp of the most recent decoy redirect event."""
+        async with get_session() as session:
+            stmt = (
+                select(func.max(EventModel.timestamp))
+                .where(EventModel.decision == Decision.REDIRECT_TO_DECOY.value)
+            )
+            result = await session.execute(stmt)
+            return result.scalar()

@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from app.api.router import api_router, root_router
 from app.core.config import settings
 from app.core.cors import configure_cors
+from app.core.rate_limit import configure_rate_limit
 from app.storage.db.database import close_db, init_db
 
 
@@ -33,6 +34,7 @@ app = FastAPI(
 
 # CORS
 configure_cors(app)
+configure_rate_limit(app)
 
 # Routers
 app.include_router(root_router)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from app.schemas.request import InspectRequest
 from app.schemas.decision import Decision, InspectResponse
@@ -14,6 +14,8 @@ from app.services.fingerprint import generate_fingerprint
 from app.services.logger import log_inspection
 from app.services.risk_engine import calculate_risk
 from app.services.decoy_engine import _infer_decoy_type
+from app.services.feature_extraction import extract_features
+from app.core.security import require_api_key
 
 router = APIRouter(prefix="/simulate", tags=["simulate"])
 
@@ -26,6 +28,7 @@ async def _process_simulation(request: InspectRequest) -> InspectResponse:
         path=request.path,
         payload_indicators=request.payload_indicators,
     )
+    feature_vector = extract_features(request)
     risk = calculate_risk(request)
     anomaly = anomaly_detector.detect(request)
     if anomaly.signals:
@@ -35,8 +38,9 @@ async def _process_simulation(request: InspectRequest) -> InspectResponse:
         risk=risk,
         fingerprint_hash=fingerprint_hash,
         is_anomalous=anomaly.is_anomalous,
+        anomaly_confidence=anomaly.confidence,
     )
-    await log_inspection(request, risk.score, decision)
+    await log_inspection(request, risk.score, decision, feature_vector)
 
     decoy_type = None
     if decision == Decision.REDIRECT_TO_DECOY:
@@ -53,7 +57,11 @@ async def _process_simulation(request: InspectRequest) -> InspectResponse:
     )
 
 
-@router.post("/normal", response_model=InspectResponse)
+@router.post(
+    "/normal",
+    response_model=InspectResponse,
+    dependencies=[Depends(require_api_key)],
+)
 async def simulate_normal():
     """Generate a safe normal traffic event for demo purposes."""
     request = InspectRequest(
@@ -67,7 +75,11 @@ async def simulate_normal():
     return await _process_simulation(request)
 
 
-@router.post("/suspicious", response_model=InspectResponse)
+@router.post(
+    "/suspicious",
+    response_model=InspectResponse,
+    dependencies=[Depends(require_api_key)],
+)
 async def simulate_suspicious():
     """Generate a safe suspicious traffic event for demo purposes."""
     request = InspectRequest(

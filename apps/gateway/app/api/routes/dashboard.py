@@ -1,6 +1,6 @@
 """Dashboard API endpoints."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from app.schemas.dashboard import DashboardOverview
 from app.services.threat_analysis import get_threat_summary
@@ -22,16 +22,16 @@ async def dashboard_overview():
 
 
 @router.get("/events")
-async def dashboard_events(limit: int = 50):
+async def dashboard_events(limit: int = Query(default=50, ge=1, le=200)):
     """Recent activity events (newest first)."""
     events = await store.get_recent_events(limit=limit)
     return {"events": [e.model_dump(mode="json") for e in events]}
 
 
 @router.get("/alerts")
-async def dashboard_alerts():
+async def dashboard_alerts(limit: int = Query(default=100, ge=1, le=200)):
     """Active security alerts."""
-    alerts = await store.get_alerts()
+    alerts = await store.get_alerts(limit=limit)
     return {"alerts": [a.model_dump(mode="json") for a in alerts]}
 
 
@@ -39,3 +39,15 @@ async def dashboard_alerts():
 async def dashboard_threat_analysis():
     """Threat analysis summary from logged events."""
     return await get_threat_summary()
+
+
+@router.get("/traffic")
+async def dashboard_traffic():
+    """Traffic breakdown by hour for the traffic chart."""
+    return {"traffic": await store.get_traffic_breakdown()}
+
+
+@router.get("/risk-history")
+async def dashboard_risk_history(limit: int = Query(default=20, ge=1, le=200)):
+    """Recent risk scores for the sparkline chart."""
+    return {"history": await store.get_risk_history(limit=limit)}

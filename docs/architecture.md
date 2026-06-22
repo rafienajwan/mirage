@@ -1,44 +1,37 @@
-# Project MIRAGE — Architecture
+# Project MIRAGE - Architecture
 
-## Overview
-
-Project MIRAGE is an AI-powered cyber deception defense platform for API security. The platform detects suspicious API requests, calculates risk scores, redirects attackers into safe decoy environments, records attacker behavior, and visualizes threats through a security dashboard.
-
-## Planned Architecture
+## Implemented MVP
 
 ```mermaid
 graph TD
-    A[Client / Attacker] --> B[API Gateway]
-    B --> C{AI Risk Scorer}
-    C -->|Normal Traffic| D[Production App]
-    C -->|Suspicious Traffic| E[Decoy Environment]
-    E --> F[Fake Endpoints]
-    E --> G[Fake Credentials]
-    E --> H[Fake Database]
-    E --> I[Activity Logger]
-    I --> J[Security Dashboard]
-    I --> K[Incident Response]
+    A[Client or simulator] --> B[FastAPI inspection API]
+    B --> C[Feature extraction]
+    C --> D[Heuristic risk and anomaly engines]
+    D --> E{Decision engine}
+    E -->|Allow or monitor| F[Event and alert storage]
+    E -->|Redirect| G[Safe decoy response templates]
+    G --> F
+    F --> H[Polling security dashboard]
+    C --> I[ML-ready feature vectors]
+    I --> J[Offline Random Forest trainer]
 ```
 
-## Components
+The gateway currently evaluates submitted request metadata. It does not yet
+forward arbitrary traffic to a protected application or isolated decoy service.
 
-| Component | Directory | Status | Description |
-|-----------|-----------|--------|-------------|
-| Web (Frontend) | `apps/web` | Active | Next.js landing page + security dashboard |
-| Gateway | `apps/gateway` | Planned | FastAPI defense gateway with AI risk scoring |
-| Decoy Service | `apps/decoy` | Planned | Decoy routing and fake environment management |
-| Demo App | `apps/real-app-demo` | Planned | Protected demo application |
-| Shared | `packages/shared` | Planned | Shared types and constants |
+## Target Architecture From The Proposal
 
-## Core Concepts
+```mermaid
+graph TD
+    A[Incoming traffic] --> B[Transparent defense gateway]
+    B --> C[Hybrid heuristic and ML analysis]
+    C --> D{Traffic decision}
+    D -->|Normal| E[Real application]
+    D -->|Suspicious| F[Isolated adaptive decoy]
+    F --> G[Honeytokens and interaction capture]
+    E --> H[Threat intelligence database]
+    G --> H
+    H --> I[WebSocket dashboard and incident response]
+```
 
-- **AI Risk Scoring** — Evaluates incoming requests for anomaly indicators
-- **Anomaly Detection** — Identifies patterns that deviate from normal traffic
-- **Threat Fingerprinting** — Records behavioral signatures from trapped attackers
-- **Decoy Environment** — Isolated sandbox mimicking production systems
-- **Fake Endpoint** — Simulated API routes returning fabricated data
-- **Fake Credential** — Honeytoken credentials that trigger alerts when used
-- **Fake Response** — Realistic but fabricated API responses
-- **Activity Logger** — Records all attacker interactions within decoy
-- **Security Dashboard** — Real-time visualization of threats and system status
-- **Incident Response** — Automated alerting and containment workflows
+See `docs/PROPOSAL_ALIGNMENT.md` for the exact implementation gap.
