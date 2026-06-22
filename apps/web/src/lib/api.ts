@@ -162,6 +162,14 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
+async function simulationFetch<T>(kind: "normal" | "suspicious"): Promise<T> {
+  const res = await fetch(`/api/simulate/${kind}`, { method: "POST" });
+  if (!res.ok) {
+    throw new Error(`Simulation error: ${res.status} ${res.statusText}`);
+  }
+  return res.json();
+}
+
 /** Fetch dashboard overview metrics. */
 export async function fetchOverview(): Promise<OverviewMetrics> {
   const data = await apiFetch<BackendOverview>("/dashboard/overview");
@@ -190,9 +198,7 @@ export async function fetchAlerts(): Promise<FeedAlert[]> {
 
 /** Simulate a normal (low-risk) request. */
 export async function simulateNormal(): Promise<SimulationResult> {
-  const data = await apiFetch<BackendSimulationResult>("/simulate/normal", {
-    method: "POST",
-  });
+  const data = await simulationFetch<BackendSimulationResult>("normal");
   return {
     requestId: data.request_id,
     riskScore: data.risk_score,
@@ -206,9 +212,7 @@ export async function simulateNormal(): Promise<SimulationResult> {
 
 /** Simulate a suspicious (high-risk) request. */
 export async function simulateSuspicious(): Promise<SimulationResult> {
-  const data = await apiFetch<BackendSimulationResult>("/simulate/suspicious", {
-    method: "POST",
-  });
+  const data = await simulationFetch<BackendSimulationResult>("suspicious");
   return {
     requestId: data.request_id,
     riskScore: data.risk_score,
