@@ -4,15 +4,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import Header from "@/components/layout/Header";
 import VideoBackground from "@/components/landing/VideoBackground";
-import { 
-  Brain, 
-  Layers, 
-  KeyRound, 
-  LineChart, 
-  Terminal, 
-  ShieldCheck,
-  Activity
-} from "lucide-react";
+import { Brain, Layers, KeyRound, LineChart, Terminal } from "lucide-react";
 import Link from "next/link";
 
 export default function FeaturesPage() {
