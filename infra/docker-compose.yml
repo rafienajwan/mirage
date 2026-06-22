@@ -22,8 +22,17 @@ services:
       MIRAGE_API_KEY: ${MIRAGE_API_KEY:-}
       RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-120}
       RISK_THRESHOLD: ${RISK_THRESHOLD:-60}
+      ANOMALY_REDIRECT_CONFIDENCE: ${ANOMALY_REDIRECT_CONFIDENCE:-0.5}
+      REAL_APP_URL: http://real-app:8001
+      DECOY_SERVICE_URL: http://decoy:8002
+      PROXY_TIMEOUT_SECONDS: ${PROXY_TIMEOUT_SECONDS:-10}
+      PROXY_MAX_BODY_BYTES: ${PROXY_MAX_BODY_BYTES:-1048576}
     depends_on:
       db:
+        condition: service_healthy
+      real-app:
+        condition: service_healthy
+      decoy:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
@@ -41,6 +50,24 @@ services:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  real-app:
+    build:
+      context: ../apps/real-app-demo
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  decoy:
+    build:
+      context: ../apps/decoy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
       interval: 5s
       timeout: 3s
       retries: 10
