@@ -43,7 +43,7 @@ export default function FeaturesPage() {
             </h1>
             <div className="h-[2px] w-24 scan-line" />
             <p className="text-xs sm:text-sm text-white/50 max-w-xl mt-4 leading-relaxed">
-              MIRAGE menggeser postur pertahanan dari firewall pasif ke kampanye penyesatan aktif, menjebak penyerang dalam infrastruktur tiruan.
+              MIRAGE shifts your security posture from passive firewalls to active deception campaigns, detaining attackers inside synthetic environments.
             </p>
           </motion.div>
 
@@ -65,7 +65,7 @@ export default function FeaturesPage() {
                 AI Risk Scoring
               </h3>
               <p className="text-[11px] sm:text-xs text-white/50 leading-relaxed">
-                Menganalisis header, parameter, dan muatan request secara real-time. Detektor anomali langsung mendeteksi pola exploit zero-day.
+                Analyzes request headers, parameters, and body payloads in real-time. The anomaly detector instantly identifies zero-day exploit patterns.
               </p>
             </motion.div>
 
@@ -86,7 +86,7 @@ export default function FeaturesPage() {
                 Dynamic Decoys
               </h3>
               <p className="text-[11px] sm:text-xs text-white/50 leading-relaxed">
-                Pengalihan otomatis request mencurigakan ke decoy sandbox tiruan. Penyerang tertahan pada database dan API palsu tanpa sadar.
+                Automatically redirects suspicious requests to a sandbox decoy environment. Attackers spend resources on fake databases and mock APIs without knowing.
               </p>
             </motion.div>
 
@@ -107,7 +107,7 @@ export default function FeaturesPage() {
                 Canary Honeytokens
               </h3>
               <p className="text-[11px] sm:text-xs text-white/50 leading-relaxed">
-                Menyisipkan file kredensial tiruan (e.g. AWS tokens). Peringatan terpicu secara instan saat kredensial tersebut dieksfiltrasi dan dicoba.
+                Injects mock credential files (e.g., false AWS tokens). Immediate alerts trigger the moment these honeytokens are exfiltrated and tested.
               </p>
             </motion.div>
 
@@ -128,7 +128,7 @@ export default function FeaturesPage() {
                 SOC Analytics Dashboard
               </h3>
               <p className="text-[11px] sm:text-xs text-white/50 leading-relaxed">
-                Dasbor real-time dengan metrik komprehensif, sidik jari ancaman, serta notifikasi instan untuk mempercepat koordinasi tim sekuriti.
+                Real-time dashboard with comprehensive metrics, attacker fingerprints, and immediate security alerts to accelerate threat mitigation.
               </p>
             </motion.div>
           </div>
@@ -150,7 +150,7 @@ export default function FeaturesPage() {
             </h2>
             <div className="h-[2px] w-24 scan-line" />
             <p className="text-xs sm:text-sm text-white/50 max-w-xl mt-4">
-              Jalankan simulasi serangan langsung dari dasbor kontrol untuk mengamati siklus deteksi, isolasi, dan perekaman data forensik.
+              Trigger simulated attacks directly from the control panel to observe the full cycle of threat detection, decoy containment, and forensic analysis.
             </p>
           </motion.div>
 
@@ -166,7 +166,7 @@ export default function FeaturesPage() {
                 <span className="font-mono text-2xl font-bold text-white/10 mb-2 block">01</span>
                 <h4 className="font-display font-bold text-[10px] sm:text-xs uppercase text-white mb-2">Traffic Entry</h4>
                 <p className="text-[11px] text-white/40 leading-relaxed">
-                  Klien mengirimkan request API normal. AI melakukan inspeksi dan memperbolehkannya masuk ke Core App (Risiko Rendah).
+                  The client sends a normal API request. The AI inspects the metadata and allows it through to the production database (Low Risk).
                 </p>
               </div>
               <div className="text-[9px] font-mono text-brand-emerald bg-brand-emerald/5 border border-brand-emerald/10 px-2 py-0.5 rounded self-start mt-4 uppercase">
@@ -185,7 +185,7 @@ export default function FeaturesPage() {
                 <span className="font-mono text-2xl font-bold text-white/10 mb-2 block">02</span>
                 <h4 className="font-display font-bold text-[10px] sm:text-xs uppercase text-white mb-2">Anomaly Detected</h4>
                 <p className="text-[11px] text-white/40 leading-relaxed">
-                  Request mencurigakan (seperti SQL Injection) terdeteksi. AI secara instan meningkatkan skor risiko ke kritis.
+                  A suspicious request (e.g., SQL Injection) is detected. The AI engine immediately flags the request and escalates the risk score to critical.
                 </p>
               </div>
               <div className="text-[9px] font-mono text-red-400 bg-red-400/5 border border-red-400/10 px-2 py-0.5 rounded self-start mt-4 uppercase">
@@ -204,7 +204,7 @@ export default function FeaturesPage() {
                 <span className="font-mono text-2xl font-bold text-white/10 mb-2 block">03</span>
                 <h4 className="font-display font-bold text-[10px] sm:text-xs uppercase text-white mb-2">Active Decoy</h4>
                 <p className="text-[11px] text-white/40 leading-relaxed">
-                  Lalu lintas dialihkan ke Decoy Sandbox secara transparan. Penyerang berinteraksi dengan API & DB tiruan.
+                  The connection is transparently redirected to the decoy sandbox. The attacker interacts with mock endpoints, believing they bypassed security.
                 </p>
               </div>
               <div className="text-[9px] font-mono text-brand-cyan bg-brand-cyan/5 border border-brand-cyan/10 px-2 py-0.5 rounded self-start mt-4 uppercase">
@@ -223,7 +223,7 @@ export default function FeaturesPage() {
                 <span className="font-mono text-2xl font-bold text-white/10 mb-2 block">04</span>
                 <h4 className="font-display font-bold text-[10px] sm:text-xs uppercase text-white mb-2">SOC Intelligence</h4>
                 <p className="text-[11px] text-white/40 leading-relaxed">
-                  Perilaku penyerang direkam, token madu aktif, dan alarm dasbor berbunyi memberikan visualisasi interaktif.
+                  Attacker fingerprints are stored, decoy keys are exfiltrated, and interactive SOC dashboard logs trigger real-time alerts.
                 </p>
               </div>
               <div className="text-[9px] font-mono text-amber-400 bg-amber-400/5 border border-amber-400/10 px-2 py-0.5 rounded self-start mt-4 uppercase">
@@ -242,7 +242,7 @@ export default function FeaturesPage() {
               href="/dashboard"
               className="px-6 py-2.5 rounded border border-brand-cyan/20 hover:border-brand-cyan/40 bg-brand-cyan/5 text-brand-cyan hover:text-white font-display text-[10px] tracking-widest uppercase transition-colors"
             >
-              Mulai Simulasi Sekarang
+              Start Simulation Now
             </Link>
           </motion.div>
         </section>
