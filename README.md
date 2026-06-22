@@ -14,6 +14,17 @@ Project MIRAGE is an autonomous cybersecurity defense platform that secures mode
 
 ---
 
+## Implementation Status
+
+As of 2026-06-22, this repository is a local MVP rather than the complete target
+platform described in the proposal. It provides request metadata inspection,
+heuristic scoring, safe decoy templates, persistent logging, dashboard polling,
+ML-ready feature storage, and an offline Random Forest training pipeline.
+
+Transparent proxy routing, a deployed ML artifact, isolated adaptive decoys,
+honeytoken-use tracking, WebSocket updates, and cloud deployment remain planned.
+See `docs/PROPOSAL_ALIGNMENT.md` for the detailed comparison.
+
 ## Technical Overview
 
 ### The Problem: Passive Firewalls & Alert Fatigue

@@ -1,59 +1,12 @@
-# Project MIRAGE — Demo Flow
+# Project MIRAGE - Current Demo Flow
 
-## Demonstration Scenario
+1. Start the FastAPI gateway and Next.js dashboard.
+2. Trigger normal or suspicious traffic from the dashboard simulation panel.
+3. The gateway extracts a numeric feature vector and calculates heuristic risk.
+4. The decision engine returns `allow`, `monitor`, or `redirect_to_decoy`.
+5. The event, decision, alert, and feature vector are persisted.
+6. The dashboard refreshes metrics, charts, alerts, and decoy status every 10 seconds.
 
-This document describes the planned demonstration flow for Project MIRAGE.
-
-### Step 1: Normal Traffic
-
-A legitimate user sends a standard API request:
-
-```
-GET /api/v1/users
-User-Agent: NormalBrowser
-```
-
-**Expected result**: The AI Risk Scorer evaluates the request as normal (score < 60). The request is routed to the production application and returns real data.
-
-### Step 2: Suspicious Request
-
-An attacker sends a request with suspicious parameters:
-
-```
-GET /api/v1/users?id=suspicious-parameter
-User-Agent: UnknownScript
-```
-
-**Expected result**: The AI Risk Scorer flags the request as suspicious (score >= 60). The request is transparently redirected to the Decoy Environment.
-
-### Step 3: Decoy Engagement
-
-The attacker interacts with the decoy environment:
-
-- Accesses fake endpoints returning fabricated data
-- Discovers fake credentials (honeytokens)
-- Attempts to access restricted files (e.g., `.env`)
-
-**Expected result**: All interactions are logged by the Activity Logger. The attacker believes they are in the real system.
-
-### Step 4: Dashboard Visualization
-
-The Security Dashboard displays:
-
-- A spike in the anomaly chart
-- New entries in the threat activity feed
-- Decoy environment status changes
-- Alert notifications with severity labels
-
-### Step 5: Incident Response
-
-The platform generates:
-
-- Threat fingerprint records
-- Behavioral analysis summary
-- Attacker IP and source information
-- Automated alert notifications
-
-## Mock Data
-
-The current frontend uses safe, simulated mock data defined in `apps/web/src/lib/mock-data.ts`. No real exploits, credentials, or offensive payloads are included.
+The demo does not currently proxy requests to a real application or an isolated
+decoy container. Decoy responses are safe in-process templates, and the ML
+trainer is offline until a reviewed labeled dataset is available.
