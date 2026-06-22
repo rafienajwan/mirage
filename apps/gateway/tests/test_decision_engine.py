@@ -19,6 +19,17 @@ def test_monitor_medium_risk():
     assert decision == Decision.MONITOR
 
 
+def test_redirect_medium_risk_with_multiple_anomaly_signals():
+    risk = RiskResult(score=40.0, level=RiskLevel.MEDIUM, reasons=["Suspicious"])
+    decision = make_decision(
+        risk,
+        fingerprint_hash="abc123",
+        is_anomalous=True,
+        anomaly_confidence=0.5,
+    )
+    assert decision == Decision.REDIRECT_TO_DECOY
+
+
 def test_redirect_high_risk():
     risk = RiskResult(score=70.0, level=RiskLevel.HIGH, reasons=["Suspicious"])
     decision = make_decision(risk, fingerprint_hash="abc123", is_anomalous=True)

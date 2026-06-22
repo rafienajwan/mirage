@@ -2,19 +2,11 @@
 
 from __future__ import annotations
 
-import uuid
-
 from fastapi import APIRouter, Depends
 
 from app.schemas.request import InspectRequest
-from app.schemas.decision import Decision, InspectResponse
-from app.services.anomaly_engine import anomaly_detector
-from app.services.decision_engine import make_decision
-from app.services.fingerprint import generate_fingerprint
-from app.services.logger import log_inspection
-from app.services.risk_engine import calculate_risk
-from app.services.decoy_engine import _infer_decoy_type
-from app.services.feature_extraction import extract_features
+from app.schemas.decision import InspectResponse
+from app.services.inspection import inspect_and_log
 from app.core.security import require_api_key
 
 router = APIRouter(prefix="/simulate", tags=["simulate"])
@@ -22,39 +14,7 @@ router = APIRouter(prefix="/simulate", tags=["simulate"])
 
 async def _process_simulation(request: InspectRequest) -> InspectResponse:
     """Shared logic for processing a simulated request."""
-    fingerprint_hash = generate_fingerprint(
-        ip_address=request.ip_address,
-        user_agent=request.user_agent,
-        path=request.path,
-        payload_indicators=request.payload_indicators,
-    )
-    feature_vector = extract_features(request)
-    risk = calculate_risk(request)
-    anomaly = anomaly_detector.detect(request)
-    if anomaly.signals:
-        risk.reasons.extend([f"Anomaly: {s}" for s in anomaly.signals])
-
-    decision = make_decision(
-        risk=risk,
-        fingerprint_hash=fingerprint_hash,
-        is_anomalous=anomaly.is_anomalous,
-        anomaly_confidence=anomaly.confidence,
-    )
-    await log_inspection(request, risk.score, decision, feature_vector)
-
-    decoy_type = None
-    if decision == Decision.REDIRECT_TO_DECOY:
-        decoy_type = _infer_decoy_type(request.path)
-
-    return InspectResponse(
-        request_id=str(uuid.uuid4())[:8],
-        risk_score=risk.score,
-        risk_level=risk.level,
-        decision=decision,
-        reasons=risk.reasons,
-        fingerprint_hash=fingerprint_hash,
-        decoy_type=decoy_type,
-    )
+    return await inspect_and_log(request, event_type="simulation")
 
 
 @router.post(

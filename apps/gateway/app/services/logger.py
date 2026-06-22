@@ -25,6 +25,8 @@ async def log_inspection(
     risk_score: float,
     decision: Decision,
     feature_vector: dict[str, float] | None = None,
+    *,
+    event_type: str = "inspection",
 ) -> EventRecord:
     """Log an inspection event and create an alert if needed."""
     event = EventRecord(
@@ -35,7 +37,7 @@ async def log_inspection(
         method=request.method,
         risk_score=risk_score,
         decision=decision,
-        event_type="inspection",
+        event_type=event_type,
         feature_vector=feature_vector or {},
         summary=f"{request.method} {request.path} → {decision.value} (score: {risk_score})",
     )
