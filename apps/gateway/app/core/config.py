@@ -59,6 +59,26 @@ class Settings:
     proxy_max_body_bytes: int = field(
         default_factory=lambda: int(os.getenv("PROXY_MAX_BODY_BYTES", "1048576"))
     )
+    decoy_login_token: str = field(
+        default_factory=lambda: os.getenv(
+            "DECOY_LOGIN_TOKEN", "DECOY_LOGIN_TOKEN_NOT_CONFIGURED"
+        )
+    )
+    decoy_oauth_token: str = field(
+        default_factory=lambda: os.getenv(
+            "DECOY_OAUTH_TOKEN", "DECOY_OAUTH_TOKEN_NOT_CONFIGURED"
+        )
+    )
+    decoy_service_token: str = field(
+        default_factory=lambda: os.getenv(
+            "DECOY_SERVICE_TOKEN", "DECOY_SERVICE_TOKEN_NOT_CONFIGURED"
+        )
+    )
+    decoy_database_url: str = field(
+        default_factory=lambda: os.getenv(
+            "DECOY_DATABASE_URL", "postgresql://db:5432/decoy"
+        )
+    )
 
 
 settings = Settings()
