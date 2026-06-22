@@ -40,7 +40,7 @@ export default function RiskScoreWidget({ score, history }: RiskScoreWidgetProps
   const offset = circumference - (score / 100) * circumference;
 
   // Map risk history to chart format
-  const chartData = history.map((h, i) => ({
+  const chartData = history.map((h) => ({
     time: new Date(h.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     score: h.riskScore,
   }));

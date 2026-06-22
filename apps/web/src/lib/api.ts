@@ -111,7 +111,7 @@ function mapDecision(decision: string): ThreatStatus {
     case "monitor":
       return "alert";
     case "allow":
-      return "contained";
+      return "allowed";
     default:
       return "alert";
   }

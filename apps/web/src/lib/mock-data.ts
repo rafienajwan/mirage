@@ -5,7 +5,7 @@
 
 // ─── Threat activity feed types ────────────────────────────────
 export type ThreatSeverity = "low" | "medium" | "high" | "critical";
-export type ThreatStatus = "redirected" | "decoy_active" | "contained" | "alert";
+export type ThreatStatus = "allowed" | "redirected" | "decoy_active" | "contained" | "alert";
 
 // ─── Alerts panel types ────────────────────────────────────────
 export type AlertSeverity = "info" | "warning" | "critical";
