@@ -18,10 +18,11 @@ Project MIRAGE is an autonomous cybersecurity defense platform that secures mode
 
 As of 2026-06-22, this repository is a local MVP rather than the complete target
 platform described in the proposal. It provides request metadata inspection,
-heuristic scoring, safe decoy templates, persistent logging, dashboard polling,
-ML-ready feature storage, and an offline Random Forest training pipeline.
+heuristic scoring, a guarded reverse-proxy route, isolated real and static decoy
+services, persistent logging, dashboard polling, ML-ready feature storage, and
+an offline Random Forest training pipeline.
 
-Transparent proxy routing, a deployed ML artifact, isolated adaptive decoys,
+Arbitrary ingress proxying, a deployed ML artifact, adaptive decoys,
 honeytoken-use tracking, WebSocket updates, and cloud deployment remain planned.
 See `docs/PROPOSAL_ALIGNMENT.md` for the detailed comparison.
 
@@ -71,10 +72,10 @@ graph TD
     A[User / Attacker] --> B[API Gateway / Proxy]
     B --> C{AI Risk & Anomaly Analyzer}
     
-    C -- "Normal Traffic (Score < 0.65)" --> D[Production Core App]
+    C -- "Allowed or monitored" --> D[Demo Core App]
     D --> E[(Production PostgreSQL Database)]
     
-    C -- "Suspicious Traffic (Score >= 0.65)" --> F[MIRAGE Decoy Sandbox]
+    C -- "Redirect to decoy" --> F[MIRAGE Decoy Service]
     F --> G[Fake API Endpoint Templates]
     F --> H[Fake Database / Seed Data]
     F --> I[Honeytoken Canary Keys]
@@ -179,8 +180,11 @@ python -m venv venv
 venv\Scripts\activate
 # Linux/Mac: source venv/bin/activate
 
-pip install -r requirements.txt
-cp .env.example .env
+python -m pip install -e ".[dev,ml,postgres]"
+# Windows: Copy-Item .env.example .env
+# Linux/macOS: cp .env.example .env
+# Fill MIRAGE_API_KEY and the DECOY_* values in apps/gateway/.env.
+python -m alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 API docs: [http://localhost:8000/docs](http://localhost:8000/docs)
@@ -192,6 +196,23 @@ npm install
 npm run dev
 ```
 Frontend: [http://localhost:3000](http://localhost:3000)
+
+### 4. Run the Full Docker Stack
+
+Copy the root template and fill every variable marked `REQUIRED`. The
+`POSTGRES_PASSWORD` value must be URL-safe and must match the password embedded
+in `DATABASE_URL`. Decoy variables must contain synthetic values only; never put
+credentials from a real system in them.
+
+```bash
+# Windows: Copy-Item .env.example .env
+# Linux/macOS: cp .env.example .env
+
+docker compose --env-file .env -f infra/docker-compose.yml up --build
+```
+
+The root `.env` is ignored by Git. Share configuration names through
+`.env.example`, never by committing `.env`.
 
 ---
 

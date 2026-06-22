@@ -1,0 +1,1 @@
+"""Protected demo application package."""

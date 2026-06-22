@@ -6,6 +6,7 @@ tokens, or secrets are ever generated.
 
 from __future__ import annotations
 
+from app.core.config import settings
 from app.schemas.dashboard import DecoyResponse
 
 
@@ -14,7 +15,7 @@ from app.schemas.dashboard import DecoyResponse
 _FAKE_LOGIN = {
     "status": "success",
     "user": {"id": 9999, "email": "fake_user_demo_only@mirage-decoy.io", "role": "admin"},
-    "token": "mirage_demo_token_not_real_abc123",
+    "token": settings.decoy_login_token,
     "expires_in": 3600,
 }
 
@@ -29,14 +30,14 @@ _FAKE_ADMIN = {
 
 _FAKE_CONFIG = {
     "app_name": "mirage_decoy_app",
-    "database_url": "postgresql://decoy_demo:decoy_demo@localhost:5432/mirage_decoy",
-    "secret_key": "decoy_config_demo_only_not_real",
+    "database_url": settings.decoy_database_url,
+    "secret_key": settings.decoy_service_token,
     "debug": True,
     "note": "This is a MIRAGE decoy configuration — no real secrets are present.",
 }
 
 _FAKE_TOKEN = {
-    "access_token": "mirage_demo_token_not_real_xyz789",
+    "access_token": settings.decoy_oauth_token,
     "token_type": "bearer",
     "scope": "read write admin",
     "note": "This token is a MIRAGE demo value and cannot be used anywhere.",

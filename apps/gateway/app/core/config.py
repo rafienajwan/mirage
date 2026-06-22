@@ -31,6 +31,9 @@ class Settings:
     risk_threshold: float = field(
         default_factory=lambda: float(os.getenv("RISK_THRESHOLD", "60"))
     )
+    anomaly_redirect_confidence: float = field(
+        default_factory=lambda: float(os.getenv("ANOMALY_REDIRECT_CONFIDENCE", "0.5"))
+    )
     database_url: str = field(
         default_factory=lambda: os.getenv(
             "DATABASE_URL", "sqlite+aiosqlite:///./mirage.db"
@@ -43,6 +46,38 @@ class Settings:
     )
     rate_limit_per_minute: int = field(
         default_factory=lambda: int(os.getenv("RATE_LIMIT_PER_MINUTE", "120"))
+    )
+    real_app_url: str = field(
+        default_factory=lambda: os.getenv("REAL_APP_URL", "http://localhost:8001")
+    )
+    decoy_service_url: str = field(
+        default_factory=lambda: os.getenv("DECOY_SERVICE_URL", "http://localhost:8002")
+    )
+    proxy_timeout_seconds: float = field(
+        default_factory=lambda: float(os.getenv("PROXY_TIMEOUT_SECONDS", "10"))
+    )
+    proxy_max_body_bytes: int = field(
+        default_factory=lambda: int(os.getenv("PROXY_MAX_BODY_BYTES", "1048576"))
+    )
+    decoy_login_token: str = field(
+        default_factory=lambda: os.getenv(
+            "DECOY_LOGIN_TOKEN", "DECOY_LOGIN_TOKEN_NOT_CONFIGURED"
+        )
+    )
+    decoy_oauth_token: str = field(
+        default_factory=lambda: os.getenv(
+            "DECOY_OAUTH_TOKEN", "DECOY_OAUTH_TOKEN_NOT_CONFIGURED"
+        )
+    )
+    decoy_service_token: str = field(
+        default_factory=lambda: os.getenv(
+            "DECOY_SERVICE_TOKEN", "DECOY_SERVICE_TOKEN_NOT_CONFIGURED"
+        )
+    )
+    decoy_database_url: str = field(
+        default_factory=lambda: os.getenv(
+            "DECOY_DATABASE_URL", "postgresql://db:5432/decoy"
+        )
     )
 
 
