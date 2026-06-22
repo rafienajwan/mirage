@@ -3,11 +3,12 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, Menu, X, LayoutDashboard } from "lucide-react";
+import Link from "next/link";
 
 const NAV_ITEMS = [
-  { name: "Overview", href: "#overview" },
-  { name: "Features", href: "#features" },
-  { name: "Demo", href: "#demo" },
+  { name: "Overview", href: "/" },
+  { name: "Features", href: "/features" },
+  { name: "Demo", href: "/features#demo" },
   { name: "Dashboard", href: "/dashboard" },
 ];
 
@@ -16,11 +17,11 @@ export default function Header() {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   return (
-    <header className="sticky top-0 w-full z-50 border-b border-white/5 bg-[#060816]/65 backdrop-blur-md">
+    <header className="fixed top-0 left-0 w-full z-50 border-b border-white/5 bg-[#060816]/65 backdrop-blur-md">
       <div className="max-w-[1400px] mx-auto px-6 h-20 flex items-center justify-between">
 
         {/* Logo */}
-        <a href="#" className="flex items-center space-x-3 group z-50">
+        <Link href="/" className="flex items-center space-x-3 group z-50">
           <div className="relative flex items-center justify-center w-10 h-10 rounded-lg border border-brand-cyan/20 bg-brand-cyan/5 overflow-hidden">
             {/* Pulsing neon center */}
             <div className="absolute inset-0 bg-brand-cyan/10 animate-pulse" />
@@ -33,12 +34,12 @@ export default function Header() {
             Project MIRAGE
             <span className="text-brand-emerald ml-0.5 animate-pulse">_</span>
           </span>
-        </a>
+        </Link>
 
         {/* Desktop Navigation */}
         <nav className="hidden lg:flex items-center space-x-1 lg:space-x-3">
           {NAV_ITEMS.map((item, idx) => (
-            <a
+            <Link
               key={item.name}
               href={item.href}
               className="relative px-4 py-2 font-display text-[10px] font-normal tracking-[0.2em] text-white/50 hover:text-brand-cyan transition-colors duration-300"
@@ -56,19 +57,19 @@ export default function Header() {
                   transition={{ type: "spring", stiffness: 350, damping: 30 }}
                 />
               )}
-            </a>
+            </Link>
           ))}
         </nav>
 
         {/* CTA Button */}
         <div className="hidden lg:flex items-center space-x-4">
-          <a
+          <Link
             href="/dashboard"
             className="flex items-center space-x-1.5 font-display text-[10px] tracking-widest text-brand-cyan hover:text-white transition-colors border border-brand-cyan/20 hover:border-brand-cyan/40 bg-brand-cyan/5 px-3 py-1.5 rounded"
           >
             <LayoutDashboard className="w-3.5 h-3.5" />
             <span>OPEN DASHBOARD</span>
-          </a>
+          </Link>
         </div>
 
         {/* Mobile Hamburger Button */}
@@ -104,14 +105,14 @@ export default function Header() {
                   transition={{ delay: idx * 0.05 }}
                   key={item.name}
                 >
-                  <a
+                  <Link
                     href={item.href}
                     onClick={() => setIsOpen(false)}
                     className="group relative block font-display text-lg tracking-widest text-white/80 hover:text-brand-cyan transition-colors py-2"
                   >
                     {item.name}
                     <span className="block max-w-0 group-hover:max-w-full transition-all duration-300 h-[2px] bg-gradient-to-r from-brand-cyan to-brand-emerald mx-auto mt-1" />
-                  </a>
+                  </Link>
                 </motion.div>
               ))}
             </div>
@@ -122,13 +123,13 @@ export default function Header() {
               transition={{ delay: 0.3 }}
               className="mt-16 w-full max-w-xs flex flex-col space-y-4"
             >
-              <a
+              <Link
                 href="/dashboard"
                 onClick={() => setIsOpen(false)}
-                className="font-display text-sm tracking-widest text-brand-cyan border border-brand-cyan/20 bg-brand-cyan/5 px-6 py-2.5 rounded-lg"
+                className="font-display text-sm tracking-widest text-brand-cyan border border-brand-cyan/20 bg-brand-cyan/5 px-6 py-2.5 rounded-lg text-center"
               >
                 Open Dashboard
-              </a>
+              </Link>
             </motion.div>
           </motion.div>
         )}
