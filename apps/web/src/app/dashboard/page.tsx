@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import Header from "@/components/layout/Header";
 import MetricCard from "@/components/ui/MetricCard";
@@ -10,13 +10,76 @@ import AlertPanel from "@/components/dashboard/AlertPanel";
 import SimulationPanel from "@/components/dashboard/SimulationPanel";
 import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus } from "@/lib/api";
 import type { OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData } from "@/lib/api";
-import { Globe, ShieldAlert, ArrowRightLeft, Bell, Loader2, WifiOff } from "lucide-react";
+import { Globe, ShieldAlert, ArrowRightLeft, Bell, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 // Charts use Recharts ResponsiveContainer — must be client-only to avoid SSR dimension warnings
 const TrafficChart = dynamic(() => import("@/components/dashboard/TrafficChart"), { ssr: false });
 const RiskScoreWidget = dynamic(() => import("@/components/dashboard/RiskScoreWidget"), { ssr: false });
 
 const POLL_INTERVAL = 10_000; // 10 seconds
+
+/**
+ * Web Audio API synthesizer for low-latency cyberpunk alerts without external assets.
+ */
+function playAlertSound(severity: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    
+    // Create nodes
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    if (severity === "critical") {
+      // Pulsing siren alarm
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(800, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(350, ctx.currentTime + 0.35);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+      
+      osc.start();
+      osc.stop(ctx.currentTime + 0.4);
+    } else if (severity === "high") {
+      // High double chirp
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(650, ctx.currentTime);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.setValueAtTime(0.001, ctx.currentTime + 0.08);
+      
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.type = "sine";
+      osc2.frequency.setValueAtTime(650, ctx.currentTime + 0.12);
+      gain2.gain.setValueAtTime(0.08, ctx.currentTime + 0.12);
+      gain2.gain.setValueAtTime(0.001, ctx.currentTime + 0.2);
+      
+      osc.start();
+      osc.stop(ctx.currentTime + 0.08);
+      osc2.start(ctx.currentTime + 0.12);
+      osc2.stop(ctx.currentTime + 0.2);
+    } else {
+      // Soft ping
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(520, ctx.currentTime);
+      gain.gain.setValueAtTime(0.04, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      
+      osc.start();
+      osc.stop(ctx.currentTime + 0.15);
+    }
+  } catch (e) {
+    console.warn("Failed to play audio alert:", e);
+  }
+}
 
 export default function DashboardPage() {
   const [overview, setOverview] = useState<OverviewMetrics | null>(null);
@@ -27,6 +90,54 @@ export default function DashboardPage() {
   const [decoyStatus, setDecoyStatus] = useState<DecoyStatusData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Toast notifications & audio toggle
+  const [toasts, setToasts] = useState<Array<{ id: string; title: string; description: string; severity: string; timestamp: string }>>([]);
+  const [soundEnabled, setSoundEnabled] = useState(false);
+  const soundEnabledRef = useRef(false);
+  const prevAlertIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    soundEnabledRef.current = soundEnabled;
+  }, [soundEnabled]);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const handleAlertsUpdate = useCallback((newAlerts: FeedAlert[]) => {
+    // Only alert for events triggered AFTER mount
+    if (prevAlertIdsRef.current.size > 0) {
+      const newItems = newAlerts.filter((a) => !prevAlertIdsRef.current.has(a.id));
+      newItems.forEach((alert) => {
+        const toastId = `${alert.id}-${Date.now()}`;
+        setToasts((prev) => [
+          {
+            id: toastId,
+            title: alert.ruleName || "Threat Event Triggered",
+            description: alert.description || `Anomaly score of ${alert.riskScore} detected.`,
+            severity: alert.severity || "medium",
+            timestamp: alert.timestamp,
+          },
+          ...prev,
+        ].slice(0, 5));
+
+        // Auto remove toast after 6s
+        setTimeout(() => {
+          removeToast(toastId);
+        }, 6000);
+
+        // Play synth alert sound
+        if (soundEnabledRef.current && (alert.severity === "critical" || alert.severity === "high")) {
+          playAlertSound(alert.severity);
+        }
+      });
+    }
+
+    const ids = new Set(newAlerts.map((a) => a.id));
+    prevAlertIdsRef.current = ids;
+    setAlerts(newAlerts);
+  }, [removeToast]);
 
   const load = useCallback(async () => {
     try {
@@ -40,7 +151,7 @@ export default function DashboardPage() {
       ]);
       setOverview(ov);
       setEvents(ev);
-      setAlerts(al);
+      handleAlertsUpdate(al);
       setTraffic(tr);
       setRiskHistory(rh);
       setDecoyStatus(ds);
@@ -50,7 +161,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [handleAlertsUpdate]);
 
   // Fetch on mount + poll every POLL_INTERVAL ms
   useEffect(() => {
@@ -66,7 +177,7 @@ export default function DashboardPage() {
         ]);
         setOverview(ov);
         setEvents(ev);
-        setAlerts(al);
+        handleAlertsUpdate(al);
         setTraffic(tr);
         setRiskHistory(rh);
         setDecoyStatus(ds);
@@ -81,21 +192,45 @@ export default function DashboardPage() {
     refresh();
     const interval = setInterval(refresh, POLL_INTERVAL);
     return () => clearInterval(interval);
-  }, []);
+  }, [handleAlertsUpdate]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#060816] text-white">
+    <div className="min-h-screen flex flex-col bg-[#060816] text-white relative">
       <Header />
 
       <main className="flex-1 w-full max-w-[1400px] mx-auto px-6 pt-28 pb-8 lg:pt-32 lg:pb-12">
         {/* Page title */}
-        <div className="mb-8">
-          <h1 className="font-display text-2xl lg:text-3xl font-bold tracking-tight text-white">
-            Security Dashboard
-          </h1>
-          <p className="text-sm text-white/40 mt-1">
-            Real-time overview of API security, decoy environments, and threat activity.
-          </p>
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="font-display text-2xl lg:text-3xl font-bold tracking-tight text-white">
+              Security Dashboard
+            </h1>
+            <p className="text-sm text-white/40 mt-1">
+              Real-time overview of API security, decoy environments, and threat activity.
+            </p>
+          </div>
+          
+          {/* Cyberpunk Audio Toggle */}
+          <button
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className={`flex items-center gap-2 px-4 py-2 rounded border text-[10px] font-mono tracking-widest transition-all duration-300 hover:scale-[1.01] ${
+              soundEnabled
+                ? "bg-brand-cyan/10 border-brand-cyan/40 text-brand-cyan shadow-[0_0_15px_rgba(0,240,255,0.2)]"
+                : "bg-white/[0.02] border-white/5 text-white/40 hover:text-white/60 hover:border-white/10"
+            }`}
+          >
+            {soundEnabled ? (
+              <>
+                <Volume2 className="w-3.5 h-3.5 animate-pulse" />
+                <span>ALARM AUDIO: ACTIVE</span>
+              </>
+            ) : (
+              <>
+                <VolumeX className="w-3.5 h-3.5" />
+                <span>ALARM AUDIO: MUTED</span>
+              </>
+            )}
+          </button>
         </div>
 
         {/* Error banner */}
@@ -180,6 +315,67 @@ export default function DashboardPage() {
           <AlertPanel alerts={alerts} />
         </div>
       </main>
+
+      {/* Toast Notification Container */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none">
+        <AnimatePresence>
+          {toasts.map((toast) => (
+            <motion.div
+              key={toast.id}
+              initial={{ opacity: 0, y: 30, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.85, transition: { duration: 0.2 } }}
+              className="pointer-events-auto w-full p-4 rounded-xl border border-white/10 bg-[#060816]/95 backdrop-blur-xl shadow-2xl flex items-start gap-3 relative overflow-hidden"
+              style={{
+                boxShadow: "0 10px 40px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.05)"
+              }}
+            >
+              {/* Severity Accent Bar */}
+              <div 
+                className="absolute top-0 left-0 bottom-0 w-1"
+                style={{
+                  backgroundColor: toast.severity === "critical" ? "#ef4444" : toast.severity === "high" ? "#f97316" : "#f59e0b"
+                }}
+              />
+              
+              <div className="flex-shrink-0 mt-0.5">
+                <Bell className="w-3.5 h-3.5 text-white/50 animate-bounce" />
+              </div>
+              
+              <div className="flex-1 min-w-0 pl-1">
+                <div className="flex items-center justify-between mb-1">
+                  <span 
+                    className="text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded"
+                    style={{
+                      color: toast.severity === "critical" ? "#ef4444" : toast.severity === "high" ? "#f97316" : "#f59e0b",
+                      backgroundColor: toast.severity === "critical" ? "rgba(239, 68, 68, 0.1)" : toast.severity === "high" ? "rgba(249, 115, 22, 0.1)" : "rgba(245, 158, 11, 0.1)",
+                      border: `1px solid ${toast.severity === "critical" ? "rgba(239, 68, 68, 0.2)" : toast.severity === "high" ? "rgba(249, 115, 22, 0.2)" : "rgba(245, 158, 11, 0.2)"}`
+                    }}
+                  >
+                    {toast.severity} threat
+                  </span>
+                  <span className="text-[8px] text-white/30 font-mono">
+                    {new Date(toast.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                  </span>
+                </div>
+                <h5 className="text-[10px] font-bold text-white mb-0.5 font-display truncate">
+                  {toast.title}
+                </h5>
+                <p className="text-[9px] text-white/40 leading-relaxed font-mono truncate">
+                  {toast.description}
+                </p>
+              </div>
+              
+              <button 
+                onClick={() => removeToast(toast.id)}
+                className="text-white/20 hover:text-white/60 transition-colors flex-shrink-0 p-0.5"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
 
       {/* Footer */}
       <footer className="border-t border-white/5 py-6">
