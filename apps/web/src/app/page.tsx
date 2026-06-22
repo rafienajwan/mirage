@@ -22,7 +22,7 @@ export default function Home() {
       <Header />
 
       {/* Main Container */}
-      <main className="flex-1 w-full max-w-[1400px] mx-auto px-6 relative z-10 flex flex-col justify-between pt-2 md:pt-4 pb-16 lg:pb-32">
+      <main className="flex-1 w-full max-w-[1400px] mx-auto px-6 relative z-10 flex flex-col justify-between pt-24 md:pt-28 pb-16 lg:pb-32">
         {/* Decorative Top Status Bar */}
         <div className="hidden lg:flex items-center justify-between text-[8px] font-mono tracking-[0.2em] text-white/20 border-b border-white/5 pb-4 mb-6">
           <div className="flex items-center space-x-6">

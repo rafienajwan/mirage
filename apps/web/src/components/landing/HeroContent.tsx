@@ -3,6 +3,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Compass } from "lucide-react";
+import Link from "next/link";
 
 export default function HeroContent() {
   return (
@@ -52,22 +53,22 @@ export default function HeroContent() {
         className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 w-full sm:w-auto px-4 sm:px-0"
       >
         {/* Primary CTA */}
-        <a
-          href="#dashboard"
+        <Link
+          href="/dashboard"
           className="group relative w-full sm:w-auto px-8 py-3.5 rounded-full bg-[#5ed29c] text-[#060816] font-display text-[10px] font-bold tracking-widest uppercase flex items-center justify-center space-x-2 transition-all duration-300 hover:scale-[1.02] hover:shadow-[0_0_25px_rgba(94,210,156,0.4)]"
         >
           <span>View Dashboard</span>
           <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
-        </a>
+        </Link>
 
         {/* Secondary CTA */}
-        <a
-          href="/dashboard#demo"
+        <Link
+          href="/dashboard"
           className="relative w-full sm:w-auto px-8 py-3.5 rounded-full border border-white/5 hover:border-brand-cyan/20 bg-white/[0.01] hover:bg-brand-cyan/[0.02] backdrop-blur-sm font-display text-[10px] font-bold tracking-widest text-white/60 hover:text-brand-cyan uppercase flex items-center justify-center space-x-2 transition-all duration-300 hover:shadow-[0_0_15px_rgba(0,240,255,0.1)]"
         >
           <Compass className="w-4 h-4 text-white/40" />
           <span>Explore Demo Flow</span>
-        </a>
+        </Link>
       </motion.div>
       
     </div>
