@@ -59,6 +59,15 @@ class Settings:
     proxy_max_body_bytes: int = field(
         default_factory=lambda: int(os.getenv("PROXY_MAX_BODY_BYTES", "1048576"))
     )
+    ml_model_artifact: str | None = field(
+        default_factory=lambda: os.getenv("MIRAGE_MODEL_ARTIFACT") or None
+    )
+    ml_shadow_monitor_threshold: float = field(
+        default_factory=lambda: float(os.getenv("ML_SHADOW_MONITOR_THRESHOLD", "0.35"))
+    )
+    ml_shadow_redirect_threshold: float = field(
+        default_factory=lambda: float(os.getenv("ML_SHADOW_REDIRECT_THRESHOLD", "0.65"))
+    )
     decoy_login_token: str = field(
         default_factory=lambda: os.getenv(
             "DECOY_LOGIN_TOKEN", "DECOY_LOGIN_TOKEN_NOT_CONFIGURED"

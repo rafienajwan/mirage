@@ -38,6 +38,8 @@ Open `http://localhost:8000/docs` for the generated API reference.
 | `RATE_LIMIT_PER_MINUTE` | Rolling per-client request limit |
 | `PROXY_TIMEOUT_SECONDS` | Upstream timeout |
 | `PROXY_MAX_BODY_BYTES` | Maximum forwarded request body |
+| `MIRAGE_MODEL_ARTIFACT` | Optional trained artifact path for shadow scoring |
+| `ML_SHADOW_*` | Model-only thresholds; live routing remains heuristic |
 | `DECOY_*` | Synthetic values only; never real credentials |
 
 Docker Compose requires `MIRAGE_API_KEY`; standalone development permits it to
@@ -77,6 +79,8 @@ python scripts/train_model.py --input data/training_events.jsonl --output artifa
 
 Training computes precision, recall, F1, and false-positive rate. Runtime
 routing remains heuristic until a reviewed artifact is enabled in shadow mode.
+Set `MIRAGE_MODEL_ARTIFACT` to a trained artifact path to store model-only
+scores beside events without changing live routing.
 
 ## Known Limitations
 

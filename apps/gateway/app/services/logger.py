@@ -7,6 +7,7 @@ import uuid
 from app.schemas.dashboard import AlertSeverity
 from app.schemas.decision import Decision
 from app.schemas.event import EventRecord
+from app.schemas.ml import MLShadowScore
 from app.schemas.request import InspectRequest
 from app.storage import store
 from app.utils.time import utcnow
@@ -25,6 +26,7 @@ async def log_inspection(
     risk_score: float,
     decision: Decision,
     feature_vector: dict[str, float] | None = None,
+    ml_shadow: MLShadowScore | None = None,
     *,
     event_type: str = "inspection",
 ) -> EventRecord:
@@ -39,6 +41,7 @@ async def log_inspection(
         decision=decision,
         event_type=event_type,
         feature_vector=feature_vector or {},
+        ml_shadow=ml_shadow,
         summary=f"{request.method} {request.path} → {decision.value} (score: {risk_score})",
     )
     await store.add_event(event)

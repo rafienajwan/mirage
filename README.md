@@ -18,13 +18,13 @@ exact implementation gap.
 - bounded request bodies, upstream timeouts, credential filtering, and rate limits;
 - SQLite development storage and PostgreSQL/Alembic support;
 - dashboard metrics, events, alerts, traffic history, and simulation controls;
-- ML-ready feature vectors and an offline Random Forest training pipeline;
+- ML-ready feature vectors, optional ML shadow scoring, and an offline Random Forest training pipeline;
 - Docker Compose configuration for the five-service demo stack.
 
 ## Current Boundaries
 
 - The gateway only proxies its explicit `/api/v1/proxy/*` route.
-- Runtime routing uses heuristics, not a trained ML artifact.
+- Runtime routing uses heuristics; trained artifacts can be observed in shadow mode.
 - Decoy responses are static and do not track honeytoken use.
 - Dashboard updates use 10-second HTTP polling rather than WebSocket.
 - Docker image builds and cloud deployment are not yet verified in CI.

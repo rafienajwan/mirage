@@ -12,6 +12,7 @@ from app.services.decoy_engine import _infer_decoy_type
 from app.services.feature_extraction import extract_features
 from app.services.fingerprint import generate_fingerprint
 from app.services.logger import log_inspection
+from app.services.ml_shadow import score_ml_shadow
 from app.services.risk_engine import calculate_risk
 
 
@@ -37,11 +38,13 @@ async def inspect_and_log(
         is_anomalous=anomaly.is_anomalous,
         anomaly_confidence=anomaly.confidence,
     )
+    ml_shadow = score_ml_shadow(feature_vector, heuristic_decision=decision)
     await log_inspection(
         request,
         risk.score,
         decision,
         feature_vector,
+        ml_shadow,
         event_type=event_type,
     )
 
@@ -58,4 +61,5 @@ async def inspect_and_log(
         reasons=risk.reasons,
         fingerprint_hash=fingerprint_hash,
         decoy_type=decoy_type,
+        ml_shadow=ml_shadow,
     )
