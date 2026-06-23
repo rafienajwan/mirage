@@ -41,3 +41,5 @@ data/
 
 # Logs
 *.log
+
+.hintrc
