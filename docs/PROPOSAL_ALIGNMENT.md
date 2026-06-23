@@ -24,7 +24,7 @@ the beginning of a real ML pipeline.
 | PostgreSQL/Supabase storage | Partial | Async PostgreSQL and Alembic are supported; Supabase deployment and actor/honeytoken tables are pending. |
 | Feature-vector storage | Implemented | Request and optional CICIDS-style flow features are stored with events. |
 | CICIDS2017 dataset | Not integrated | Relevant fields are accepted, but dataset ingestion, cleaning, splitting, and provenance are pending. |
-| Custom API logs | Partial | Runtime events and features are captured; analyst-corrected labels and export tooling are pending. |
+| Custom API logs | Partial | Runtime events, features, and analyst-corrected labels are captured; export tooling is pending. |
 | Precision/recall/F1/FPR evaluation | Implemented | The Random Forest trainer calculates all four metrics. |
 | Real-time WebSocket dashboard | Not implemented | Dashboard uses 10-second HTTP polling. |
 | Security dashboard and alerts | Implemented for demo | Live metrics, events, risk history, decoy status, and internal alerts are available. |
@@ -42,6 +42,7 @@ The current demo can accurately claim that MIRAGE:
 - forwards demo traffic to isolated real-app or static decoy services;
 - stores events, alerts, and ML-ready feature vectors;
 - can store model-only shadow scores beside events when a reviewed artifact is configured;
+- supports analyst labels for correcting event classification outcomes;
 - displays live backend data on a dashboard;
 - can train and evaluate a Random Forest model from labeled feature records.
 

@@ -1,8 +1,10 @@
 """Dashboard API endpoints."""
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from app.core.security import require_api_key
 from app.schemas.dashboard import DashboardOverview
+from app.schemas.event import EventLabelRequest
 from app.services.threat_analysis import get_threat_summary
 from app.storage import store
 
@@ -26,6 +28,21 @@ async def dashboard_events(limit: int = Query(default=50, ge=1, le=200)):
     """Recent activity events (newest first)."""
     events = await store.get_recent_events(limit=limit)
     return {"events": [e.model_dump(mode="json") for e in events]}
+
+
+@router.patch(
+    "/events/{event_id}/label",
+    dependencies=[Depends(require_api_key)],
+)
+async def label_dashboard_event(event_id: str, payload: EventLabelRequest):
+    """Apply an analyst label to an existing event."""
+    updated = await store.update_event_label(event_id, payload.label, payload.note)
+    if updated is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Event not found",
+        )
+    return updated.model_dump(mode="json")
 
 
 @router.get("/alerts")

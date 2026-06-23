@@ -2,7 +2,7 @@
 
 import GlassPanel from "@/components/ui/GlassPanel";
 import type { ThreatSeverity, ThreatStatus } from "@/lib/mock-data";
-import type { FeedEvent } from "@/lib/api";
+import type { AnalystLabel, FeedEvent } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, Inbox } from "lucide-react";
 
@@ -29,15 +29,28 @@ const statusLabel: Record<ThreatStatus, string> = {
   alert: "Alert",
 };
 
+const analystLabels: { value: AnalystLabel; label: string }[] = [
+  { value: "normal", label: "Normal" },
+  { value: "suspicious", label: "Suspicious" },
+  { value: "false_positive", label: "False +" },
+  { value: "false_negative", label: "False -" },
+];
+
 interface ThreatFeedProps {
   events: FeedEvent[];
+  labelingEventId?: string | null;
+  onLabel?: (eventId: string, label: AnalystLabel) => void;
 }
 
 /**
  * Recent threat activity feed/table for the dashboard.
  * Accepts events as a prop — pass live data from the API or mock data.
  */
-export default function ThreatFeed({ events }: ThreatFeedProps) {
+export default function ThreatFeed({
+  events,
+  labelingEventId = null,
+  onLabel,
+}: ThreatFeedProps) {
   const showMLShadow = events.some((event) => event.mlShadow);
   const headerGridClass = showMLShadow
     ? "hidden sm:grid grid-cols-[1fr_92px_68px_76px_86px_96px] gap-2 text-[8px] text-white/30 uppercase tracking-widest pb-2 border-b border-white/5 mb-2"
@@ -85,9 +98,29 @@ export default function ThreatFeed({ events }: ThreatFeedProps) {
                 className={rowGridClass}
               >
                 {/* Event info */}
-                <div className="flex flex-col">
+                <div className="flex flex-col gap-1">
                   <span className="text-[11px] text-white/80 font-medium">{event.type}</span>
                   <span className="text-[9px] text-white/30 font-mono">{event.endpoint}</span>
+                  {onLabel ? (
+                    <select
+                      aria-label={`Analyst label for ${event.endpoint}`}
+                      value={event.analystLabel ?? ""}
+                      disabled={labelingEventId === event.id}
+                      onChange={(item) => {
+                        if (item.target.value) {
+                          onLabel(event.id, item.target.value as AnalystLabel);
+                        }
+                      }}
+                      className="mt-1 w-fit max-w-full rounded border border-white/10 bg-white/5 px-2 py-1 text-[8px] font-mono uppercase text-white/55 outline-none transition-colors hover:border-white/20 disabled:cursor-wait disabled:opacity-40"
+                    >
+                      <option value="">Unlabeled</option>
+                      {analystLabels.map((item) => (
+                        <option key={item.value} value={item.value}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
                 </div>
 
                 {/* Source IP */}

@@ -10,7 +10,7 @@ from collections import defaultdict
 
 from app.schemas.dashboard import AlertRecord, AlertSeverity
 from app.schemas.decision import Decision
-from app.schemas.event import EventRecord
+from app.schemas.event import AnalystLabel, EventRecord
 
 
 class MemoryStore:
@@ -28,6 +28,25 @@ class MemoryStore:
 
     async def get_recent_events(self, limit: int = 50) -> list[EventRecord]:
         return list(reversed(self.events[-limit:]))
+
+    async def update_event_label(
+        self,
+        event_id: str,
+        label: AnalystLabel,
+        note: str = "",
+    ) -> EventRecord | None:
+        for index, event in enumerate(self.events):
+            if event.event_id == event_id:
+                updated = event.model_copy(
+                    update={
+                        "analyst_label": label,
+                        "analyst_note": note,
+                        "labeled_at": datetime.now(timezone.utc),
+                    }
+                )
+                self.events[index] = updated
+                return updated
+        return None
 
     # ── Alerts ─────────────────────────────────────────────────
 

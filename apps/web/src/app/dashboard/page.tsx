@@ -8,8 +8,8 @@ import ThreatFeed from "@/components/dashboard/ThreatFeed";
 import DecoyStatusCard from "@/components/dashboard/DecoyStatusCard";
 import AlertPanel from "@/components/dashboard/AlertPanel";
 import SimulationPanel from "@/components/dashboard/SimulationPanel";
-import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus } from "@/lib/api";
-import type { OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData } from "@/lib/api";
+import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, labelEvent } from "@/lib/api";
+import type { AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData } from "@/lib/api";
 import { Globe, ShieldAlert, ArrowRightLeft, Bell, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -98,6 +98,7 @@ export default function DashboardPage() {
   const [decoyStatus, setDecoyStatus] = useState<DecoyStatusData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [labelingEventId, setLabelingEventId] = useState<string | null>(null);
 
   // Toast notifications & audio toggle
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
@@ -148,6 +149,21 @@ export default function DashboardPage() {
     alertsInitializedRef.current = true;
     setAlerts(newAlerts);
   }, [removeToast]);
+
+  const handleLabelEvent = useCallback(async (eventId: string, label: AnalystLabel) => {
+    setLabelingEventId(eventId);
+    try {
+      const updated = await labelEvent(eventId, label);
+      setEvents((current) =>
+        current.map((event) => (event.id === eventId ? updated : event)),
+      );
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to label event");
+    } finally {
+      setLabelingEventId(null);
+    }
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -297,7 +313,11 @@ export default function DashboardPage() {
 
         {/* Threat feed */}
         <div className="mb-8">
-          <ThreatFeed events={events} />
+          <ThreatFeed
+            events={events}
+            labelingEventId={labelingEventId}
+            onLabel={handleLabelEvent}
+          />
         </div>
 
         {/* Bottom row: Decoy + Alerts */}

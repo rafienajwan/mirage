@@ -29,6 +29,11 @@ class EventModel(Base):
     summary: Mapped[str] = mapped_column(Text, default="")
     feature_vector: Mapped[dict] = mapped_column(JSON, default=dict)
     ml_shadow: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    analyst_label: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    analyst_note: Mapped[str] = mapped_column(Text, default="")
+    labeled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 class AlertModel(Base):
