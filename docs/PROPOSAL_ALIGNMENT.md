@@ -15,8 +15,8 @@ the beginning of a real ML pipeline.
 | Proposal capability | Status | Repository reality |
 | --- | --- | --- |
 | FastAPI defense gateway | Partial | `/api/v1/proxy/*` inspects and forwards traffic, but arbitrary application ingress is not intercepted. |
-| Hybrid risk scoring | Partial | Heuristic risk scoring is active. A Random Forest training/inference path exists but is not yet used for live decisions. |
-| Scikit-learn anomaly detection | Partial | Scikit-learn is configured and training is implemented; runtime anomaly detection remains heuristic. |
+| Hybrid risk scoring | Partial | Heuristic risk scoring is active. A Random Forest training/inference path can run in shadow mode, but it does not control live routing. |
+| Scikit-learn anomaly detection | Partial | Scikit-learn is configured and training/shadow inference are implemented; runtime anomaly detection remains heuristic. |
 | Threat fingerprint matching | Partial | Stable request fingerprints exist; persistent actor profiles and clustering do not. |
 | Automated real/decoy routing | Implemented for demo | The proxy routes to separate real-app and decoy services using the live decision engine. |
 | Fake endpoints and fake data | Implemented for demo | The isolated decoy service exposes static, synthetic responses without real secrets. |
@@ -41,6 +41,7 @@ The current demo can accurately claim that MIRAGE:
 - automatically decides allow, monitor, or redirect-to-decoy;
 - forwards demo traffic to isolated real-app or static decoy services;
 - stores events, alerts, and ML-ready feature vectors;
+- can store model-only shadow scores beside events when a reviewed artifact is configured;
 - displays live backend data on a dashboard;
 - can train and evaluate a Random Forest model from labeled feature records.
 

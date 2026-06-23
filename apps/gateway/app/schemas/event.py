@@ -7,6 +7,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from app.schemas.decision import Decision
+from app.schemas.ml import MLShadowScore
 
 
 class EventRecord(BaseModel):
@@ -22,3 +23,4 @@ class EventRecord(BaseModel):
     event_type: str = Field(default="inspection")
     summary: str = ""
     feature_vector: dict[str, float] = Field(default_factory=dict)
+    ml_shadow: MLShadowScore | None = None

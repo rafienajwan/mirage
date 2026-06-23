@@ -30,6 +30,16 @@ interface BackendEvent {
   decision: "allow" | "monitor" | "redirect_to_decoy";
   event_type: string;
   summary: string;
+  ml_shadow: BackendMlShadow | null;
+}
+
+interface BackendMlShadow {
+  artifact: string;
+  probability: number;
+  score: number;
+  prediction: string;
+  shadow_decision: "allow" | "monitor" | "redirect_to_decoy";
+  agrees_with_decision: boolean;
 }
 
 interface BackendAlert {
@@ -49,6 +59,7 @@ interface BackendSimulationResult {
   reasons: string[];
   fingerprint_hash: string;
   decoy_type: string | null;
+  ml_shadow: BackendMlShadow | null;
 }
 
 // ─── Frontend types (mapped from backend) ───────────────────────
@@ -71,6 +82,16 @@ export interface FeedEvent {
   severity: ThreatSeverity;
   status: ThreatStatus;
   description: string;
+  mlShadow: MLShadow | null;
+}
+
+export interface MLShadow {
+  artifact: string;
+  probability: number;
+  score: number;
+  prediction: string;
+  shadowDecision: ThreatStatus;
+  agreesWithDecision: boolean;
 }
 
 export interface FeedAlert {
@@ -91,6 +112,7 @@ export interface SimulationResult {
   reasons: string[];
   fingerprintHash: string;
   decoyType: string | null;
+  mlShadow: MLShadow | null;
 }
 
 export interface TrafficPoint {
@@ -138,6 +160,19 @@ function mapEvent(e: BackendEvent): FeedEvent {
     severity: mapRiskLevel(e.risk_score),
     status: mapDecision(e.decision),
     description: e.summary || `${e.method} ${e.path}`,
+    mlShadow: mapMLShadow(e.ml_shadow),
+  };
+}
+
+function mapMLShadow(shadow: BackendMlShadow | null): MLShadow | null {
+  if (!shadow) return null;
+  return {
+    artifact: shadow.artifact,
+    probability: shadow.probability,
+    score: shadow.score,
+    prediction: shadow.prediction,
+    shadowDecision: mapDecision(shadow.shadow_decision),
+    agreesWithDecision: shadow.agrees_with_decision,
   };
 }
 
@@ -211,6 +246,7 @@ export async function simulateNormal(): Promise<SimulationResult> {
     reasons: data.reasons,
     fingerprintHash: data.fingerprint_hash,
     decoyType: data.decoy_type,
+    mlShadow: mapMLShadow(data.ml_shadow),
   };
 }
 
@@ -225,6 +261,7 @@ export async function simulateSuspicious(): Promise<SimulationResult> {
     reasons: data.reasons,
     fingerprintHash: data.fingerprint_hash,
     decoyType: data.decoy_type,
+    mlShadow: mapMLShadow(data.ml_shadow),
   };
 }
 

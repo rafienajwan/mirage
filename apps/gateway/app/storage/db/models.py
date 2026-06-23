@@ -28,6 +28,7 @@ class EventModel(Base):
     event_type: Mapped[str] = mapped_column(String(64), default="inspection")
     summary: Mapped[str] = mapped_column(Text, default="")
     feature_vector: Mapped[dict] = mapped_column(JSON, default=dict)
+    ml_shadow: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class AlertModel(Base):

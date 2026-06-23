@@ -7,6 +7,7 @@ from httpx import ASGITransport, AsyncClient
 
 # Configure storage before importing the application singleton.
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
+os.environ["MIRAGE_API_KEY"] = ""
 
 from app.main import app  # noqa: E402
 from app.storage.db.database import Base, engine  # noqa: E402

@@ -7,6 +7,8 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from app.schemas.ml import MLShadowScore
+
 
 class RiskLevel(str, Enum):
     LOW = "low"
@@ -36,4 +38,8 @@ class InspectResponse(BaseModel):
     )
     decoy_type: Optional[str] = Field(
         default=None, description="Type of decoy response if redirected"
+    )
+    ml_shadow: MLShadowScore | None = Field(
+        default=None,
+        description="Optional model shadow score. It does not affect live routing.",
     )

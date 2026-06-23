@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import GlassPanel from "@/components/ui/GlassPanel";
 import type { ThreatSeverity, ThreatStatus } from "@/lib/mock-data";
 import type { FeedEvent } from "@/lib/api";
@@ -39,6 +38,14 @@ interface ThreatFeedProps {
  * Accepts events as a prop — pass live data from the API or mock data.
  */
 export default function ThreatFeed({ events }: ThreatFeedProps) {
+  const showMLShadow = events.some((event) => event.mlShadow);
+  const headerGridClass = showMLShadow
+    ? "hidden sm:grid grid-cols-[1fr_92px_68px_76px_86px_96px] gap-2 text-[8px] text-white/30 uppercase tracking-widest pb-2 border-b border-white/5 mb-2"
+    : "hidden sm:grid grid-cols-[1fr_100px_80px_80px_90px] gap-2 text-[8px] text-white/30 uppercase tracking-widest pb-2 border-b border-white/5 mb-2";
+  const rowGridClass = showMLShadow
+    ? "grid grid-cols-1 sm:grid-cols-[1fr_92px_68px_76px_86px_96px] gap-1 sm:gap-2 items-start sm:items-center py-2 border-b border-white/5 last:border-0"
+    : "grid grid-cols-1 sm:grid-cols-[1fr_100px_80px_80px_90px] gap-1 sm:gap-2 items-start sm:items-center py-2 border-b border-white/5 last:border-0";
+
   return (
     <GlassPanel className="p-5">
       <div className="flex items-center justify-between mb-4">
@@ -61,12 +68,13 @@ export default function ThreatFeed({ events }: ThreatFeedProps) {
       ) : (
         <>
           {/* Table header */}
-          <div className="hidden sm:grid grid-cols-[1fr_100px_80px_80px_90px] gap-2 text-[8px] text-white/30 uppercase tracking-widest pb-2 border-b border-white/5 mb-2">
+          <div className={headerGridClass}>
             <span>Event</span>
             <span>Source</span>
             <span>Risk</span>
             <span>Severity</span>
             <span>Status</span>
+            {showMLShadow ? <span>ML Shadow</span> : null}
           </div>
 
           {/* Feed items */}
@@ -74,7 +82,7 @@ export default function ThreatFeed({ events }: ThreatFeedProps) {
             {events.map((event) => (
               <div
                 key={event.id}
-                className="grid grid-cols-1 sm:grid-cols-[1fr_100px_80px_80px_90px] gap-1 sm:gap-2 items-start sm:items-center py-2 border-b border-white/5 last:border-0"
+                className={rowGridClass}
               >
                 {/* Event info */}
                 <div className="flex flex-col">
@@ -109,6 +117,26 @@ export default function ThreatFeed({ events }: ThreatFeedProps) {
                 >
                   {statusLabel[event.status]}
                 </span>
+
+                {showMLShadow ? (
+                  event.mlShadow ? (
+                    <span
+                      className={cn(
+                        "text-[8px] font-bold px-2 py-0.5 rounded border uppercase w-fit",
+                        event.mlShadow.agreesWithDecision
+                          ? "text-brand-emerald bg-brand-emerald/10 border-brand-emerald/20"
+                          : "text-amber-400 bg-amber-500/10 border-amber-500/20"
+                      )}
+                      title={`Artifact: ${event.mlShadow.artifact}; shadow decision: ${statusLabel[event.mlShadow.shadowDecision]}`}
+                    >
+                      {event.mlShadow.score.toFixed(1)}
+                    </span>
+                  ) : (
+                    <span className="text-[8px] text-white/25 font-mono uppercase">
+                      No model
+                    </span>
+                  )
+                ) : null}
               </div>
             ))}
           </div>

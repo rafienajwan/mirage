@@ -35,6 +35,11 @@ class DatabaseStore:
                 event_type=event.event_type,
                 summary=event.summary,
                 feature_vector=event.feature_vector,
+                ml_shadow=(
+                    event.ml_shadow.model_dump(mode="json")
+                    if event.ml_shadow
+                    else None
+                ),
             )
             session.add(row)
 
@@ -59,6 +64,7 @@ class DatabaseStore:
                     event_type=r.event_type,
                     summary=r.summary,
                     feature_vector=r.feature_vector or {},
+                    ml_shadow=r.ml_shadow,
                 )
                 for r in rows
             ]

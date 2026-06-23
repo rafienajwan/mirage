@@ -18,6 +18,8 @@ services:
       context: ../apps/gateway
     ports:
       - "8000:8000"
+    volumes:
+      - ../apps/gateway/artifacts:/app/artifacts:ro
     environment:
       APP_ENV: production
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}
@@ -30,6 +32,9 @@ services:
       DECOY_SERVICE_URL: http://decoy:8002
       PROXY_TIMEOUT_SECONDS: ${PROXY_TIMEOUT_SECONDS:-10}
       PROXY_MAX_BODY_BYTES: ${PROXY_MAX_BODY_BYTES:-1048576}
+      MIRAGE_MODEL_ARTIFACT: ${MIRAGE_MODEL_ARTIFACT:-}
+      ML_SHADOW_MONITOR_THRESHOLD: ${ML_SHADOW_MONITOR_THRESHOLD:-0.35}
+      ML_SHADOW_REDIRECT_THRESHOLD: ${ML_SHADOW_REDIRECT_THRESHOLD:-0.65}
       DECOY_LOGIN_TOKEN: ${DECOY_LOGIN_TOKEN:?DECOY_LOGIN_TOKEN is required}
       DECOY_OAUTH_TOKEN: ${DECOY_OAUTH_TOKEN:?DECOY_OAUTH_TOKEN is required}
       DECOY_SERVICE_TOKEN: ${DECOY_SERVICE_TOKEN:?DECOY_SERVICE_TOKEN is required}
