@@ -104,3 +104,43 @@ async def test_inspect_rejects_unbounded_input(client):
         },
     )
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_dashboard_event_labeling(client):
+    inspect_response = await client.post(
+        "/api/v1/inspect",
+        json={
+            "ip_address": "192.168.1.1",
+            "method": "GET",
+            "path": "/api/v1/products",
+            "user_agent": "Mozilla/5.0",
+            "request_count": 2,
+            "payload_indicators": [],
+        },
+    )
+    assert inspect_response.status_code == 200
+
+    events_response = await client.get("/api/v1/dashboard/events?limit=1")
+    event_id = events_response.json()["events"][0]["event_id"]
+    label_response = await client.patch(
+        f"/api/v1/dashboard/events/{event_id}/label",
+        json={"label": "normal", "note": "Reviewed as benign demo traffic"},
+    )
+
+    assert label_response.status_code == 200
+    data = label_response.json()
+    assert data["event_id"] == event_id
+    assert data["analyst_label"] == "normal"
+    assert data["analyst_note"] == "Reviewed as benign demo traffic"
+    assert data["labeled_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_dashboard_event_labeling_returns_404(client):
+    response = await client.patch(
+        "/api/v1/dashboard/events/missing/label",
+        json={"label": "false_positive"},
+    )
+
+    assert response.status_code == 404

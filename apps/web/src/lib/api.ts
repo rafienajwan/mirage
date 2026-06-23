@@ -31,6 +31,9 @@ interface BackendEvent {
   event_type: string;
   summary: string;
   ml_shadow: BackendMlShadow | null;
+  analyst_label: AnalystLabel | null;
+  analyst_note: string;
+  labeled_at: string | null;
 }
 
 interface BackendMlShadow {
@@ -83,7 +86,16 @@ export interface FeedEvent {
   status: ThreatStatus;
   description: string;
   mlShadow: MLShadow | null;
+  analystLabel: AnalystLabel | null;
+  analystNote: string;
+  labeledAt: string | null;
 }
+
+export type AnalystLabel =
+  | "normal"
+  | "suspicious"
+  | "false_positive"
+  | "false_negative";
 
 export interface MLShadow {
   artifact: string;
@@ -161,6 +173,9 @@ function mapEvent(e: BackendEvent): FeedEvent {
     status: mapDecision(e.decision),
     description: e.summary || `${e.method} ${e.path}`,
     mlShadow: mapMLShadow(e.ml_shadow),
+    analystLabel: e.analyst_label,
+    analystNote: e.analyst_note,
+    labeledAt: e.labeled_at,
   };
 }
 
@@ -225,6 +240,23 @@ export async function fetchOverview(): Promise<OverviewMetrics> {
 export async function fetchEvents(): Promise<FeedEvent[]> {
   const { events } = await apiFetch<{ events: BackendEvent[] }>("/dashboard/events");
   return events.map(mapEvent);
+}
+
+/** Apply an analyst label through the server-side API bridge. */
+export async function labelEvent(
+  eventId: string,
+  label: AnalystLabel,
+  note = "",
+): Promise<FeedEvent> {
+  const res = await fetch(`/api/events/${encodeURIComponent(eventId)}/label`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ label, note }),
+  });
+  if (!res.ok) {
+    throw new Error(`Labeling error: ${res.status} ${res.statusText}`);
+  }
+  return mapEvent(await res.json());
 }
 
 /** Fetch active alerts. */

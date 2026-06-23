@@ -19,6 +19,7 @@ exact implementation gap.
 - SQLite development storage and PostgreSQL/Alembic support;
 - dashboard metrics, events, alerts, traffic history, and simulation controls;
 - ML-ready feature vectors, optional ML shadow scoring, and an offline Random Forest training pipeline;
+- analyst event labels for future training data curation;
 - Docker Compose configuration for the five-service demo stack.
 
 ## Current Boundaries
@@ -250,11 +251,12 @@ infra/
 ## Next Priorities
 
 1. Prepare versioned CICIDS2017 and custom API-log datasets.
-2. Run trained models in shadow mode before changing routing decisions.
-3. Add analyst label correction and retraining workflows.
-4. Replace dashboard polling with authenticated WebSocket updates.
-5. Add adaptive decoys, honeytoken-use detection, and actor profiles.
-6. Verify Docker image builds and deploy the stack.
+2. Export labeled event features into trainable JSONL datasets.
+3. Run trained models in shadow mode before changing routing decisions.
+4. Add retraining workflows from analyst-corrected labels.
+5. Replace dashboard polling with authenticated WebSocket updates.
+6. Add adaptive decoys, honeytoken-use detection, and actor profiles.
+7. Verify Docker image builds and deploy the stack.
 
 ## License
 

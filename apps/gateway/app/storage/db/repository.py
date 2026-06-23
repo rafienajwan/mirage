@@ -12,7 +12,7 @@ from sqlalchemy import case, extract, func, select
 
 from app.schemas.dashboard import AlertRecord, AlertSeverity
 from app.schemas.decision import Decision
-from app.schemas.event import EventRecord
+from app.schemas.event import AnalystLabel, EventRecord
 from app.storage.db.database import get_session
 from app.storage.db.models import AlertModel, EventModel
 
@@ -40,6 +40,11 @@ class DatabaseStore:
                     if event.ml_shadow
                     else None
                 ),
+                analyst_label=(
+                    event.analyst_label.value if event.analyst_label else None
+                ),
+                analyst_note=event.analyst_note,
+                labeled_at=event.labeled_at,
             )
             session.add(row)
 
@@ -65,9 +70,50 @@ class DatabaseStore:
                     summary=r.summary,
                     feature_vector=r.feature_vector or {},
                     ml_shadow=r.ml_shadow,
+                    analyst_label=(
+                        AnalystLabel(r.analyst_label)
+                        if r.analyst_label
+                        else None
+                    ),
+                    analyst_note=r.analyst_note or "",
+                    labeled_at=r.labeled_at,
                 )
                 for r in rows
             ]
+
+    async def update_event_label(
+        self,
+        event_id: str,
+        label: AnalystLabel,
+        note: str = "",
+    ) -> EventRecord | None:
+        async with get_session() as session:
+            result = await session.execute(
+                select(EventModel).where(EventModel.event_id == event_id)
+            )
+            row = result.scalar_one_or_none()
+            if row is None:
+                return None
+
+            row.analyst_label = label.value
+            row.analyst_note = note
+            row.labeled_at = datetime.now(timezone.utc)
+            return EventRecord(
+                event_id=row.event_id,
+                timestamp=row.timestamp,
+                ip_address=row.ip_address,
+                path=row.path,
+                method=row.method,
+                risk_score=row.risk_score,
+                decision=Decision(row.decision),
+                event_type=row.event_type,
+                summary=row.summary,
+                feature_vector=row.feature_vector or {},
+                ml_shadow=row.ml_shadow,
+                analyst_label=label,
+                analyst_note=row.analyst_note or "",
+                labeled_at=row.labeled_at,
+            )
 
     # ── Alerts ─────────────────────────────────────────────────
 
