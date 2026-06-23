@@ -142,6 +142,36 @@ body {
   background: linear-gradient(to right, transparent, rgba(0, 240, 255, 0.3) 10%, rgba(94, 210, 156, 0.3) 50%, rgba(0, 240, 255, 0.3) 90%, transparent);
 }
 
+/* Dashboard alert toasts */
+.toast-panel {
+  --toast-color: #00f0ff;
+  --toast-background: rgba(0, 240, 255, 0.1);
+  --toast-border: rgba(0, 240, 255, 0.2);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.05);
+}
+
+.toast-warning {
+  --toast-color: #f59e0b;
+  --toast-background: rgba(245, 158, 11, 0.1);
+  --toast-border: rgba(245, 158, 11, 0.2);
+}
+
+.toast-critical {
+  --toast-color: #ef4444;
+  --toast-background: rgba(239, 68, 68, 0.1);
+  --toast-border: rgba(239, 68, 68, 0.2);
+}
+
+.toast-severity-bar {
+  background-color: var(--toast-color);
+}
+
+.toast-severity-badge {
+  color: var(--toast-color);
+  background-color: var(--toast-background);
+  border: 1px solid var(--toast-border);
+}
+
 /* Custom scrollbar for dashboard feeds */
 ::-webkit-scrollbar {
   width: 4px;

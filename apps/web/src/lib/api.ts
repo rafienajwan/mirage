@@ -76,6 +76,8 @@ export interface FeedEvent {
 export interface FeedAlert {
   id: string;
   message: string;
+  description: string;
+  recommendedAction: string;
   severity: AlertSeverity;
   timestamp: string;
   acknowledged: boolean;
@@ -143,6 +145,8 @@ function mapAlert(a: BackendAlert): FeedAlert {
   return {
     id: a.alert_id,
     message: a.title,
+    description: a.description,
+    recommendedAction: a.recommended_action,
     severity: a.severity,
     timestamp: a.created_at,
     acknowledged: false,

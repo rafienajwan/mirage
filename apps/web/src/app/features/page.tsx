@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { motion } from "framer-motion";
 import Header from "@/components/layout/Header";
 import VideoBackground from "@/components/landing/VideoBackground";
@@ -9,7 +8,7 @@ import Link from "next/link";
 
 export default function FeaturesPage() {
   return (
-    <div className="relative min-h-screen flex flex-col bg-[#060816] text-white selection:bg-brand-cyan/30 selection:text-white overflow-x-hidden">
+    <div className="relative min-h-screen flex flex-col bg-bg-dark-navy text-white selection:bg-brand-cyan/30 selection:text-white overflow-x-hidden">
       {/* Fullscreen cinematic HLS video background */}
       <VideoBackground />
 
@@ -17,7 +16,7 @@ export default function FeaturesPage() {
       <Header />
 
       {/* Main Container */}
-      <main className="flex-1 w-full max-w-[1400px] mx-auto px-6 relative z-10 flex flex-col gap-24 pt-28 pb-16">
+      <main className="flex-1 w-full max-w-350 mx-auto px-6 relative z-10 flex flex-col gap-24 pt-28 pb-16">
         
         {/* Features Section */}
         <section id="features" className="scroll-mt-24 pt-8">
@@ -33,7 +32,7 @@ export default function FeaturesPage() {
             <h1 className="font-sans font-black text-3xl sm:text-5xl lg:text-6xl text-white tracking-[-0.03em] uppercase mb-4">
               ACTIVE CYBER DECEPTION LAYERS
             </h1>
-            <div className="h-[2px] w-24 scan-line" />
+            <div className="h-0.5 w-24 scan-line" />
             <p className="text-xs sm:text-sm text-white/50 max-w-xl mt-4 leading-relaxed">
               MIRAGE shifts your security posture from passive firewalls to active deception campaigns, detaining attackers inside synthetic environments.
             </p>
@@ -46,10 +45,10 @@ export default function FeaturesPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.1 }}
               whileHover={{ y: -6, scale: 1.01 }}
-              className="relative p-6 rounded-xl border border-brand-cyan/10 bg-brand-cyan/[0.01] hover:bg-brand-cyan/[0.02] backdrop-blur-md overflow-hidden group transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,240,255,0.08)]"
+              className="relative p-6 rounded-xl border border-brand-cyan/10 bg-brand-cyan/1 hover:bg-brand-cyan/2 backdrop-blur-md overflow-hidden group transition-all duration-300 hover:shadow-[0_0_20px_rgba(0,240,255,0.08)]"
             >
-              <div className="absolute top-0 left-0 w-2 h-[2px] bg-brand-cyan" />
-              <div className="absolute top-0 left-0 w-[2px] h-2 bg-brand-cyan" />
+              <div className="absolute top-0 left-0 w-2 h-0.5 bg-brand-cyan" />
+              <div className="absolute top-0 left-0 w-0.5 h-2 bg-brand-cyan" />
               <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-brand-cyan/5 border border-brand-cyan/20 mb-4 group-hover:scale-110 transition-transform duration-300">
                 <Brain className="w-5 h-5 text-brand-cyan" />
               </div>
@@ -67,10 +66,10 @@ export default function FeaturesPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
               whileHover={{ y: -6, scale: 1.01 }}
-              className="relative p-6 rounded-xl border border-brand-emerald/10 bg-brand-emerald/[0.01] hover:bg-brand-emerald/[0.02] backdrop-blur-md overflow-hidden group transition-all duration-300 hover:shadow-[0_0_20px_rgba(94,210,156,0.08)]"
+              className="relative p-6 rounded-xl border border-brand-emerald/10 bg-brand-emerald/1 hover:bg-brand-emerald/2 backdrop-blur-md overflow-hidden group transition-all duration-300 hover:shadow-[0_0_20px_rgba(94,210,156,0.08)]"
             >
-              <div className="absolute top-0 left-0 w-2 h-[2px] bg-brand-emerald" />
-              <div className="absolute top-0 left-0 w-[2px] h-2 bg-brand-emerald" />
+              <div className="absolute top-0 left-0 w-2 h-0.5 bg-brand-emerald" />
+              <div className="absolute top-0 left-0 w-0.5 h-2 bg-brand-emerald" />
               <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-brand-emerald/5 border border-brand-emerald/20 mb-4 group-hover:scale-110 transition-transform duration-300">
                 <Layers className="w-5 h-5 text-brand-emerald" />
               </div>
@@ -88,10 +87,10 @@ export default function FeaturesPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.3 }}
               whileHover={{ y: -6, scale: 1.01 }}
-              className="relative p-6 rounded-xl border border-amber-500/10 bg-amber-500/[0.01] hover:bg-amber-500/[0.02] backdrop-blur-md overflow-hidden group transition-all duration-300 hover:shadow-[0_0_20px_rgba(245,158,11,0.08)]"
+              className="relative p-6 rounded-xl border border-amber-500/10 bg-amber-500/1 hover:bg-amber-500/2 backdrop-blur-md overflow-hidden group transition-all duration-300 hover:shadow-[0_0_20px_rgba(245,158,11,0.08)]"
             >
-              <div className="absolute top-0 left-0 w-2 h-[2px] bg-amber-500" />
-              <div className="absolute top-0 left-0 w-[2px] h-2 bg-amber-500" />
+              <div className="absolute top-0 left-0 w-2 h-0.5 bg-amber-500" />
+              <div className="absolute top-0 left-0 w-0.5 h-2 bg-amber-500" />
               <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-amber-500/5 border border-amber-500/20 mb-4 group-hover:scale-110 transition-transform duration-300">
                 <KeyRound className="w-5 h-5 text-amber-400" />
               </div>
@@ -109,10 +108,10 @@ export default function FeaturesPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.4 }}
               whileHover={{ y: -6, scale: 1.01 }}
-              className="relative p-6 rounded-xl border border-red-500/10 bg-red-500/[0.01] hover:bg-red-500/[0.02] backdrop-blur-md overflow-hidden group transition-all duration-300 hover:shadow-[0_0_20px_rgba(239,68,68,0.08)]"
+              className="relative p-6 rounded-xl border border-red-500/10 bg-red-500/1 hover:bg-red-500/2 backdrop-blur-md overflow-hidden group transition-all duration-300 hover:shadow-[0_0_20px_rgba(239,68,68,0.08)]"
             >
-              <div className="absolute top-0 left-0 w-2 h-[2px] bg-red-500" />
-              <div className="absolute top-0 left-0 w-[2px] h-2 bg-red-500" />
+              <div className="absolute top-0 left-0 w-2 h-0.5 bg-red-500" />
+              <div className="absolute top-0 left-0 w-0.5 h-2 bg-red-500" />
               <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-red-500/5 border border-red-500/20 mb-4 group-hover:scale-110 transition-transform duration-300">
                 <LineChart className="w-5 h-5 text-red-400" />
               </div>
@@ -140,7 +139,7 @@ export default function FeaturesPage() {
             <h2 className="font-sans font-black text-3xl sm:text-5xl text-white tracking-[-0.03em] uppercase mb-4">
               MVP THREAT DEMONSTRATION FLOW
             </h2>
-            <div className="h-[2px] w-24 scan-line" />
+            <div className="h-0.5 w-24 scan-line" />
             <p className="text-xs sm:text-sm text-white/50 max-w-xl mt-4">
               Trigger simulated attacks directly from the control panel to observe the full cycle of threat detection, decoy containment, and forensic analysis.
             </p>
@@ -152,7 +151,7 @@ export default function FeaturesPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.4 }}
-              className="relative p-5 rounded-xl border border-white/5 bg-white/[0.01] overflow-hidden flex flex-col justify-between min-h-[180px]"
+              className="relative p-5 rounded-xl border border-white/5 bg-white/1 overflow-hidden flex flex-col justify-between min-h-45"
             >
               <div>
                 <span className="font-mono text-2xl font-bold text-white/10 mb-2 block">01</span>
@@ -171,7 +170,7 @@ export default function FeaturesPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.5 }}
-              className="relative p-5 rounded-xl border border-white/5 bg-white/[0.01] overflow-hidden flex flex-col justify-between min-h-[180px]"
+              className="relative p-5 rounded-xl border border-white/5 bg-white/1 overflow-hidden flex flex-col justify-between min-h-45"
             >
               <div>
                 <span className="font-mono text-2xl font-bold text-white/10 mb-2 block">02</span>
@@ -190,7 +189,7 @@ export default function FeaturesPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.6 }}
-              className="relative p-5 rounded-xl border border-white/5 bg-white/[0.01] overflow-hidden flex flex-col justify-between min-h-[180px]"
+              className="relative p-5 rounded-xl border border-white/5 bg-white/1 overflow-hidden flex flex-col justify-between min-h-45"
             >
               <div>
                 <span className="font-mono text-2xl font-bold text-white/10 mb-2 block">03</span>
@@ -209,7 +208,7 @@ export default function FeaturesPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.7 }}
-              className="relative p-5 rounded-xl border border-white/5 bg-white/[0.01] overflow-hidden flex flex-col justify-between min-h-[180px]"
+              className="relative p-5 rounded-xl border border-white/5 bg-white/1 overflow-hidden flex flex-col justify-between min-h-45"
             >
               <div>
                 <span className="font-mono text-2xl font-bold text-white/10 mb-2 block">04</span>
