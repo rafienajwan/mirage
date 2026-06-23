@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import Header from "@/components/layout/Header";
 import MetricCard from "@/components/ui/MetricCard";
@@ -19,13 +19,21 @@ const RiskScoreWidget = dynamic(() => import("@/components/dashboard/RiskScoreWi
 
 const POLL_INTERVAL = 10_000; // 10 seconds
 
+interface ToastNotification {
+  id: string;
+  title: string;
+  description: string;
+  severity: FeedAlert["severity"];
+  timestamp: string;
+}
+
 /**
  * Web Audio API synthesizer for low-latency cyberpunk alerts without external assets.
  */
 function playAlertSound(severity: string) {
   if (typeof window === "undefined") return;
   try {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    const AudioCtx = window.AudioContext;
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
     
@@ -46,7 +54,7 @@ function playAlertSound(severity: string) {
       
       osc.start();
       osc.stop(ctx.currentTime + 0.4);
-    } else if (severity === "high") {
+    } else if (severity === "warning") {
       // High double chirp
       osc.type = "sine";
       osc.frequency.setValueAtTime(650, ctx.currentTime);
@@ -92,9 +100,10 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Toast notifications & audio toggle
-  const [toasts, setToasts] = useState<Array<{ id: string; title: string; description: string; severity: string; timestamp: string }>>([]);
+  const [toasts, setToasts] = useState<ToastNotification[]>([]);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const soundEnabledRef = useRef(false);
+  const alertsInitializedRef = useRef(false);
   const prevAlertIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -107,16 +116,16 @@ export default function DashboardPage() {
 
   const handleAlertsUpdate = useCallback((newAlerts: FeedAlert[]) => {
     // Only alert for events triggered AFTER mount
-    if (prevAlertIdsRef.current.size > 0) {
+    if (alertsInitializedRef.current) {
       const newItems = newAlerts.filter((a) => !prevAlertIdsRef.current.has(a.id));
       newItems.forEach((alert) => {
         const toastId = `${alert.id}-${Date.now()}`;
         setToasts((prev) => [
           {
             id: toastId,
-            title: alert.ruleName || "Threat Event Triggered",
-            description: alert.description || `Anomaly score of ${alert.riskScore} detected.`,
-            severity: alert.severity || "medium",
+            title: alert.message || "Threat Event Triggered",
+            description: alert.description,
+            severity: alert.severity,
             timestamp: alert.timestamp,
           },
           ...prev,
@@ -128,7 +137,7 @@ export default function DashboardPage() {
         }, 6000);
 
         // Play synth alert sound
-        if (soundEnabledRef.current && (alert.severity === "critical" || alert.severity === "high")) {
+        if (soundEnabledRef.current && (alert.severity === "critical" || alert.severity === "warning")) {
           playAlertSound(alert.severity);
         }
       });
@@ -136,6 +145,7 @@ export default function DashboardPage() {
 
     const ids = new Set(newAlerts.map((a) => a.id));
     prevAlertIdsRef.current = ids;
+    alertsInitializedRef.current = true;
     setAlerts(newAlerts);
   }, [removeToast]);
 
@@ -163,42 +173,21 @@ export default function DashboardPage() {
     }
   }, [handleAlertsUpdate]);
 
-  // Fetch on mount + poll every POLL_INTERVAL ms
+  // Fetch on mount + poll every POLL_INTERVAL ms.
   useEffect(() => {
-    async function refresh() {
-      try {
-        const [ov, ev, al, tr, rh, ds] = await Promise.all([
-          fetchOverview(),
-          fetchEvents(),
-          fetchAlerts(),
-          fetchTraffic(),
-          fetchRiskHistory(),
-          fetchDecoyStatus(),
-        ]);
-        setOverview(ov);
-        setEvents(ev);
-        handleAlertsUpdate(al);
-        setTraffic(tr);
-        setRiskHistory(rh);
-        setDecoyStatus(ds);
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to fetch data");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    refresh();
-    const interval = setInterval(refresh, POLL_INTERVAL);
-    return () => clearInterval(interval);
-  }, [handleAlertsUpdate]);
+    const initialLoad = setTimeout(load, 0);
+    const interval = setInterval(load, POLL_INTERVAL);
+    return () => {
+      clearTimeout(initialLoad);
+      clearInterval(interval);
+    };
+  }, [load]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#060816] text-white relative">
+    <div className="min-h-screen flex flex-col bg-bg-dark-navy text-white relative">
       <Header />
 
-      <main className="flex-1 w-full max-w-[1400px] mx-auto px-6 pt-28 pb-8 lg:pt-32 lg:pb-12">
+      <main className="flex-1 w-full max-w-350 mx-auto px-6 pt-28 pb-8 lg:pt-32 lg:pb-12">
         {/* Page title */}
         <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -212,11 +201,13 @@ export default function DashboardPage() {
           
           {/* Cyberpunk Audio Toggle */}
           <button
+            type="button"
             onClick={() => setSoundEnabled(!soundEnabled)}
+            aria-pressed={soundEnabled}
             className={`flex items-center gap-2 px-4 py-2 rounded border text-[10px] font-mono tracking-widest transition-all duration-300 hover:scale-[1.01] ${
               soundEnabled
                 ? "bg-brand-cyan/10 border-brand-cyan/40 text-brand-cyan shadow-[0_0_15px_rgba(0,240,255,0.2)]"
-                : "bg-white/[0.02] border-white/5 text-white/40 hover:text-white/60 hover:border-white/10"
+                : "bg-white/2 border-white/5 text-white/40 hover:text-white/60 hover:border-white/10"
             }`}
           >
             {soundEnabled ? (
@@ -236,7 +227,7 @@ export default function DashboardPage() {
         {/* Error banner */}
         {error && (
           <div className="mb-6 flex items-center gap-3 p-4 rounded-lg border border-amber-500/20 bg-amber-500/5 text-[11px] font-mono text-amber-400">
-            <WifiOff className="w-4 h-4 flex-shrink-0" />
+            <WifiOff className="w-4 h-4 shrink-0" />
             <div>
               <span className="font-bold">Backend unreachable</span>
               <span className="text-white/40 ml-2">
@@ -259,7 +250,7 @@ export default function DashboardPage() {
             Array.from({ length: 4 }).map((_, i) => (
               <div
                 key={i}
-                className="h-28 rounded-xl border border-white/5 bg-white/[0.02] flex items-center justify-center"
+                className="h-28 rounded-xl border border-white/5 bg-white/2 flex items-center justify-center"
               >
                 <Loader2 className="w-4 h-4 text-white/20 animate-spin" />
               </div>
@@ -325,33 +316,18 @@ export default function DashboardPage() {
               initial={{ opacity: 0, y: 30, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.85, transition: { duration: 0.2 } }}
-              className="pointer-events-auto w-full p-4 rounded-xl border border-white/10 bg-[#060816]/95 backdrop-blur-xl shadow-2xl flex items-start gap-3 relative overflow-hidden"
-              style={{
-                boxShadow: "0 10px 40px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.05)"
-              }}
+              className={`toast-panel toast-${toast.severity} pointer-events-auto w-full p-4 rounded-xl border border-white/10 bg-bg-dark-navy/95 backdrop-blur-xl flex items-start gap-3 relative overflow-hidden`}
             >
               {/* Severity Accent Bar */}
-              <div 
-                className="absolute top-0 left-0 bottom-0 w-1"
-                style={{
-                  backgroundColor: toast.severity === "critical" ? "#ef4444" : toast.severity === "high" ? "#f97316" : "#f59e0b"
-                }}
-              />
+              <div className="toast-severity-bar absolute top-0 left-0 bottom-0 w-1" />
               
-              <div className="flex-shrink-0 mt-0.5">
+              <div className="shrink-0 mt-0.5">
                 <Bell className="w-3.5 h-3.5 text-white/50 animate-bounce" />
               </div>
               
               <div className="flex-1 min-w-0 pl-1">
                 <div className="flex items-center justify-between mb-1">
-                  <span 
-                    className="text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded"
-                    style={{
-                      color: toast.severity === "critical" ? "#ef4444" : toast.severity === "high" ? "#f97316" : "#f59e0b",
-                      backgroundColor: toast.severity === "critical" ? "rgba(239, 68, 68, 0.1)" : toast.severity === "high" ? "rgba(249, 115, 22, 0.1)" : "rgba(245, 158, 11, 0.1)",
-                      border: `1px solid ${toast.severity === "critical" ? "rgba(239, 68, 68, 0.2)" : toast.severity === "high" ? "rgba(249, 115, 22, 0.2)" : "rgba(245, 158, 11, 0.2)"}`
-                    }}
-                  >
+                  <span className="toast-severity-badge text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded">
                     {toast.severity} threat
                   </span>
                   <span className="text-[8px] text-white/30 font-mono">
@@ -366,9 +342,12 @@ export default function DashboardPage() {
                 </p>
               </div>
               
-              <button 
+              <button
+                type="button"
                 onClick={() => removeToast(toast.id)}
-                className="text-white/20 hover:text-white/60 transition-colors flex-shrink-0 p-0.5"
+                aria-label={`Dismiss ${toast.title}`}
+                title="Dismiss notification"
+                className="text-white/20 hover:text-white/60 transition-colors shrink-0 p-0.5"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -379,7 +358,7 @@ export default function DashboardPage() {
 
       {/* Footer */}
       <footer className="border-t border-white/5 py-6">
-        <div className="max-w-[1400px] mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[9px] text-white/20 font-mono">
+        <div className="max-w-350 mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[9px] text-white/20 font-mono">
           <span>PROJECT MIRAGE // SECURITY DASHBOARD v1.0</span>
           <span className="text-brand-emerald/60">ALL SYSTEMS NOMINAL</span>
         </div>
