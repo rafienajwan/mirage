@@ -188,9 +188,19 @@ async def test_training_data_export_jsonl(client):
         assert response.status_code == 200
 
     export = await client.get("/api/v1/dashboard/training-data/export")
+    summary = await client.get("/api/v1/dashboard/training-data/summary")
 
     assert export.status_code == 200
     assert export.headers["content-type"].startswith("application/x-ndjson")
     rows = [json.loads(line) for line in export.text.splitlines()]
     assert {row["label"] for row in rows} == {0, 1}
     assert all(row["features"] for row in rows)
+
+    assert summary.status_code == 200
+    summary_data = summary.json()
+    assert summary_data["labeled_rows"] == 2
+    assert summary_data["exportable_rows"] == 2
+    assert summary_data["normal_rows"] == 1
+    assert summary_data["suspicious_rows"] == 1
+    assert summary_data["has_both_classes"] is True
+    assert summary_data["ready_for_training"] is False
