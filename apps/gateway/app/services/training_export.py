@@ -15,6 +15,8 @@ LABEL_TO_BINARY = {
     AnalystLabel.FALSE_NEGATIVE: 1,
 }
 
+MINIMUM_TRAINING_ROWS = 20
+
 
 def event_to_training_row(event: EventRecord) -> dict | None:
     """Convert an analyst-labeled event into the trainer's JSONL row shape."""
@@ -37,3 +39,46 @@ def events_to_jsonl(events: Iterable[EventRecord]) -> str:
         if (row := event_to_training_row(event)) is not None
     ]
     return "".join(f"{json.dumps(row, sort_keys=True)}\n" for row in rows)
+
+
+def training_data_summary(
+    events: Iterable[EventRecord],
+    minimum_rows: int = MINIMUM_TRAINING_ROWS,
+) -> dict:
+    """Summarize whether analyst labels are ready for a first training run."""
+    analyst_labels = {label.value: 0 for label in AnalystLabel}
+    normal_rows = 0
+    suspicious_rows = 0
+    labeled_rows = 0
+    exportable_rows = 0
+
+    for event in events:
+        if event.analyst_label is None:
+            continue
+
+        labeled_rows += 1
+        analyst_labels[event.analyst_label.value] += 1
+
+        row = event_to_training_row(event)
+        if row is None:
+            continue
+
+        exportable_rows += 1
+        if row["label"] == 0:
+            normal_rows += 1
+        else:
+            suspicious_rows += 1
+
+    has_both_classes = normal_rows > 0 and suspicious_rows > 0
+    ready_for_training = exportable_rows >= minimum_rows and has_both_classes
+
+    return {
+        "labeled_rows": labeled_rows,
+        "exportable_rows": exportable_rows,
+        "minimum_rows": minimum_rows,
+        "normal_rows": normal_rows,
+        "suspicious_rows": suspicious_rows,
+        "has_both_classes": has_both_classes,
+        "ready_for_training": ready_for_training,
+        "analyst_labels": analyst_labels,
+    }

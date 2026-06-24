@@ -21,6 +21,19 @@ class DashboardOverview(BaseModel):
     average_risk_score: float = Field(ge=0, le=100)
 
 
+class TrainingDataSummary(BaseModel):
+    """Readiness summary for analyst-labeled model training data."""
+
+    labeled_rows: int = Field(ge=0)
+    exportable_rows: int = Field(ge=0)
+    minimum_rows: int = Field(ge=1)
+    normal_rows: int = Field(ge=0)
+    suspicious_rows: int = Field(ge=0)
+    has_both_classes: bool
+    ready_for_training: bool
+    analyst_labels: dict[str, int]
+
+
 # ─── Alerts ────────────────────────────────────────────────────
 
 class AlertSeverity(str, Enum):

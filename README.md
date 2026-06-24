@@ -20,7 +20,7 @@ exact implementation gap.
 - dashboard metrics, events, alerts, traffic history, and simulation controls;
 - ML-ready feature vectors, optional ML shadow scoring, and an offline Random Forest training pipeline;
 - analyst event labels for future training data curation;
-- JSONL export for analyst-labeled training records;
+- JSONL export and readiness checks for analyst-labeled training records;
 - Docker Compose configuration for the five-service demo stack.
 
 ## Current Boundaries
@@ -187,6 +187,7 @@ All paths below use the `http://localhost:8000` base URL.
 | `POST /api/v1/simulate/suspicious` | API key | Generate a suspicious demo event |
 | `GET /api/v1/dashboard/*` | Public | Dashboard metrics, events, alerts, and charts |
 | `GET /api/v1/dashboard/training-data/export` | API key | Export analyst-labeled feature vectors as JSONL |
+| `GET /api/v1/dashboard/training-data/summary` | API key | Check labeled row counts and class balance before training |
 | `GET /api/v1/decoy/status` | Public | Current decoy metrics |
 | `POST /api/v1/decoy/respond` | API key | Generate an in-process synthetic response |
 
@@ -224,6 +225,11 @@ python scripts/train_model.py --input data/training_events.jsonl --output artifa
 
 Do not promote an artifact without reviewing dataset provenance, holdout
 behavior, precision, recall, F1, and false-positive rate.
+
+The dashboard training indicator and `/api/v1/dashboard/training-data/summary`
+use the same export rules. A first local training run is considered ready when
+there are at least 20 exportable analyst-labeled rows and both binary classes are
+present.
 
 ## Repository Layout
 

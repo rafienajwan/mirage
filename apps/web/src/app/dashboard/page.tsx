@@ -8,9 +8,9 @@ import ThreatFeed from "@/components/dashboard/ThreatFeed";
 import DecoyStatusCard from "@/components/dashboard/DecoyStatusCard";
 import AlertPanel from "@/components/dashboard/AlertPanel";
 import SimulationPanel from "@/components/dashboard/SimulationPanel";
-import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, labelEvent, downloadTrainingData } from "@/lib/api";
-import type { AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData } from "@/lib/api";
-import { Globe, ShieldAlert, ArrowRightLeft, Bell, Download, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
+import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, labelEvent, downloadTrainingData } from "@/lib/api";
+import type { AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary } from "@/lib/api";
+import { Globe, ShieldAlert, ArrowRightLeft, Bell, Database, Download, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Charts use Recharts ResponsiveContainer — must be client-only to avoid SSR dimension warnings
@@ -96,6 +96,7 @@ export default function DashboardPage() {
   const [traffic, setTraffic] = useState<TrafficPoint[]>([]);
   const [riskHistory, setRiskHistory] = useState<RiskHistoryPoint[]>([]);
   const [decoyStatus, setDecoyStatus] = useState<DecoyStatusData | null>(null);
+  const [trainingSummary, setTrainingSummary] = useState<TrainingDataSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [labelingEventId, setLabelingEventId] = useState<string | null>(null);
@@ -188,13 +189,14 @@ export default function DashboardPage() {
 
   const load = useCallback(async () => {
     try {
-      const [ov, ev, al, tr, rh, ds] = await Promise.all([
+      const [ov, ev, al, tr, rh, ds, ts] = await Promise.all([
         fetchOverview(),
         fetchEvents(),
         fetchAlerts(),
         fetchTraffic(),
         fetchRiskHistory(),
         fetchDecoyStatus(),
+        fetchTrainingDataSummary().catch(() => null),
       ]);
       setOverview(ov);
       setEvents(ev);
@@ -202,6 +204,7 @@ export default function DashboardPage() {
       setTraffic(tr);
       setRiskHistory(rh);
       setDecoyStatus(ds);
+      setTrainingSummary(ts);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch data");
@@ -220,6 +223,13 @@ export default function DashboardPage() {
     };
   }, [load]);
 
+  const trainingRowsText = trainingSummary
+    ? `${trainingSummary.exportableRows}/${trainingSummary.minimumRows} rows`
+    : "checking rows";
+  const trainingClassesText = trainingSummary?.hasBothClasses
+    ? `${trainingSummary.normalRows} normal / ${trainingSummary.suspiciousRows} suspicious`
+    : "needs both classes";
+
   return (
     <div className="min-h-screen flex flex-col bg-bg-dark-navy text-white relative">
       <Header />
@@ -237,6 +247,23 @@ export default function DashboardPage() {
           </div>
           
           <div className="flex flex-wrap items-center gap-2">
+            <div
+              title={`Training data: ${trainingRowsText}; ${trainingClassesText}`}
+              className={`flex items-center gap-2 px-3 py-2 rounded border text-[10px] font-mono tracking-widest ${
+                trainingSummary?.readyForTraining
+                  ? "border-brand-emerald/30 bg-brand-emerald/10 text-brand-emerald"
+                  : "border-amber-500/20 bg-amber-500/5 text-amber-300"
+              }`}
+            >
+              <Database className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                {trainingSummary?.readyForTraining ? "TRAINING READY" : "TRAINING PENDING"}
+              </span>
+              <span className="hidden md:inline text-white/35">
+                {trainingRowsText} | {trainingClassesText}
+              </span>
+            </div>
+
             <button
               type="button"
               onClick={handleTrainingExport}

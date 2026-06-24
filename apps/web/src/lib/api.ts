@@ -65,6 +65,17 @@ interface BackendSimulationResult {
   ml_shadow: BackendMlShadow | null;
 }
 
+interface BackendTrainingDataSummary {
+  labeled_rows: number;
+  exportable_rows: number;
+  minimum_rows: number;
+  normal_rows: number;
+  suspicious_rows: number;
+  has_both_classes: boolean;
+  ready_for_training: boolean;
+  analyst_labels: Record<AnalystLabel, number>;
+}
+
 // ─── Frontend types (mapped from backend) ───────────────────────
 
 export interface OverviewMetrics {
@@ -136,6 +147,17 @@ export interface TrafficPoint {
 export interface RiskHistoryPoint {
   timestamp: string;
   riskScore: number;
+}
+
+export interface TrainingDataSummary {
+  labeledRows: number;
+  exportableRows: number;
+  minimumRows: number;
+  normalRows: number;
+  suspiciousRows: number;
+  hasBothClasses: boolean;
+  readyForTraining: boolean;
+  analystLabels: Record<AnalystLabel, number>;
 }
 
 // ─── Mapping helpers ────────────────────────────────────────────
@@ -266,6 +288,25 @@ export async function downloadTrainingData(): Promise<Blob> {
     throw new Error(`Training export error: ${res.status} ${res.statusText}`);
   }
   return res.blob();
+}
+
+/** Fetch analyst-labeled training data readiness. */
+export async function fetchTrainingDataSummary(): Promise<TrainingDataSummary> {
+  const res = await fetch("/api/training-data/summary", { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`Training summary error: ${res.status} ${res.statusText}`);
+  }
+  const data = (await res.json()) as BackendTrainingDataSummary;
+  return {
+    labeledRows: data.labeled_rows,
+    exportableRows: data.exportable_rows,
+    minimumRows: data.minimum_rows,
+    normalRows: data.normal_rows,
+    suspiciousRows: data.suspicious_rows,
+    hasBothClasses: data.has_both_classes,
+    readyForTraining: data.ready_for_training,
+    analystLabels: data.analyst_labels,
+  };
 }
 
 /** Fetch active alerts. */

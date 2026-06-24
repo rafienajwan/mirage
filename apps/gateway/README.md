@@ -90,6 +90,17 @@ curl -H "X-Mirage-API-Key: YOUR_LOCAL_MIRAGE_API_KEY" \
   -o data/training_events.jsonl
 ```
 
+Check dataset readiness before training:
+
+```bash
+curl -H "X-Mirage-API-Key: YOUR_LOCAL_MIRAGE_API_KEY" \
+  http://localhost:8000/api/v1/dashboard/training-data/summary
+```
+
+The readiness summary follows the same export filter: analyst-labeled events
+must include a feature vector. A first local training run is considered ready
+after at least 20 exportable rows exist and both binary classes are present.
+
 ## Known Limitations
 
 - proxy coverage is limited to `/api/v1/proxy/*`;
