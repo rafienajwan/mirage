@@ -74,7 +74,16 @@ python -m pytest tests -q
 ## Offline Model Training
 
 ```bash
-python scripts/train_model.py --input data/training_events.jsonl --output artifacts/risk_model.joblib
+python scripts/prepare_dataset.py \
+  --source mirage-jsonl \
+  --input data/raw/runtime/training_events.jsonl \
+  --output-dir data/prepared/runtime-v1 \
+  --dataset-name runtime-export \
+  --dataset-version v1
+
+python scripts/train_model.py \
+  --input data/prepared/runtime-v1/train.jsonl \
+  --output artifacts/risk_model.joblib
 ```
 
 Training computes precision, recall, F1, and false-positive rate. Runtime

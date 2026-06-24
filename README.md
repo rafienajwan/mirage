@@ -21,6 +21,7 @@ exact implementation gap.
 - ML-ready feature vectors, optional ML shadow scoring, and an offline Random Forest training pipeline;
 - analyst event labels for future training data curation;
 - JSONL export and readiness checks for analyst-labeled training records;
+- dataset preparation adapters for MIRAGE JSONL and CICIDS-style CSV sources;
 - Docker Compose configuration for the five-service demo stack.
 
 ## Current Boundaries
@@ -218,9 +219,21 @@ docker compose --env-file .env -f infra/docker-compose.yml config --quiet
 Runtime decisions remain heuristic. Training accepts JSON Lines records with a
 numeric `features` object and binary `label` (`0` normal, `1` suspicious):
 
+Prepare a reviewed dataset split first:
+
 ```bash
 cd apps/gateway
-python scripts/train_model.py --input data/training_events.jsonl --output artifacts/risk_model.joblib
+python scripts/prepare_dataset.py \
+  --source mirage-jsonl \
+  --input data/raw/runtime/training_events.jsonl \
+  --output-dir data/prepared/runtime-v1 \
+  --dataset-name runtime-export \
+  --dataset-version v1
+```
+
+```bash
+cd apps/gateway
+python scripts/train_model.py --input data/prepared/runtime-v1/train.jsonl --output artifacts/risk_model.joblib
 ```
 
 Do not promote an artifact without reviewing dataset provenance, holdout
@@ -251,6 +264,7 @@ infra/
 
 - `docs/architecture.md`: implemented and target architecture boundaries;
 - `docs/configuration.md`: environment files, variable scopes, and secret handling;
+- `docs/dataset-preparation.md`: raw dataset adapters, splits, and readiness rules;
 - `docs/demo-flow.md`: concise end-to-end demonstration;
 - `docs/PROPOSAL_ALIGNMENT.md`: proposal capability matrix and safe claims;
 - `apps/gateway/README.md`: gateway-specific development notes;
@@ -258,8 +272,8 @@ infra/
 
 ## Next Priorities
 
-1. Prepare versioned CICIDS2017 and custom API-log datasets.
-2. Train and review the first model from analyst-labeled JSONL exports.
+1. Expand CICIDS2017 and custom API-log adapters with reviewed real datasets.
+2. Train and review the first model from prepared JSONL splits.
 3. Run trained models in shadow mode before changing routing decisions.
 4. Add retraining workflows from analyst-corrected labels.
 5. Replace dashboard polling with authenticated WebSocket updates.
