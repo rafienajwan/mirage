@@ -226,9 +226,9 @@ export default function DashboardPage() {
   const trainingRowsText = trainingSummary
     ? `${trainingSummary.exportableRows}/${trainingSummary.minimumRows} rows`
     : "checking rows";
-  const trainingClassesText = trainingSummary?.hasBothClasses
+  const trainingClassesText = trainingSummary?.hasMinimumClassRows
     ? `${trainingSummary.normalRows} normal / ${trainingSummary.suspiciousRows} suspicious`
-    : "needs both classes";
+    : `needs ${trainingSummary?.minimumRowsPerClass ?? 2}+ per class`;
 
   return (
     <div className="min-h-screen flex flex-col bg-bg-dark-navy text-white relative">

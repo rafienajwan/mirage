@@ -203,4 +203,6 @@ async def test_training_data_export_jsonl(client):
     assert summary_data["normal_rows"] == 1
     assert summary_data["suspicious_rows"] == 1
     assert summary_data["has_both_classes"] is True
+    assert summary_data["minimum_rows_per_class"] == 2
+    assert summary_data["has_minimum_class_rows"] is False
     assert summary_data["ready_for_training"] is False

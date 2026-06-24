@@ -27,9 +27,11 @@ class TrainingDataSummary(BaseModel):
     labeled_rows: int = Field(ge=0)
     exportable_rows: int = Field(ge=0)
     minimum_rows: int = Field(ge=1)
+    minimum_rows_per_class: int = Field(ge=1)
     normal_rows: int = Field(ge=0)
     suspicious_rows: int = Field(ge=0)
     has_both_classes: bool
+    has_minimum_class_rows: bool
     ready_for_training: bool
     analyst_labels: dict[str, int]
 

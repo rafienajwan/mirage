@@ -228,8 +228,8 @@ behavior, precision, recall, F1, and false-positive rate.
 
 The dashboard training indicator and `/api/v1/dashboard/training-data/summary`
 use the same export rules. A first local training run is considered ready when
-there are at least 20 exportable analyst-labeled rows and both binary classes are
-present.
+there are at least 20 exportable analyst-labeled rows and each binary class has
+at least two rows for stratified splitting.
 
 ## Repository Layout
 

@@ -69,9 +69,11 @@ interface BackendTrainingDataSummary {
   labeled_rows: number;
   exportable_rows: number;
   minimum_rows: number;
+  minimum_rows_per_class: number;
   normal_rows: number;
   suspicious_rows: number;
   has_both_classes: boolean;
+  has_minimum_class_rows: boolean;
   ready_for_training: boolean;
   analyst_labels: Record<AnalystLabel, number>;
 }
@@ -153,9 +155,11 @@ export interface TrainingDataSummary {
   labeledRows: number;
   exportableRows: number;
   minimumRows: number;
+  minimumRowsPerClass: number;
   normalRows: number;
   suspiciousRows: number;
   hasBothClasses: boolean;
+  hasMinimumClassRows: boolean;
   readyForTraining: boolean;
   analystLabels: Record<AnalystLabel, number>;
 }
@@ -301,9 +305,11 @@ export async function fetchTrainingDataSummary(): Promise<TrainingDataSummary> {
     labeledRows: data.labeled_rows,
     exportableRows: data.exportable_rows,
     minimumRows: data.minimum_rows,
+    minimumRowsPerClass: data.minimum_rows_per_class,
     normalRows: data.normal_rows,
     suspiciousRows: data.suspicious_rows,
     hasBothClasses: data.has_both_classes,
+    hasMinimumClassRows: data.has_minimum_class_rows,
     readyForTraining: data.ready_for_training,
     analystLabels: data.analyst_labels,
   };

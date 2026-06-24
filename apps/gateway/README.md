@@ -99,7 +99,8 @@ curl -H "X-Mirage-API-Key: YOUR_LOCAL_MIRAGE_API_KEY" \
 
 The readiness summary follows the same export filter: analyst-labeled events
 must include a feature vector. A first local training run is considered ready
-after at least 20 exportable rows exist and both binary classes are present.
+after at least 20 exportable rows exist and each binary class has at least two
+rows for stratified splitting.
 
 ## Known Limitations
 
