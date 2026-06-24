@@ -115,6 +115,40 @@ class DatabaseStore:
                 labeled_at=row.labeled_at,
             )
 
+    async def get_labeled_events(self, limit: int = 10000) -> list[EventRecord]:
+        async with get_session() as session:
+            stmt = (
+                select(EventModel)
+                .where(EventModel.analyst_label.is_not(None))
+                .order_by(EventModel.id.asc())
+                .limit(limit)
+            )
+            result = await session.execute(stmt)
+            rows = result.scalars().all()
+            return [
+                EventRecord(
+                    event_id=r.event_id,
+                    timestamp=r.timestamp,
+                    ip_address=r.ip_address,
+                    path=r.path,
+                    method=r.method,
+                    risk_score=r.risk_score,
+                    decision=Decision(r.decision),
+                    event_type=r.event_type,
+                    summary=r.summary,
+                    feature_vector=r.feature_vector or {},
+                    ml_shadow=r.ml_shadow,
+                    analyst_label=(
+                        AnalystLabel(r.analyst_label)
+                        if r.analyst_label
+                        else None
+                    ),
+                    analyst_note=r.analyst_note or "",
+                    labeled_at=r.labeled_at,
+                )
+                for r in rows
+            ]
+
     # ── Alerts ─────────────────────────────────────────────────
 
     async def add_alert(

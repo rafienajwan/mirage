@@ -259,6 +259,15 @@ export async function labelEvent(
   return mapEvent(await res.json());
 }
 
+/** Download analyst-labeled feature vectors as JSON Lines. */
+export async function downloadTrainingData(): Promise<Blob> {
+  const res = await fetch("/api/training-data/export", { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`Training export error: ${res.status} ${res.statusText}`);
+  }
+  return res.blob();
+}
+
 /** Fetch active alerts. */
 export async function fetchAlerts(): Promise<FeedAlert[]> {
   const { alerts } = await apiFetch<{ alerts: BackendAlert[] }>("/dashboard/alerts");

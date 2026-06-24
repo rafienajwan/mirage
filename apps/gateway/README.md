@@ -82,6 +82,14 @@ routing remains heuristic until a reviewed artifact is enabled in shadow mode.
 Set `MIRAGE_MODEL_ARTIFACT` to a trained artifact path to store model-only
 scores beside events without changing live routing.
 
+Analyst-labeled events can be exported from the running gateway as JSON Lines:
+
+```bash
+curl -H "X-Mirage-API-Key: YOUR_LOCAL_MIRAGE_API_KEY" \
+  http://localhost:8000/api/v1/dashboard/training-data/export \
+  -o data/training_events.jsonl
+```
+
 ## Known Limitations
 
 - proxy coverage is limited to `/api/v1/proxy/*`;

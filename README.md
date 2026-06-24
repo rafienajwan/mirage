@@ -20,6 +20,7 @@ exact implementation gap.
 - dashboard metrics, events, alerts, traffic history, and simulation controls;
 - ML-ready feature vectors, optional ML shadow scoring, and an offline Random Forest training pipeline;
 - analyst event labels for future training data curation;
+- JSONL export for analyst-labeled training records;
 - Docker Compose configuration for the five-service demo stack.
 
 ## Current Boundaries
@@ -185,6 +186,7 @@ All paths below use the `http://localhost:8000` base URL.
 | `POST /api/v1/simulate/normal` | API key | Generate a normal demo event |
 | `POST /api/v1/simulate/suspicious` | API key | Generate a suspicious demo event |
 | `GET /api/v1/dashboard/*` | Public | Dashboard metrics, events, alerts, and charts |
+| `GET /api/v1/dashboard/training-data/export` | API key | Export analyst-labeled feature vectors as JSONL |
 | `GET /api/v1/decoy/status` | Public | Current decoy metrics |
 | `POST /api/v1/decoy/respond` | API key | Generate an in-process synthetic response |
 
@@ -251,7 +253,7 @@ infra/
 ## Next Priorities
 
 1. Prepare versioned CICIDS2017 and custom API-log datasets.
-2. Export labeled event features into trainable JSONL datasets.
+2. Train and review the first model from analyst-labeled JSONL exports.
 3. Run trained models in shadow mode before changing routing decisions.
 4. Add retraining workflows from analyst-corrected labels.
 5. Replace dashboard polling with authenticated WebSocket updates.
