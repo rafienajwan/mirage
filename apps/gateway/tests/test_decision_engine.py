@@ -1,5 +1,7 @@
 """Tests for decision logic and request inspection."""
 
+import json
+
 import pytest
 
 from app.schemas.decision import Decision, RiskLevel
@@ -144,3 +146,51 @@ async def test_dashboard_event_labeling_returns_404(client):
     )
 
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_training_data_export_jsonl(client):
+    await client.post(
+        "/api/v1/inspect",
+        json={
+            "ip_address": "192.168.1.1",
+            "method": "GET",
+            "path": "/api/v1/products",
+            "user_agent": "Mozilla/5.0",
+            "request_count": 2,
+            "payload_indicators": [],
+        },
+    )
+    await client.post(
+        "/api/v1/inspect",
+        json={
+            "ip_address": "10.0.0.99",
+            "method": "POST",
+            "path": "/.env",
+            "user_agent": "sqlmap/1.7",
+            "request_count": 85,
+            "payload_indicators": ["sql-like", "path-traversal"],
+        },
+    )
+
+    events = (await client.get("/api/v1/dashboard/events?limit=2")).json()["events"]
+    labels = {
+        event["event_id"]: (
+            "suspicious" if event["decision"] == "redirect_to_decoy" else "normal"
+        )
+        for event in events
+    }
+    for event_id, label in labels.items():
+        response = await client.patch(
+            f"/api/v1/dashboard/events/{event_id}/label",
+            json={"label": label},
+        )
+        assert response.status_code == 200
+
+    export = await client.get("/api/v1/dashboard/training-data/export")
+
+    assert export.status_code == 200
+    assert export.headers["content-type"].startswith("application/x-ndjson")
+    rows = [json.loads(line) for line in export.text.splitlines()]
+    assert {row["label"] for row in rows} == {0, 1}
+    assert all(row["features"] for row in rows)

@@ -1,11 +1,12 @@
 """Dashboard API endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from app.core.security import require_api_key
 from app.schemas.dashboard import DashboardOverview
 from app.schemas.event import EventLabelRequest
 from app.services.threat_analysis import get_threat_summary
+from app.services.training_export import events_to_jsonl
 from app.storage import store
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -43,6 +44,22 @@ async def label_dashboard_event(event_id: str, payload: EventLabelRequest):
             detail="Event not found",
         )
     return updated.model_dump(mode="json")
+
+
+@router.get(
+    "/training-data/export",
+    dependencies=[Depends(require_api_key)],
+)
+async def export_training_data(limit: int = Query(default=10000, ge=1, le=50000)):
+    """Export analyst-labeled feature vectors as JSON Lines for model training."""
+    events = await store.get_labeled_events(limit=limit)
+    return Response(
+        content=events_to_jsonl(events),
+        media_type="application/x-ndjson",
+        headers={
+            "Content-Disposition": 'attachment; filename="training_events.jsonl"',
+        },
+    )
 
 
 @router.get("/alerts")

@@ -48,6 +48,10 @@ class MemoryStore:
                 return updated
         return None
 
+    async def get_labeled_events(self, limit: int = 10000) -> list[EventRecord]:
+        labeled = [event for event in self.events if event.analyst_label is not None]
+        return labeled[:limit]
+
     # ── Alerts ─────────────────────────────────────────────────
 
     async def add_alert(

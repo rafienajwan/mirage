@@ -8,9 +8,9 @@ import ThreatFeed from "@/components/dashboard/ThreatFeed";
 import DecoyStatusCard from "@/components/dashboard/DecoyStatusCard";
 import AlertPanel from "@/components/dashboard/AlertPanel";
 import SimulationPanel from "@/components/dashboard/SimulationPanel";
-import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, labelEvent } from "@/lib/api";
+import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, labelEvent, downloadTrainingData } from "@/lib/api";
 import type { AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData } from "@/lib/api";
-import { Globe, ShieldAlert, ArrowRightLeft, Bell, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
+import { Globe, ShieldAlert, ArrowRightLeft, Bell, Download, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Charts use Recharts ResponsiveContainer — must be client-only to avoid SSR dimension warnings
@@ -99,6 +99,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [labelingEventId, setLabelingEventId] = useState<string | null>(null);
+  const [exportingTrainingData, setExportingTrainingData] = useState(false);
 
   // Toast notifications & audio toggle
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
@@ -165,6 +166,26 @@ export default function DashboardPage() {
     }
   }, []);
 
+  const handleTrainingExport = useCallback(async () => {
+    setExportingTrainingData(true);
+    try {
+      const blob = await downloadTrainingData();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "training_events.jsonl";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to export training data");
+    } finally {
+      setExportingTrainingData(false);
+    }
+  }, []);
+
   const load = useCallback(async () => {
     try {
       const [ov, ev, al, tr, rh, ds] = await Promise.all([
@@ -215,29 +236,45 @@ export default function DashboardPage() {
             </p>
           </div>
           
-          {/* Cyberpunk Audio Toggle */}
-          <button
-            type="button"
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            aria-pressed={soundEnabled}
-            className={`flex items-center gap-2 px-4 py-2 rounded border text-[10px] font-mono tracking-widest transition-all duration-300 hover:scale-[1.01] ${
-              soundEnabled
-                ? "bg-brand-cyan/10 border-brand-cyan/40 text-brand-cyan shadow-[0_0_15px_rgba(0,240,255,0.2)]"
-                : "bg-white/2 border-white/5 text-white/40 hover:text-white/60 hover:border-white/10"
-            }`}
-          >
-            {soundEnabled ? (
-              <>
-                <Volume2 className="w-3.5 h-3.5 animate-pulse" />
-                <span>ALARM AUDIO: ACTIVE</span>
-              </>
-            ) : (
-              <>
-                <VolumeX className="w-3.5 h-3.5" />
-                <span>ALARM AUDIO: MUTED</span>
-              </>
-            )}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleTrainingExport}
+              disabled={exportingTrainingData}
+              className="flex items-center gap-2 px-4 py-2 rounded border border-brand-emerald/25 bg-brand-emerald/10 text-brand-emerald text-[10px] font-mono tracking-widest transition-all duration-300 hover:scale-[1.01] hover:border-brand-emerald/40 disabled:cursor-wait disabled:opacity-50"
+            >
+              {exportingTrainingData ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Download className="w-3.5 h-3.5" />
+              )}
+              <span>EXPORT JSONL</span>
+            </button>
+
+            {/* Cyberpunk Audio Toggle */}
+            <button
+              type="button"
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              aria-pressed={soundEnabled}
+              className={`flex items-center gap-2 px-4 py-2 rounded border text-[10px] font-mono tracking-widest transition-all duration-300 hover:scale-[1.01] ${
+                soundEnabled
+                  ? "bg-brand-cyan/10 border-brand-cyan/40 text-brand-cyan shadow-[0_0_15px_rgba(0,240,255,0.2)]"
+                  : "bg-white/2 border-white/5 text-white/40 hover:text-white/60 hover:border-white/10"
+              }`}
+            >
+              {soundEnabled ? (
+                <>
+                  <Volume2 className="w-3.5 h-3.5 animate-pulse" />
+                  <span>ALARM AUDIO: ACTIVE</span>
+                </>
+              ) : (
+                <>
+                  <VolumeX className="w-3.5 h-3.5" />
+                  <span>ALARM AUDIO: MUTED</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Error banner */}
