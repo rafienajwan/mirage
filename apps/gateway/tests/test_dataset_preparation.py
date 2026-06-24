@@ -1,0 +1,133 @@
+"""Tests for dataset validation and preparation workflows."""
+
+from __future__ import annotations
+
+import json
+
+import pytest
+
+from app.ml.datasets import (
+    DatasetValidationError,
+    PreparedTrainingRow,
+    load_cicids_csv,
+    load_mirage_jsonl,
+    prepare_dataset,
+    stratified_split,
+)
+from app.services.feature_extraction import FEATURE_NAMES
+
+
+def _features(offset: float = 0.0) -> dict[str, float]:
+    features = {name: 0.0 for name in FEATURE_NAMES}
+    features["request_count_log"] = offset
+    features["sensitive_path"] = offset % 2
+    return features
+
+
+def _write_jsonl(path, rows: list[dict]) -> None:
+    path.write_text(
+        "".join(f"{json.dumps(row)}\n" for row in rows),
+        encoding="utf-8",
+    )
+
+
+def test_load_mirage_jsonl_normalizes_feature_order(tmp_path):
+    source = tmp_path / "training_events.jsonl"
+    _write_jsonl(
+        source,
+        [
+            {
+                "event_id": "evt-1",
+                "label": 1,
+                "features": {
+                    "request_count_log": "3.5",
+                    "unknown_feature": 999,
+                },
+            }
+        ],
+    )
+
+    rows = load_mirage_jsonl(source)
+
+    assert len(rows) == 1
+    assert rows[0].label == 1
+    assert set(rows[0].features) == set(FEATURE_NAMES)
+    assert rows[0].features["request_count_log"] == 3.5
+    assert "unknown_feature" not in rows[0].features
+
+
+def test_load_mirage_jsonl_rejects_bad_label(tmp_path):
+    source = tmp_path / "training_events.jsonl"
+    _write_jsonl(source, [{"label": 3, "features": _features()}])
+
+    with pytest.raises(DatasetValidationError, match="label must be 0 or 1"):
+        load_mirage_jsonl(source)
+
+
+def test_stratified_split_requires_two_rows_per_class():
+    rows = [
+        *load_rows(label=0, count=19),
+        *load_rows(label=1, count=1),
+    ]
+
+    with pytest.raises(DatasetValidationError, match="at least two rows"):
+        stratified_split(rows)
+
+
+def test_prepare_dataset_writes_split_and_manifest(tmp_path):
+    source = tmp_path / "training_events.jsonl"
+    rows = [
+        {"label": label, "features": _features(float(index))}
+        for label in (0, 1)
+        for index in range(10)
+    ]
+    _write_jsonl(source, rows)
+
+    manifest = prepare_dataset(
+        source,
+        tmp_path / "prepared" / "runtime-v1",
+        source_kind="mirage-jsonl",
+        dataset_name="runtime-export",
+        dataset_version="v1",
+        train_ratio=0.8,
+        random_seed=7,
+    )
+
+    output_dir = tmp_path / "prepared" / "runtime-v1"
+    manifest_data = json.loads((output_dir / "manifest.json").read_text())
+    train_rows = (output_dir / "train.jsonl").read_text().splitlines()
+    test_rows = (output_dir / "test.jsonl").read_text().splitlines()
+
+    assert manifest.total_rows == 20
+    assert manifest.train_rows == 16
+    assert manifest.test_rows == 4
+    assert manifest_data["label_counts"] == {"0": 10, "1": 10}
+    assert len(train_rows) == 16
+    assert len(test_rows) == 4
+
+
+def test_load_cicids_csv_maps_known_columns(tmp_path):
+    source = tmp_path / "cicids.csv"
+    source.write_text(
+        "\n".join(
+            [
+                "Destination Port,Flow Duration,Flow Packets/s,Packet Length Mean,SYN Flag Count,Average Packet Size,Label",
+                "443,1200,15.5,42.0,2,64.0,BENIGN",
+                "8080,5000,95.0,128.0,4,256.0,DDoS",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    rows = load_cicids_csv(source)
+
+    assert [row.label for row in rows] == [0, 1]
+    assert rows[0].features["destination_port"] == 443.0
+    assert rows[1].features["flow_packets_per_second"] == 95.0
+
+
+def load_rows(label: int, count: int):
+    return [
+        PreparedTrainingRow(features=_features(float(i)), label=label)
+        for i in range(count)
+    ]

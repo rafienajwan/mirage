@@ -23,8 +23,8 @@ the beginning of a real ML pipeline.
 | Honeytoken detection | Not implemented | Fake credential strings exist, but issuance, tracking, and use-triggered alerts do not. |
 | PostgreSQL/Supabase storage | Partial | Async PostgreSQL and Alembic are supported; Supabase deployment and actor/honeytoken tables are pending. |
 | Feature-vector storage | Implemented | Request and optional CICIDS-style flow features are stored with events. |
-| CICIDS2017 dataset | Not integrated | Relevant fields are accepted, but dataset ingestion, cleaning, splitting, and provenance are pending. |
-| Custom API logs | Partial | Runtime events, features, analyst-corrected labels, and JSONL export tooling are available; reviewed datasets are still pending. |
+| CICIDS2017 dataset | Partial | A basic CICIDS-style CSV adapter and train/test split workflow exist; reviewed raw dataset ingestion, cleaning, and provenance are still pending. |
+| Custom API logs | Partial | Runtime events, features, analyst-corrected labels, JSONL export, validation, and split tooling are available; reviewed datasets are still pending. |
 | Precision/recall/F1/FPR evaluation | Implemented | The Random Forest trainer calculates all four metrics. |
 | Real-time WebSocket dashboard | Not implemented | Dashboard uses 10-second HTTP polling. |
 | Security dashboard and alerts | Implemented for demo | Live metrics, events, risk history, decoy status, and internal alerts are available. |
@@ -44,6 +44,7 @@ The current demo can accurately claim that MIRAGE:
 - can store model-only shadow scores beside events when a reviewed artifact is configured;
 - supports analyst labels for correcting event classification outcomes;
 - exports analyst-labeled feature vectors as JSON Lines for model training;
+- prepares validated train/test splits from MIRAGE JSONL and CICIDS-style CSV sources;
 - displays live backend data on a dashboard;
 - can train and evaluate a Random Forest model from labeled feature records.
 
