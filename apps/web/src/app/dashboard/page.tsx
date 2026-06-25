@@ -8,9 +8,9 @@ import ThreatFeed from "@/components/dashboard/ThreatFeed";
 import DecoyStatusCard from "@/components/dashboard/DecoyStatusCard";
 import AlertPanel from "@/components/dashboard/AlertPanel";
 import SimulationPanel from "@/components/dashboard/SimulationPanel";
-import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, labelEvent, downloadTrainingData } from "@/lib/api";
-import type { AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary } from "@/lib/api";
-import { Globe, ShieldAlert, ArrowRightLeft, Bell, Database, Download, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
+import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, labelEvent, downloadTrainingData } from "@/lib/api";
+import type { AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData } from "@/lib/api";
+import { Globe, ShieldAlert, ArrowRightLeft, Bell, BrainCircuit, Database, Download, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Charts use Recharts ResponsiveContainer — must be client-only to avoid SSR dimension warnings
@@ -97,6 +97,7 @@ export default function DashboardPage() {
   const [riskHistory, setRiskHistory] = useState<RiskHistoryPoint[]>([]);
   const [decoyStatus, setDecoyStatus] = useState<DecoyStatusData | null>(null);
   const [trainingSummary, setTrainingSummary] = useState<TrainingDataSummary | null>(null);
+  const [mlShadowStatus, setMlShadowStatus] = useState<MLShadowStatusData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [labelingEventId, setLabelingEventId] = useState<string | null>(null);
@@ -189,7 +190,7 @@ export default function DashboardPage() {
 
   const load = useCallback(async () => {
     try {
-      const [ov, ev, al, tr, rh, ds, ts] = await Promise.all([
+      const [ov, ev, al, tr, rh, ds, ts, ms] = await Promise.all([
         fetchOverview(),
         fetchEvents(),
         fetchAlerts(),
@@ -197,6 +198,7 @@ export default function DashboardPage() {
         fetchRiskHistory(),
         fetchDecoyStatus(),
         fetchTrainingDataSummary().catch(() => null),
+        fetchMLShadowStatus().catch(() => null),
       ]);
       setOverview(ov);
       setEvents(ev);
@@ -205,6 +207,7 @@ export default function DashboardPage() {
       setRiskHistory(rh);
       setDecoyStatus(ds);
       setTrainingSummary(ts);
+      setMlShadowStatus(ms);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch data");
@@ -229,6 +232,17 @@ export default function DashboardPage() {
   const trainingClassesText = trainingSummary?.hasMinimumClassRows
     ? `${trainingSummary.normalRows} normal / ${trainingSummary.suspiciousRows} suspicious`
     : `needs ${trainingSummary?.minimumRowsPerClass ?? 2}+ per class`;
+  const mlShadowLabel =
+    mlShadowStatus?.mode === "shadow_ready"
+      ? "ML SHADOW READY"
+      : mlShadowStatus?.mode === "missing"
+        ? "ML ARTIFACT MISSING"
+        : mlShadowStatus?.mode === "invalid"
+          ? "ML ARTIFACT INVALID"
+          : "ML SHADOW OFF";
+  const mlShadowDetail = mlShadowStatus?.artifact
+    ? `${mlShadowStatus.artifact} | monitor ${mlShadowStatus.monitorThreshold} / redirect ${mlShadowStatus.redirectThreshold}`
+    : "heuristic routing only";
 
   return (
     <div className="min-h-screen flex flex-col bg-bg-dark-navy text-white relative">
@@ -247,6 +261,23 @@ export default function DashboardPage() {
           </div>
           
           <div className="flex flex-wrap items-center gap-2">
+            <div
+              title={`Model status: ${mlShadowLabel}; ${mlShadowDetail}`}
+              className={`flex items-center gap-2 px-3 py-2 rounded border text-[10px] font-mono tracking-widest ${
+                mlShadowStatus?.mode === "shadow_ready"
+                  ? "border-brand-cyan/30 bg-brand-cyan/10 text-brand-cyan"
+                  : mlShadowStatus?.mode === "invalid" || mlShadowStatus?.mode === "missing"
+                    ? "border-red-500/25 bg-red-500/5 text-red-300"
+                    : "border-white/5 bg-white/2 text-white/40"
+              }`}
+            >
+              <BrainCircuit className="w-3.5 h-3.5 shrink-0" />
+              <span>{mlShadowLabel}</span>
+              <span className="hidden xl:inline text-white/35">
+                {mlShadowDetail}
+              </span>
+            </div>
+
             <div
               title={`Training data: ${trainingRowsText}; ${trainingClassesText}`}
               className={`flex items-center gap-2 px-3 py-2 rounded border text-[10px] font-mono tracking-widest ${

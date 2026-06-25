@@ -78,6 +78,17 @@ interface BackendTrainingDataSummary {
   analyst_labels: Record<AnalystLabel, number>;
 }
 
+interface BackendMLShadowStatus {
+  mode: "disabled" | "missing" | "invalid" | "shadow_ready";
+  artifact: string | null;
+  shadow_ready: boolean;
+  monitor_threshold: number;
+  redirect_threshold: number;
+  metrics: Record<string, number>;
+  blockers: string[];
+  warnings: string[];
+}
+
 // ─── Frontend types (mapped from backend) ───────────────────────
 
 export interface OverviewMetrics {
@@ -162,6 +173,17 @@ export interface TrainingDataSummary {
   hasMinimumClassRows: boolean;
   readyForTraining: boolean;
   analystLabels: Record<AnalystLabel, number>;
+}
+
+export interface MLShadowStatusData {
+  mode: "disabled" | "missing" | "invalid" | "shadow_ready";
+  artifact: string | null;
+  shadowReady: boolean;
+  monitorThreshold: number;
+  redirectThreshold: number;
+  metrics: Record<string, number>;
+  blockers: string[];
+  warnings: string[];
 }
 
 // ─── Mapping helpers ────────────────────────────────────────────
@@ -312,6 +334,21 @@ export async function fetchTrainingDataSummary(): Promise<TrainingDataSummary> {
     hasMinimumClassRows: data.has_minimum_class_rows,
     readyForTraining: data.ready_for_training,
     analystLabels: data.analyst_labels,
+  };
+}
+
+/** Fetch model-only shadow scoring status. */
+export async function fetchMLShadowStatus(): Promise<MLShadowStatusData> {
+  const data = await apiFetch<BackendMLShadowStatus>("/dashboard/ml-shadow/status");
+  return {
+    mode: data.mode,
+    artifact: data.artifact,
+    shadowReady: data.shadow_ready,
+    monitorThreshold: data.monitor_threshold,
+    redirectThreshold: data.redirect_threshold,
+    metrics: data.metrics,
+    blockers: data.blockers,
+    warnings: data.warnings,
   };
 }
 
