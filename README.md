@@ -236,6 +236,12 @@ cd apps/gateway
 python scripts/train_model.py --input data/prepared/runtime-v1/train.jsonl --output artifacts/risk_model.joblib
 ```
 
+Review the artifact before enabling shadow mode:
+
+```bash
+python scripts/review_model_artifact.py --artifact artifacts/risk_model.joblib
+```
+
 Do not promote an artifact without reviewing dataset provenance, holdout
 behavior, precision, recall, F1, and false-positive rate.
 
@@ -266,6 +272,7 @@ infra/
 - `docs/configuration.md`: environment files, variable scopes, and secret handling;
 - `docs/dataset-preparation.md`: raw dataset adapters, splits, and readiness rules;
 - `docs/demo-flow.md`: concise end-to-end demonstration;
+- `docs/model-artifacts.md`: artifact review and shadow-mode activation;
 - `docs/PROPOSAL_ALIGNMENT.md`: proposal capability matrix and safe claims;
 - `apps/gateway/README.md`: gateway-specific development notes;
 - `apps/web/README.md`: frontend-specific commands.
@@ -273,8 +280,8 @@ infra/
 ## Next Priorities
 
 1. Expand CICIDS2017 and custom API-log adapters with reviewed real datasets.
-2. Train and review the first model from prepared JSONL splits.
-3. Run trained models in shadow mode before changing routing decisions.
+2. Train the first reviewed model from prepared JSONL splits.
+3. Observe reviewed models in shadow mode before changing routing decisions.
 4. Add retraining workflows from analyst-corrected labels.
 5. Replace dashboard polling with authenticated WebSocket updates.
 6. Add adaptive decoys, honeytoken-use detection, and actor profiles.
