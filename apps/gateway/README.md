@@ -84,6 +84,9 @@ python scripts/prepare_dataset.py \
 python scripts/train_model.py \
   --input data/prepared/runtime-v1/train.jsonl \
   --output artifacts/risk_model.joblib
+
+python scripts/review_model_artifact.py \
+  --artifact artifacts/risk_model.joblib
 ```
 
 Training computes precision, recall, F1, and false-positive rate. Runtime
