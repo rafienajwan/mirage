@@ -59,6 +59,15 @@ Restart the gateway. New events should include `ml_shadow` data with the model
 probability, model-only decision, and whether it agrees with the heuristic live
 decision.
 
+The dashboard also reads:
+
+```text
+GET /api/v1/dashboard/ml-shadow/status
+```
+
+This endpoint returns a sanitized status object for operator visibility. It does
+not expose the full filesystem path of the configured artifact.
+
 ## Safe Claims
 
 It is safe to say that a reviewed artifact is running in shadow mode. It is not

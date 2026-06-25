@@ -189,6 +189,7 @@ All paths below use the `http://localhost:8000` base URL.
 | `GET /api/v1/dashboard/*` | Public | Dashboard metrics, events, alerts, and charts |
 | `GET /api/v1/dashboard/training-data/export` | API key | Export analyst-labeled feature vectors as JSONL |
 | `GET /api/v1/dashboard/training-data/summary` | API key | Check labeled row counts and class balance before training |
+| `GET /api/v1/dashboard/ml-shadow/status` | Public | Report sanitized ML shadow artifact readiness |
 | `GET /api/v1/decoy/status` | Public | Current decoy metrics |
 | `POST /api/v1/decoy/respond` | API key | Generate an in-process synthetic response |
 
