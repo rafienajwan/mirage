@@ -50,3 +50,22 @@ class AlertModel(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+
+
+class HoneytokenHitModel(Base):
+    """Persisted interaction with a decoy token."""
+
+    __tablename__ = "honeytoken_hits"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    hit_id: Mapped[str] = mapped_column(String(32), index=True)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    event_id: Mapped[str] = mapped_column(String(32), index=True)
+    token_kind: Mapped[str] = mapped_column(String(32))
+    token_label: Mapped[str] = mapped_column(String(128))
+    source_ip: Mapped[str] = mapped_column(String(64))
+    path: Mapped[str] = mapped_column(String(512))
+    method: Mapped[str] = mapped_column(String(16))
+    evidence: Mapped[str] = mapped_column(String(256))

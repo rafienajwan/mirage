@@ -11,6 +11,7 @@ from app.services.decision_engine import make_decision
 from app.services.decoy_engine import _infer_decoy_type
 from app.services.feature_extraction import extract_features
 from app.services.fingerprint import generate_fingerprint
+from app.services.honeytoken import detect_honeytokens
 from app.services.logger import log_inspection
 from app.services.ml_shadow import score_ml_shadow
 from app.services.risk_engine import calculate_risk
@@ -27,6 +28,7 @@ async def inspect_and_log(
         payload_indicators=request.payload_indicators,
     )
     feature_vector = extract_features(request)
+    honeytoken_matches = detect_honeytokens(request)
     risk = calculate_risk(request)
     anomaly = anomaly_detector.detect(request)
     if anomaly.signals:
@@ -46,6 +48,7 @@ async def inspect_and_log(
         feature_vector,
         ml_shadow,
         event_type=event_type,
+        honeytoken_matches=honeytoken_matches,
     )
 
     decoy_type = (

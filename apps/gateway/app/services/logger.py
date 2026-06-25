@@ -7,8 +7,10 @@ import uuid
 from app.schemas.dashboard import AlertSeverity
 from app.schemas.decision import Decision
 from app.schemas.event import EventRecord
+from app.schemas.honeytoken import HoneytokenHit
 from app.schemas.ml import MLShadowScore
 from app.schemas.request import InspectRequest
+from app.services.honeytoken import HoneytokenMatch
 from app.storage import store
 from app.utils.time import utcnow
 
@@ -29,6 +31,7 @@ async def log_inspection(
     ml_shadow: MLShadowScore | None = None,
     *,
     event_type: str = "inspection",
+    honeytoken_matches: list[HoneytokenMatch] | None = None,
 ) -> EventRecord:
     """Log an inspection event and create an alert if needed."""
     event = EventRecord(
@@ -45,6 +48,29 @@ async def log_inspection(
         summary=f"{request.method} {request.path} → {decision.value} (score: {risk_score})",
     )
     await store.add_event(event)
+
+    for match in honeytoken_matches or []:
+        hit = HoneytokenHit(
+            hit_id=str(uuid.uuid4())[:8],
+            timestamp=utcnow(),
+            event_id=event.event_id,
+            token_kind=match.token_kind,
+            token_label=match.token_label,
+            source_ip=_mask_ip(request.ip_address),
+            path=request.path,
+            method=request.method,
+            evidence=match.evidence,
+        )
+        await store.add_honeytoken_hit(hit)
+        await store.add_alert(
+            severity=AlertSeverity.CRITICAL,
+            title=f"Honeytoken touched: {match.token_label}",
+            description=(
+                f"Request from {_mask_ip(request.ip_address)} interacted with "
+                f"{match.token_label} on {request.method} {request.path}."
+            ),
+            recommended_action="Treat as high-confidence deception interaction and review attacker activity.",
+        )
 
     # Create alert for redirected traffic
     if decision == Decision.REDIRECT_TO_DECOY:
