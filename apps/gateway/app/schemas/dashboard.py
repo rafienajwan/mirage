@@ -36,6 +36,19 @@ class TrainingDataSummary(BaseModel):
     analyst_labels: dict[str, int]
 
 
+class MLShadowStatus(BaseModel):
+    """Operator-facing status for optional ML shadow scoring."""
+
+    mode: Literal["disabled", "missing", "invalid", "shadow_ready"]
+    artifact: str | None = None
+    shadow_ready: bool
+    monitor_threshold: float = Field(ge=0, le=1)
+    redirect_threshold: float = Field(ge=0, le=1)
+    metrics: dict[str, float | int]
+    blockers: list[str]
+    warnings: list[str]
+
+
 # ─── Alerts ────────────────────────────────────────────────────
 
 class AlertSeverity(str, Enum):

@@ -3,8 +3,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from app.core.security import require_api_key
-from app.schemas.dashboard import DashboardOverview, TrainingDataSummary
+from app.schemas.dashboard import DashboardOverview, MLShadowStatus, TrainingDataSummary
 from app.schemas.event import EventLabelRequest
+from app.services.ml_status import get_ml_shadow_status
 from app.services.threat_analysis import get_threat_summary
 from app.services.training_export import events_to_jsonl, training_data_summary
 from app.storage import store
@@ -71,6 +72,12 @@ async def training_data_readiness(limit: int = Query(default=10000, ge=1, le=500
     """Summarize whether analyst labels are sufficient for model training."""
     events = await store.get_labeled_events(limit=limit)
     return training_data_summary(events)
+
+
+@router.get("/ml-shadow/status", response_model=MLShadowStatus)
+async def ml_shadow_status():
+    """Current artifact and threshold status for model-only shadow scoring."""
+    return get_ml_shadow_status()
 
 
 @router.get("/alerts")
