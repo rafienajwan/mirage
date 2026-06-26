@@ -45,6 +45,8 @@ Its user, password, and database components must match the corresponding
 
 All `DECOY_*` values are attacker-facing demo material. They must never be valid
 credentials or locations for a real environment.
+If a later request reuses a configured `DECOY_*` value, MIRAGE records a
+honeytoken hit and raises a critical alert.
 
 `MIRAGE_MODEL_ARTIFACT` is optional. When it is empty or points to a missing
 artifact, runtime routing remains fully heuristic and events store no ML shadow

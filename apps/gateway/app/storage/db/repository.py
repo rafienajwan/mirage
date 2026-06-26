@@ -13,8 +13,9 @@ from sqlalchemy import case, extract, func, select
 from app.schemas.dashboard import AlertRecord, AlertSeverity
 from app.schemas.decision import Decision
 from app.schemas.event import AnalystLabel, EventRecord
+from app.schemas.honeytoken import HoneytokenHit
 from app.storage.db.database import get_session
-from app.storage.db.models import AlertModel, EventModel
+from app.storage.db.models import AlertModel, EventModel, HoneytokenHitModel
 
 
 class DatabaseStore:
@@ -198,6 +199,51 @@ class DatabaseStore:
                 .select_from(AlertModel)
                 .where(AlertModel.severity != AlertSeverity.INFO.value)
             )
+            result = await session.execute(stmt)
+            return result.scalar() or 0
+
+    async def add_honeytoken_hit(self, hit: HoneytokenHit) -> None:
+        async with get_session() as session:
+            session.add(
+                HoneytokenHitModel(
+                    hit_id=hit.hit_id,
+                    timestamp=hit.timestamp,
+                    event_id=hit.event_id,
+                    token_kind=hit.token_kind,
+                    token_label=hit.token_label,
+                    source_ip=hit.source_ip,
+                    path=hit.path,
+                    method=hit.method,
+                    evidence=hit.evidence,
+                )
+            )
+
+    async def get_honeytoken_hits(self, limit: int = 50) -> list[HoneytokenHit]:
+        async with get_session() as session:
+            stmt = (
+                select(HoneytokenHitModel)
+                .order_by(HoneytokenHitModel.id.desc())
+                .limit(limit)
+            )
+            result = await session.execute(stmt)
+            return [
+                HoneytokenHit(
+                    hit_id=row.hit_id,
+                    timestamp=row.timestamp,
+                    event_id=row.event_id,
+                    token_kind=row.token_kind,
+                    token_label=row.token_label,
+                    source_ip=row.source_ip,
+                    path=row.path,
+                    method=row.method,
+                    evidence=row.evidence,
+                )
+                for row in result.scalars().all()
+            ]
+
+    async def get_honeytoken_hit_count(self) -> int:
+        async with get_session() as session:
+            stmt = select(func.count()).select_from(HoneytokenHitModel)
             result = await session.execute(stmt)
             return result.scalar() or 0
 

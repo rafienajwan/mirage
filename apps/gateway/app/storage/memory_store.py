@@ -11,6 +11,7 @@ from collections import defaultdict
 from app.schemas.dashboard import AlertRecord, AlertSeverity
 from app.schemas.decision import Decision
 from app.schemas.event import AnalystLabel, EventRecord
+from app.schemas.honeytoken import HoneytokenHit
 
 
 class MemoryStore:
@@ -19,6 +20,7 @@ class MemoryStore:
     def __init__(self) -> None:
         self.events: list[EventRecord] = []
         self.alerts: list[AlertRecord] = []
+        self.honeytoken_hits: list[HoneytokenHit] = []
         self._alert_counter: int = 0
 
     # ── Events ─────────────────────────────────────────────────
@@ -77,6 +79,15 @@ class MemoryStore:
 
     async def get_active_alert_count(self) -> int:
         return len([a for a in self.alerts if a.severity != AlertSeverity.INFO])
+
+    async def add_honeytoken_hit(self, hit: HoneytokenHit) -> None:
+        self.honeytoken_hits.append(hit)
+
+    async def get_honeytoken_hits(self, limit: int = 50) -> list[HoneytokenHit]:
+        return list(reversed(self.honeytoken_hits[-limit:]))
+
+    async def get_honeytoken_hit_count(self) -> int:
+        return len(self.honeytoken_hits)
 
     # ── Aggregate stats ────────────────────────────────────────
 

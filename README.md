@@ -22,6 +22,7 @@ exact implementation gap.
 - analyst event labels for future training data curation;
 - JSONL export and readiness checks for analyst-labeled training records;
 - dataset preparation adapters for MIRAGE JSONL and CICIDS-style CSV sources;
+- honeytoken detection for configured decoy credentials;
 - Docker Compose configuration for the five-service demo stack.
 
 ## Current Boundaries
@@ -190,6 +191,7 @@ All paths below use the `http://localhost:8000` base URL.
 | `GET /api/v1/dashboard/training-data/export` | API key | Export analyst-labeled feature vectors as JSONL |
 | `GET /api/v1/dashboard/training-data/summary` | API key | Check labeled row counts and class balance before training |
 | `GET /api/v1/dashboard/ml-shadow/status` | Public | Report sanitized ML shadow artifact readiness |
+| `GET /api/v1/dashboard/honeytokens` | Public | Show recent decoy credential interactions |
 | `GET /api/v1/decoy/status` | Public | Current decoy metrics |
 | `POST /api/v1/decoy/respond` | API key | Generate an in-process synthetic response |
 
@@ -273,6 +275,7 @@ infra/
 - `docs/configuration.md`: environment files, variable scopes, and secret handling;
 - `docs/dataset-preparation.md`: raw dataset adapters, splits, and readiness rules;
 - `docs/demo-flow.md`: concise end-to-end demonstration;
+- `docs/honeytokens.md`: decoy credential tracking and current boundaries;
 - `docs/model-artifacts.md`: artifact review and shadow-mode activation;
 - `docs/PROPOSAL_ALIGNMENT.md`: proposal capability matrix and safe claims;
 - `apps/gateway/README.md`: gateway-specific development notes;
@@ -283,10 +286,11 @@ infra/
 1. Expand CICIDS2017 and custom API-log adapters with reviewed real datasets.
 2. Train the first reviewed model from prepared JSONL splits.
 3. Observe reviewed models in shadow mode before changing routing decisions.
-4. Add retraining workflows from analyst-corrected labels.
-5. Replace dashboard polling with authenticated WebSocket updates.
-6. Add adaptive decoys, honeytoken-use detection, and actor profiles.
-7. Verify Docker image builds and deploy the stack.
+4. Add actor profiles from fingerprints, honeytoken hits, and event history.
+5. Add retraining workflows from analyst-corrected labels.
+6. Replace dashboard polling with authenticated WebSocket updates.
+7. Add adaptive decoys and per-attacker honeytoken issuance.
+8. Verify Docker image builds and deploy the stack.
 
 ## License
 

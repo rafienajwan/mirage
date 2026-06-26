@@ -8,9 +8,9 @@ import ThreatFeed from "@/components/dashboard/ThreatFeed";
 import DecoyStatusCard from "@/components/dashboard/DecoyStatusCard";
 import AlertPanel from "@/components/dashboard/AlertPanel";
 import SimulationPanel from "@/components/dashboard/SimulationPanel";
-import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, labelEvent, downloadTrainingData } from "@/lib/api";
-import type { AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData } from "@/lib/api";
-import { Globe, ShieldAlert, ArrowRightLeft, Bell, BrainCircuit, Database, Download, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
+import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchHoneytokens, labelEvent, downloadTrainingData } from "@/lib/api";
+import type { AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, HoneytokenSummary } from "@/lib/api";
+import { Globe, ShieldAlert, ArrowRightLeft, Bell, BrainCircuit, Database, Download, KeyRound, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Charts use Recharts ResponsiveContainer — must be client-only to avoid SSR dimension warnings
@@ -98,6 +98,7 @@ export default function DashboardPage() {
   const [decoyStatus, setDecoyStatus] = useState<DecoyStatusData | null>(null);
   const [trainingSummary, setTrainingSummary] = useState<TrainingDataSummary | null>(null);
   const [mlShadowStatus, setMlShadowStatus] = useState<MLShadowStatusData | null>(null);
+  const [honeytokens, setHoneytokens] = useState<HoneytokenSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [labelingEventId, setLabelingEventId] = useState<string | null>(null);
@@ -190,7 +191,7 @@ export default function DashboardPage() {
 
   const load = useCallback(async () => {
     try {
-      const [ov, ev, al, tr, rh, ds, ts, ms] = await Promise.all([
+      const [ov, ev, al, tr, rh, ds, ts, ms, ht] = await Promise.all([
         fetchOverview(),
         fetchEvents(),
         fetchAlerts(),
@@ -199,6 +200,7 @@ export default function DashboardPage() {
         fetchDecoyStatus(),
         fetchTrainingDataSummary().catch(() => null),
         fetchMLShadowStatus().catch(() => null),
+        fetchHoneytokens().catch(() => null),
       ]);
       setOverview(ov);
       setEvents(ev);
@@ -208,6 +210,7 @@ export default function DashboardPage() {
       setDecoyStatus(ds);
       setTrainingSummary(ts);
       setMlShadowStatus(ms);
+      setHoneytokens(ht);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch data");
@@ -243,6 +246,13 @@ export default function DashboardPage() {
   const mlShadowDetail = mlShadowStatus?.artifact
     ? `${mlShadowStatus.artifact} | monitor ${mlShadowStatus.monitorThreshold} / redirect ${mlShadowStatus.redirectThreshold}`
     : "heuristic routing only";
+  const latestHoneytoken = honeytokens?.hits[0];
+  const honeytokenLabel = honeytokens?.totalHits
+    ? `HONEYTOKEN HITS: ${honeytokens.totalHits}`
+    : "HONEYTOKENS CLEAR";
+  const honeytokenDetail = latestHoneytoken
+    ? `${latestHoneytoken.tokenLabel} on ${latestHoneytoken.method} ${latestHoneytoken.path}`
+    : "no decoy token use observed";
 
   return (
     <div className="min-h-screen flex flex-col bg-bg-dark-navy text-white relative">
@@ -261,6 +271,21 @@ export default function DashboardPage() {
           </div>
           
           <div className="flex flex-wrap items-center gap-2">
+            <div
+              title={`Honeytokens: ${honeytokenDetail}`}
+              className={`flex items-center gap-2 px-3 py-2 rounded border text-[10px] font-mono tracking-widest ${
+                honeytokens?.totalHits
+                  ? "border-red-500/25 bg-red-500/5 text-red-300"
+                  : "border-brand-emerald/25 bg-brand-emerald/10 text-brand-emerald"
+              }`}
+            >
+              <KeyRound className="w-3.5 h-3.5 shrink-0" />
+              <span>{honeytokenLabel}</span>
+              <span className="hidden xl:inline text-white/35">
+                {honeytokenDetail}
+              </span>
+            </div>
+
             <div
               title={`Model status: ${mlShadowLabel}; ${mlShadowDetail}`}
               className={`flex items-center gap-2 px-3 py-2 rounded border text-[10px] font-mono tracking-widest ${

@@ -3,7 +3,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from app.core.security import require_api_key
-from app.schemas.dashboard import DashboardOverview, MLShadowStatus, TrainingDataSummary
+from app.schemas.dashboard import (
+    DashboardOverview,
+    HoneytokenSummary,
+    MLShadowStatus,
+    TrainingDataSummary,
+)
 from app.schemas.event import EventLabelRequest
 from app.services.ml_status import get_ml_shadow_status
 from app.services.threat_analysis import get_threat_summary
@@ -78,6 +83,16 @@ async def training_data_readiness(limit: int = Query(default=10000, ge=1, le=500
 async def ml_shadow_status():
     """Current artifact and threshold status for model-only shadow scoring."""
     return get_ml_shadow_status()
+
+
+@router.get("/honeytokens", response_model=HoneytokenSummary)
+async def dashboard_honeytokens(limit: int = Query(default=20, ge=1, le=100)):
+    """Recent interactions with decoy tokens."""
+    hits = await store.get_honeytoken_hits(limit=limit)
+    return {
+        "total_hits": await store.get_honeytoken_hit_count(),
+        "hits": [hit.model_dump(mode="json") for hit in hits],
+    }
 
 
 @router.get("/alerts")

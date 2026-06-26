@@ -41,6 +41,11 @@ class InspectRequest(BaseModel):
         max_length=20,
         description="Labels describing payload characteristics (e.g. 'sql-like', 'encoded')",
     )
+    payload_excerpt: str = Field(
+        default="",
+        max_length=4096,
+        description="Small bounded request excerpt used for decoy/honeytoken matching",
+    )
     timestamp: Optional[datetime] = Field(
         default=None, description="Request timestamp (auto-filled if omitted)"
     )

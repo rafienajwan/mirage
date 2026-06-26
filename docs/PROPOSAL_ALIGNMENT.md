@@ -20,7 +20,7 @@ the beginning of a real ML pipeline.
 | Threat fingerprint matching | Partial | Stable request fingerprints exist; persistent actor profiles and clustering do not. |
 | Automated real/decoy routing | Implemented for demo | The proxy routes to separate real-app and decoy services using the live decision engine. |
 | Fake endpoints and fake data | Implemented for demo | The isolated decoy service exposes static, synthetic responses without real secrets. |
-| Honeytoken detection | Not implemented | Fake credential strings exist, but issuance, tracking, and use-triggered alerts do not. |
+| Honeytoken detection | Partial | Configured decoy credential use is detected, stored, alerted, and shown on the dashboard; per-attacker issuance and rotation are pending. |
 | PostgreSQL/Supabase storage | Partial | Async PostgreSQL and Alembic are supported; Supabase deployment and actor/honeytoken tables are pending. |
 | Feature-vector storage | Implemented | Request and optional CICIDS-style flow features are stored with events. |
 | CICIDS2017 dataset | Partial | A basic CICIDS-style CSV adapter and train/test split workflow exist; reviewed raw dataset ingestion, cleaning, and provenance are still pending. |
@@ -43,6 +43,7 @@ The current demo can accurately claim that MIRAGE:
 - stores events, alerts, and ML-ready feature vectors;
 - can store model-only shadow scores beside events when a reviewed artifact is configured;
 - can review trained artifacts for feature-contract and metric readiness before shadow mode;
+- records and alerts on configured decoy credential reuse as honeytoken hits;
 - supports analyst labels for correcting event classification outcomes;
 - exports analyst-labeled feature vectors as JSON Lines for model training;
 - prepares validated train/test splits from MIRAGE JSONL and CICIDS-style CSV sources;
@@ -50,5 +51,5 @@ The current demo can accurately claim that MIRAGE:
 - can train and evaluate a Random Forest model from labeled feature records.
 
 It should not yet claim arbitrary ingress interception, a production ML model,
-adaptive decoys, active honeytoken monitoring, WebSocket updates, or deployed
-Supabase/Railway/Vercel infrastructure.
+adaptive decoys, per-attacker honeytoken issuance, WebSocket updates, or
+deployed Supabase/Railway/Vercel infrastructure.
