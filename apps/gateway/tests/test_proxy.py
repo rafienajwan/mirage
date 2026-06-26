@@ -8,7 +8,7 @@ from starlette.requests import Request
 from app.api.routes import proxy as proxy_route
 from app.core.config import settings
 from app.services.traffic_tracker import TrafficTracker, traffic_tracker
-from app.services import proxy_client
+from app.services import honeytoken, proxy_client
 from app.services.proxy_client import _request_headers, forward_request
 
 
@@ -76,6 +76,43 @@ async def test_payload_signals_can_trigger_decoy_routing(client, monkeypatch):
     assert response.status_code == 200
     assert captured["is_decoy"] is True
     assert captured["body"] == b"../../records UNION SELECT password FROM users"
+
+
+@pytest.mark.asyncio
+async def test_proxy_body_is_available_for_honeytoken_detection(client, monkeypatch):
+    captured = {}
+
+    async def fake_forward(request, **kwargs):
+        captured.update(kwargs)
+        return JSONResponse({"status": "ok"})
+
+    monkeypatch.setattr(proxy_route, "forward_request", fake_forward)
+    monkeypatch.setattr(
+        honeytoken,
+        "settings",
+        type(
+            "TestSettings",
+            (),
+            {
+                "decoy_login_token": "mirage-login-canary",
+                "decoy_oauth_token": "mirage-oauth-canary",
+                "decoy_service_token": "mirage-service-canary",
+                "decoy_database_url": "postgresql://decoy.invalid/mirage",
+            },
+        )(),
+    )
+
+    response = await client.post(
+        "/api/v1/proxy/api/token/verify",
+        content="token=mirage-service-canary",
+        headers={"content-type": "text/plain"},
+    )
+    honeytokens = await client.get("/api/v1/dashboard/honeytokens")
+
+    assert response.status_code == 200
+    assert captured["body"] == b"token=mirage-service-canary"
+    assert honeytokens.json()["total_hits"] == 1
+    assert honeytokens.json()["hits"][0]["token_kind"] == "service_token"
 
 
 @pytest.mark.asyncio
