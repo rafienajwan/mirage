@@ -106,6 +106,28 @@ interface BackendHoneytokenSummary {
   hits: BackendHoneytokenHit[];
 }
 
+interface BackendActorProfile {
+  actor_id: string;
+  fingerprint_hash: string;
+  source_ip: string;
+  first_seen: string;
+  last_seen: string;
+  request_count: number;
+  suspicious_requests: number;
+  decoy_redirects: number;
+  honeytoken_hits: number;
+  max_risk_score: number;
+  average_risk_score: number;
+  top_paths: string[];
+  last_decision: "allow" | "monitor" | "redirect_to_decoy";
+  status: "quiet" | "watch" | "suspicious" | "confirmed_interaction";
+}
+
+interface BackendActorProfileSummary {
+  total_actors: number;
+  profiles: BackendActorProfile[];
+}
+
 // ─── Frontend types (mapped from backend) ───────────────────────
 
 export interface OverviewMetrics {
@@ -218,6 +240,28 @@ export interface HoneytokenHit {
 export interface HoneytokenSummary {
   totalHits: number;
   hits: HoneytokenHit[];
+}
+
+export interface ActorProfile {
+  id: string;
+  fingerprintHash: string;
+  sourceIp: string;
+  firstSeen: string;
+  lastSeen: string;
+  requestCount: number;
+  suspiciousRequests: number;
+  decoyRedirects: number;
+  honeytokenHits: number;
+  maxRiskScore: number;
+  averageRiskScore: number;
+  topPaths: string[];
+  lastDecision: ThreatStatus;
+  status: "quiet" | "watch" | "suspicious" | "confirmed_interaction";
+}
+
+export interface ActorProfileSummary {
+  totalActors: number;
+  profiles: ActorProfile[];
 }
 
 // ─── Mapping helpers ────────────────────────────────────────────
@@ -401,6 +445,30 @@ export async function fetchHoneytokens(): Promise<HoneytokenSummary> {
       path: hit.path,
       method: hit.method,
       evidence: hit.evidence,
+    })),
+  };
+}
+
+/** Fetch recent actor profiles from threat fingerprints. */
+export async function fetchActorProfiles(): Promise<ActorProfileSummary> {
+  const data = await apiFetch<BackendActorProfileSummary>("/dashboard/actors");
+  return {
+    totalActors: data.total_actors,
+    profiles: data.profiles.map((profile) => ({
+      id: profile.actor_id,
+      fingerprintHash: profile.fingerprint_hash,
+      sourceIp: profile.source_ip,
+      firstSeen: profile.first_seen,
+      lastSeen: profile.last_seen,
+      requestCount: profile.request_count,
+      suspiciousRequests: profile.suspicious_requests,
+      decoyRedirects: profile.decoy_redirects,
+      honeytokenHits: profile.honeytoken_hits,
+      maxRiskScore: profile.max_risk_score,
+      averageRiskScore: profile.average_risk_score,
+      topPaths: profile.top_paths,
+      lastDecision: mapDecision(profile.last_decision),
+      status: profile.status,
     })),
   };
 }
