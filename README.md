@@ -23,6 +23,7 @@ and cloud-deployment capabilities remain proposal targets. See
 - JSONL export and readiness checks for analyst-labeled training records;
 - dataset preparation adapters for MIRAGE JSONL and CICIDS-style CSV sources;
 - honeytoken detection for configured decoy credentials;
+- computed actor profiles from fingerprints, event history, and honeytoken hits;
 - Docker Compose configuration for the five-service demo stack.
 
 ## Current Boundaries
@@ -273,6 +274,7 @@ infra/
 ## Documentation
 
 - `docs/architecture.md`: implemented and target architecture boundaries;
+- `docs/actor-profiles.md`: actor profile aggregation and current boundaries;
 - `docs/configuration.md`: environment files, variable scopes, and secret handling;
 - `docs/dataset-preparation.md`: raw dataset adapters, splits, and readiness rules;
 - `docs/demo-flow.md`: concise end-to-end demonstration;
@@ -287,10 +289,10 @@ infra/
 1. Expand CICIDS2017 and custom API-log adapters with reviewed real datasets.
 2. Train the first reviewed model from prepared JSONL splits.
 3. Observe reviewed models in shadow mode before changing routing decisions.
-4. Add actor profiles from fingerprints, honeytoken hits, and event history.
-5. Add retraining workflows from analyst-corrected labels.
-6. Replace dashboard polling with authenticated WebSocket updates.
-7. Add adaptive decoys and per-attacker honeytoken issuance.
+4. Add retraining workflows from analyst-corrected labels.
+5. Replace dashboard polling with authenticated WebSocket updates.
+6. Add adaptive decoys and per-attacker honeytoken issuance.
+7. Add persistent actor records, clustering, and case-management workflows.
 8. Verify Docker image builds and deploy the stack.
 
 ## License
