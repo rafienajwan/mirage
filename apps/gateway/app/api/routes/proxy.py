@@ -44,6 +44,12 @@ async def proxy_request(target_path: str, request: Request) -> Response:
     source_ip = request.client.host if request.client else "unknown"
     request_count = await traffic_tracker.record(source_ip)
     indicators = detect_payload_indicators(path, request.url.query, body)
+    payload_excerpt = " ".join(
+        [
+            request.url.query,
+            body[: settings.proxy_max_body_bytes].decode("utf-8", errors="ignore")[:4096],
+        ]
+    )
     metadata = InspectRequest(
         ip_address=source_ip,
         method=request.method,
@@ -51,6 +57,7 @@ async def proxy_request(target_path: str, request: Request) -> Response:
         user_agent=request.headers.get("user-agent", ""),
         request_count=request_count,
         payload_indicators=indicators,
+        payload_excerpt=payload_excerpt,
     )
     inspection = await inspect_and_log(metadata, event_type="proxy")
     is_decoy = inspection.decision == Decision.REDIRECT_TO_DECOY
