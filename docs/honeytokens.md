@@ -35,4 +35,4 @@ interaction. Honeytoken hits also create critical alerts.
 ## Current Boundaries
 
 This is a first tracking workflow. Token issuance, rotation, per-attacker token
-assignment, and cross-session actor profiling are still future work.
+assignment, and persistent cross-session actor records are still future work.

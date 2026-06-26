@@ -30,6 +30,7 @@ async def log_inspection(
     feature_vector: dict[str, float] | None = None,
     ml_shadow: MLShadowScore | None = None,
     *,
+    fingerprint_hash: str = "",
     event_type: str = "inspection",
     honeytoken_matches: list[HoneytokenMatch] | None = None,
 ) -> EventRecord:
@@ -42,6 +43,7 @@ async def log_inspection(
         method=request.method,
         risk_score=risk_score,
         decision=decision,
+        fingerprint_hash=fingerprint_hash,
         event_type=event_type,
         feature_vector=feature_vector or {},
         ml_shadow=ml_shadow,
@@ -81,7 +83,7 @@ async def log_inspection(
                 f"Suspicious request from {_mask_ip(request.ip_address)} "
                 f"with risk score {risk_score} was redirected to decoy."
             ),
-            recommended_action="Review threat fingerprint and consider IP block.",
+            recommended_action="Review actor profile and consider IP block.",
         )
     elif decision == Decision.MONITOR:
         await store.add_alert(

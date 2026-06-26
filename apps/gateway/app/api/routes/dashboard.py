@@ -5,12 +5,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from app.core.security import require_api_key
 from app.schemas.dashboard import (
     DashboardOverview,
+    ActorProfileSummary,
     HoneytokenSummary,
     MLShadowStatus,
     TrainingDataSummary,
 )
 from app.schemas.event import EventLabelRequest
 from app.services.ml_status import get_ml_shadow_status
+from app.services.actor_profiles import get_actor_profiles
 from app.services.threat_analysis import get_threat_summary
 from app.services.training_export import events_to_jsonl, training_data_summary
 from app.storage import store
@@ -93,6 +95,12 @@ async def dashboard_honeytokens(limit: int = Query(default=20, ge=1, le=100)):
         "total_hits": await store.get_honeytoken_hit_count(),
         "hits": [hit.model_dump(mode="json") for hit in hits],
     }
+
+
+@router.get("/actors", response_model=ActorProfileSummary)
+async def dashboard_actors(limit: int = Query(default=20, ge=1, le=100)):
+    """Recent actor profiles from fingerprints, events, and honeytokens."""
+    return await get_actor_profiles(limit=limit)
 
 
 @router.get("/alerts")

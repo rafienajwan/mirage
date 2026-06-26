@@ -35,6 +35,7 @@ class EventRecord(BaseModel):
     method: str
     risk_score: float
     decision: Decision
+    fingerprint_hash: str = ""
     event_type: str = Field(default="inspection")
     summary: str = ""
     feature_vector: dict[str, float] = Field(default_factory=dict)

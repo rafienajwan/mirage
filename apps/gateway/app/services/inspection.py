@@ -47,6 +47,7 @@ async def inspect_and_log(
         decision,
         feature_vector,
         ml_shadow,
+        fingerprint_hash=fingerprint_hash,
         event_type=event_type,
         honeytoken_matches=honeytoken_matches,
     )

@@ -5,11 +5,12 @@ import dynamic from "next/dynamic";
 import Header from "@/components/layout/Header";
 import MetricCard from "@/components/ui/MetricCard";
 import ThreatFeed from "@/components/dashboard/ThreatFeed";
+import ActorProfilesPanel from "@/components/dashboard/ActorProfilesPanel";
 import DecoyStatusCard from "@/components/dashboard/DecoyStatusCard";
 import AlertPanel from "@/components/dashboard/AlertPanel";
 import SimulationPanel from "@/components/dashboard/SimulationPanel";
-import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchHoneytokens, labelEvent, downloadTrainingData } from "@/lib/api";
-import type { AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, HoneytokenSummary } from "@/lib/api";
+import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchHoneytokens, fetchActorProfiles, labelEvent, downloadTrainingData } from "@/lib/api";
+import type { ActorProfileSummary, AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, HoneytokenSummary } from "@/lib/api";
 import { Globe, ShieldAlert, ArrowRightLeft, Bell, BrainCircuit, Database, Download, KeyRound, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -99,6 +100,7 @@ export default function DashboardPage() {
   const [trainingSummary, setTrainingSummary] = useState<TrainingDataSummary | null>(null);
   const [mlShadowStatus, setMlShadowStatus] = useState<MLShadowStatusData | null>(null);
   const [honeytokens, setHoneytokens] = useState<HoneytokenSummary | null>(null);
+  const [actorProfiles, setActorProfiles] = useState<ActorProfileSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [labelingEventId, setLabelingEventId] = useState<string | null>(null);
@@ -191,7 +193,7 @@ export default function DashboardPage() {
 
   const load = useCallback(async () => {
     try {
-      const [ov, ev, al, tr, rh, ds, ts, ms, ht] = await Promise.all([
+      const [ov, ev, al, tr, rh, ds, ts, ms, ht, ap] = await Promise.all([
         fetchOverview(),
         fetchEvents(),
         fetchAlerts(),
@@ -201,6 +203,7 @@ export default function DashboardPage() {
         fetchTrainingDataSummary().catch(() => null),
         fetchMLShadowStatus().catch(() => null),
         fetchHoneytokens().catch(() => null),
+        fetchActorProfiles().catch(() => null),
       ]);
       setOverview(ov);
       setEvents(ev);
@@ -211,6 +214,7 @@ export default function DashboardPage() {
       setTrainingSummary(ts);
       setMlShadowStatus(ms);
       setHoneytokens(ht);
+      setActorProfiles(ap);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch data");
@@ -429,6 +433,11 @@ export default function DashboardPage() {
           <div>
             <RiskScoreWidget score={overview?.averageRiskScore ?? 0} history={riskHistory} />
           </div>
+        </div>
+
+        {/* Threat feed */}
+        <div className="mb-8">
+          <ActorProfilesPanel data={actorProfiles} />
         </div>
 
         {/* Threat feed */}

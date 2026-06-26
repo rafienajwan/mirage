@@ -8,6 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.schemas.actor import ActorProfile
 from app.schemas.honeytoken import HoneytokenHit
 
 
@@ -56,6 +57,13 @@ class HoneytokenSummary(BaseModel):
 
     total_hits: int = Field(ge=0)
     hits: list[HoneytokenHit]
+
+
+class ActorProfileSummary(BaseModel):
+    """Recent actor profiles built from threat fingerprints."""
+
+    total_actors: int = Field(ge=0)
+    profiles: list[ActorProfile]
 
 
 # ─── Alerts ────────────────────────────────────────────────────
