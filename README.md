@@ -6,9 +6,9 @@ heuristics, forwards normal traffic to a protected demo app, redirects suspiciou
 traffic to an isolated static decoy, persists security events, and exposes them
 through a polling Next.js dashboard.
 
-The broader adaptive-ML, honeytoken tracking, WebSocket, and cloud-deployment
-capabilities remain proposal targets. See `docs/PROPOSAL_ALIGNMENT.md` for the
-exact implementation gap.
+The broader adaptive-ML, per-attacker honeytoken issuance/rotation, WebSocket,
+and cloud-deployment capabilities remain proposal targets. See
+`docs/PROPOSAL_ALIGNMENT.md` for the exact implementation gap.
 
 ## What Works
 
@@ -29,7 +29,8 @@ exact implementation gap.
 
 - The gateway only proxies its explicit `/api/v1/proxy/*` route.
 - Runtime routing uses heuristics; trained artifacts can be observed in shadow mode.
-- Decoy responses are static and do not track honeytoken use.
+- Decoy responses are static; configured decoy credential reuse is tracked, but
+  per-attacker honeytoken issuance is not implemented.
 - Dashboard updates use 10-second HTTP polling rather than WebSocket.
 - Docker image builds and cloud deployment are not yet verified in CI.
 

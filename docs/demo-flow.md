@@ -58,5 +58,6 @@ docker compose --env-file .env -f infra/docker-compose.yml down
 
 - Proxy coverage is limited to `/api/v1/proxy/*`.
 - Routing is heuristic rather than model-driven.
-- The decoy is static and does not track honeytoken use.
+- The decoy is static; configured decoy credential reuse is tracked, but
+  per-attacker honeytoken issuance is not implemented.
 - Dashboard updates are polled rather than streamed.

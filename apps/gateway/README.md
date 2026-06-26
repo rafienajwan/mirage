@@ -118,5 +118,5 @@ rows for stratified splitting.
 
 - proxy coverage is limited to `/api/v1/proxy/*`;
 - no trained artifact participates in live decisions;
-- actor profiles and honeytoken-use tracking are not implemented;
+- actor profiles and per-attacker honeytoken issuance are not implemented;
 - dashboard APIs are polled rather than streamed.
