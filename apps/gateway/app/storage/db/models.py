@@ -25,6 +25,7 @@ class EventModel(Base):
     method: Mapped[str] = mapped_column(String(16))
     risk_score: Mapped[float] = mapped_column(Float)
     decision: Mapped[str] = mapped_column(String(32))
+    fingerprint_hash: Mapped[str] = mapped_column(String(64), default="", index=True)
     event_type: Mapped[str] = mapped_column(String(64), default="inspection")
     summary: Mapped[str] = mapped_column(Text, default="")
     feature_vector: Mapped[dict] = mapped_column(JSON, default=dict)
