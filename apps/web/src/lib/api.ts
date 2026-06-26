@@ -89,6 +89,23 @@ interface BackendMLShadowStatus {
   warnings: string[];
 }
 
+interface BackendHoneytokenHit {
+  hit_id: string;
+  timestamp: string;
+  event_id: string;
+  token_kind: string;
+  token_label: string;
+  source_ip: string;
+  path: string;
+  method: string;
+  evidence: string;
+}
+
+interface BackendHoneytokenSummary {
+  total_hits: number;
+  hits: BackendHoneytokenHit[];
+}
+
 // ─── Frontend types (mapped from backend) ───────────────────────
 
 export interface OverviewMetrics {
@@ -184,6 +201,23 @@ export interface MLShadowStatusData {
   metrics: Record<string, number>;
   blockers: string[];
   warnings: string[];
+}
+
+export interface HoneytokenHit {
+  id: string;
+  timestamp: string;
+  eventId: string;
+  tokenKind: string;
+  tokenLabel: string;
+  sourceIp: string;
+  path: string;
+  method: string;
+  evidence: string;
+}
+
+export interface HoneytokenSummary {
+  totalHits: number;
+  hits: HoneytokenHit[];
 }
 
 // ─── Mapping helpers ────────────────────────────────────────────
@@ -349,6 +383,25 @@ export async function fetchMLShadowStatus(): Promise<MLShadowStatusData> {
     metrics: data.metrics,
     blockers: data.blockers,
     warnings: data.warnings,
+  };
+}
+
+/** Fetch recent honeytoken interactions. */
+export async function fetchHoneytokens(): Promise<HoneytokenSummary> {
+  const data = await apiFetch<BackendHoneytokenSummary>("/dashboard/honeytokens");
+  return {
+    totalHits: data.total_hits,
+    hits: data.hits.map((hit) => ({
+      id: hit.hit_id,
+      timestamp: hit.timestamp,
+      eventId: hit.event_id,
+      tokenKind: hit.token_kind,
+      tokenLabel: hit.token_label,
+      sourceIp: hit.source_ip,
+      path: hit.path,
+      method: hit.method,
+      evidence: hit.evidence,
+    })),
   };
 }
 

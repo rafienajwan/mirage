@@ -8,6 +8,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.schemas.honeytoken import HoneytokenHit
+
 
 # ─── Overview ──────────────────────────────────────────────────
 
@@ -47,6 +49,13 @@ class MLShadowStatus(BaseModel):
     metrics: dict[str, float | int]
     blockers: list[str]
     warnings: list[str]
+
+
+class HoneytokenSummary(BaseModel):
+    """Recent honeytoken activity for the dashboard."""
+
+    total_hits: int = Field(ge=0)
+    hits: list[HoneytokenHit]
 
 
 # ─── Alerts ────────────────────────────────────────────────────
