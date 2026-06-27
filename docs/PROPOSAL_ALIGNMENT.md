@@ -24,7 +24,7 @@ the beginning of a real ML pipeline.
 | PostgreSQL/Supabase storage | Partial | Async PostgreSQL and Alembic are supported for events, alerts, and honeytoken hits; Supabase deployment and persistent actor tables are pending. |
 | Feature-vector storage | Implemented | Request and optional CICIDS-style flow features are stored with events. |
 | CICIDS2017 dataset | Partial | A basic CICIDS-style CSV adapter and train/test split workflow exist; reviewed raw dataset ingestion, cleaning, and provenance are still pending. |
-| Custom API logs | Partial | Runtime events, features, analyst-corrected labels, JSONL export, validation, and split tooling are available; reviewed datasets are still pending. |
+| Custom API logs | Partial | Runtime events, features, analyst-corrected labels, JSONL export, validation, split tooling, and local retraining are available; reviewed datasets are still pending. |
 | Precision/recall/F1/FPR evaluation | Implemented | The Random Forest trainer calculates all four metrics. |
 | Real-time WebSocket dashboard | Not implemented | Dashboard uses 10-second HTTP polling. |
 | Security dashboard and alerts | Implemented for demo | Live metrics, events, risk history, decoy status, and internal alerts are available. |
@@ -47,6 +47,7 @@ The current demo can accurately claim that MIRAGE:
 - groups recent activity into actor profiles from fingerprints, events, and honeytoken hits;
 - supports analyst labels for correcting event classification outcomes;
 - exports analyst-labeled feature vectors as JSON Lines for model training;
+- trains local shadow-mode candidate artifacts from analyst-labeled events;
 - prepares validated train/test splits from MIRAGE JSONL and CICIDS-style CSV sources;
 - displays live backend data on a dashboard;
 - can train and evaluate a Random Forest model from labeled feature records.

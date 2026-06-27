@@ -45,6 +45,21 @@ The default thresholds are intentionally modest for local prototypes. For a
 real demonstration or deployment, raise them and review dataset provenance,
 holdout behavior, label quality, and false-positive tradeoffs manually.
 
+## Retrain From Analyst Labels
+
+After enough dashboard events have analyst labels and feature vectors, the
+gateway can train a local candidate artifact:
+
+```bash
+curl -X POST \
+  -H "X-Mirage-API-Key: YOUR_LOCAL_MIRAGE_API_KEY" \
+  http://localhost:8000/api/v1/dashboard/training-data/retrain
+```
+
+The endpoint stores the artifact in `MIRAGE_RETRAINING_ARTIFACT_DIR`, returns
+the training metrics, and includes the same artifact review result used before
+shadow-mode activation. It does not update `MIRAGE_MODEL_ARTIFACT`.
+
 ## Enable Shadow Mode
 
 Only after review, point the gateway to the artifact:
