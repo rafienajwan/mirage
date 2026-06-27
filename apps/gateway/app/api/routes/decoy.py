@@ -28,4 +28,9 @@ async def decoy_status():
 )
 async def decoy_respond(request: DecoyResponseRequest):
     """Generate a safe fake response for a suspicious request."""
-    return generate_decoy_response(path=request.path, decoy_type=request.decoy_type)
+    return generate_decoy_response(
+        path=request.path,
+        decoy_type=request.decoy_type,
+        actor_hint=request.actor_hint,
+        risk_score=request.risk_score,
+    )

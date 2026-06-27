@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 
 from app.core.config import settings
 from app.schemas.honeytoken import HoneytokenKind
@@ -16,6 +17,19 @@ class HoneytokenMatch:
     token_kind: HoneytokenKind
     token_label: str
     evidence: str
+
+
+_ISSUED_TOKEN_PATTERN = re.compile(
+    r"\bmirage-issued-(login|oauth|service|database)-canary-[a-f0-9]{12}\b",
+    re.IGNORECASE,
+)
+
+_ISSUED_TOKEN_LABELS: dict[str, tuple[HoneytokenKind, str]] = {
+    "login": ("login_token", "Issued decoy login token"),
+    "oauth": ("oauth_token", "Issued decoy OAuth token"),
+    "service": ("service_token", "Issued decoy service token"),
+    "database": ("database_url", "Issued decoy database token"),
+}
 
 
 def _configured_tokens() -> list[tuple[HoneytokenKind, str, str]]:
@@ -57,4 +71,18 @@ def detect_honeytokens(request: InspectRequest) -> list[HoneytokenMatch]:
                     evidence=f"{token_label} observed in request metadata",
                 )
             )
+    seen_kinds = {match.token_kind for match in matches}
+    for issued in _ISSUED_TOKEN_PATTERN.finditer(text):
+        issued_kind = issued.group(1).lower()
+        token_kind, token_label = _ISSUED_TOKEN_LABELS[issued_kind]
+        if token_kind in seen_kinds:
+            continue
+        matches.append(
+            HoneytokenMatch(
+                token_kind=token_kind,
+                token_label=token_label,
+                evidence=f"{token_label} observed in request metadata",
+            )
+        )
+        seen_kinds.add(token_kind)
     return matches

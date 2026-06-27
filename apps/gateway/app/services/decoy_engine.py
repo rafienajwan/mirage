@@ -6,6 +6,9 @@ tokens, or secrets are ever generated.
 
 from __future__ import annotations
 
+from copy import deepcopy
+import hashlib
+
 from app.core.config import settings
 from app.schemas.dashboard import DecoyResponse
 
@@ -64,6 +67,12 @@ _DECOY_MAP: dict[str, dict] = {
     "database": _FAKE_DATABASE,
 }
 
+_TOKEN_FIELDS = {
+    "login": ("token", "login"),
+    "config": ("secret_key", "service"),
+    "token": ("access_token", "oauth"),
+}
+
 # Protected fake endpoints served by the decoy system
 FAKE_ENDPOINTS: list[str] = [
     "/api/admin/users",
@@ -91,15 +100,71 @@ def _infer_decoy_type(path: str) -> str:
     return "login"
 
 
-def generate_decoy_response(path: str, decoy_type: str = "auto") -> DecoyResponse:
+def _variant_for(decoy_type: str, risk_score: float | None) -> str:
+    if risk_score is not None and risk_score >= 85:
+        return "high_interaction"
+    if decoy_type in {"config", "database"}:
+        return "credential_bait"
+    if decoy_type in {"login", "token"}:
+        return "token_bait"
+    return "standard"
+
+
+def _assigned_token(actor_hint: str, token_kind: str) -> str:
+    seed = f"{actor_hint}:{token_kind}:{settings.decoy_service_token}"
+    digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()[:12]
+    return f"mirage-issued-{token_kind}-canary-{digest}"
+
+
+def _apply_actor_assignment(body: dict, decoy_type: str, actor_hint: str) -> dict:
+    if not actor_hint:
+        return body
+
+    assignment = _TOKEN_FIELDS.get(decoy_type)
+    if assignment is not None:
+        field, token_kind = assignment
+        body[field] = _assigned_token(actor_hint, token_kind)
+
+    if decoy_type == "database":
+        body["connection_token"] = _assigned_token(actor_hint, "database")
+
+    body["mirage_assignment"] = {
+        "mode": "per_actor",
+        "tracking": "synthetic_canary",
+    }
+    return body
+
+
+def _apply_variant(body: dict, variant: str) -> dict:
+    body["mirage_decoy"] = {
+        "variant": variant,
+        "safe": True,
+        "note": "Synthetic data for deception telemetry only.",
+    }
+    if variant == "high_interaction":
+        body["mirage_decoy"]["interaction_depth"] = "extended"
+    return body
+
+
+def generate_decoy_response(
+    path: str,
+    decoy_type: str = "auto",
+    *,
+    actor_hint: str = "",
+    risk_score: float | None = None,
+) -> DecoyResponse:
     """Generate a safe fake response for a suspicious request."""
     if decoy_type == "auto":
         decoy_type = _infer_decoy_type(path)
 
-    body = _DECOY_MAP.get(decoy_type, _FAKE_LOGIN)
+    variant = _variant_for(decoy_type, risk_score)
+    body = deepcopy(_DECOY_MAP.get(decoy_type, _FAKE_LOGIN))
+    body = _apply_actor_assignment(body, decoy_type, actor_hint)
+    body = _apply_variant(body, variant)
 
     return DecoyResponse(
         decoy_type=decoy_type,
+        variant=variant,
         status_code=200,
         body=body,
         note="This is a MIRAGE demo decoy response. No real data is included.",
