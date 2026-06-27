@@ -6,8 +6,8 @@ heuristics, forwards normal traffic to a protected demo app, redirects suspiciou
 traffic to an isolated static decoy, persists security events, and exposes them
 through a polling Next.js dashboard.
 
-The broader adaptive-ML, per-attacker honeytoken issuance/rotation, WebSocket,
-and cloud-deployment capabilities remain proposal targets. See
+The broader adaptive-ML, per-attacker honeytoken issuance/rotation, and
+cloud-deployment capabilities remain proposal targets. See
 `docs/PROPOSAL_ALIGNMENT.md` for the exact implementation gap.
 
 ## What Works
@@ -32,7 +32,8 @@ and cloud-deployment capabilities remain proposal targets. See
 - Runtime routing uses heuristics; trained artifacts can be observed in shadow mode.
 - Decoy responses are static; configured decoy credential reuse is tracked, but
   per-attacker honeytoken issuance is not implemented.
-- Dashboard updates use 10-second HTTP polling rather than WebSocket.
+- Dashboard updates use HTTP polling with an optional authenticated WebSocket
+  stream for event and alert updates.
 - Docker image builds and cloud deployment are not yet verified in CI.
 
 ## Architecture
@@ -196,6 +197,7 @@ All paths below use the `http://localhost:8000` base URL.
 | `GET /api/v1/dashboard/ml-shadow/status` | Public | Report sanitized ML shadow artifact readiness |
 | `GET /api/v1/dashboard/honeytokens` | Public | Show recent decoy credential interactions |
 | `GET /api/v1/dashboard/actors` | Public | Show recent actor profiles grouped by threat fingerprint |
+| `WS /api/v1/dashboard/ws` | API key token | Stream dashboard event and alert updates |
 | `GET /api/v1/decoy/status` | Public | Current decoy metrics |
 | `POST /api/v1/decoy/respond` | API key | Generate an in-process synthetic response |
 
@@ -302,7 +304,7 @@ infra/
 1. Expand CICIDS2017 and custom API-log adapters with reviewed real datasets.
 2. Train the first reviewed model from prepared JSONL splits.
 3. Observe reviewed models in shadow mode before changing routing decisions.
-4. Replace dashboard polling with authenticated WebSocket updates.
+4. Expand WebSocket streaming beyond events/alerts and harden deployment auth.
 5. Add adaptive decoys and per-attacker honeytoken issuance.
 6. Add persistent actor records, clustering, and case-management workflows.
 7. Verify Docker image builds and deploy the stack.

@@ -36,7 +36,8 @@ Expected result: synthetic configuration data from the static decoy service.
 ## 5. Observe
 
 Open `http://localhost:3000/dashboard`. The event feed, risk metrics, alerts, and
-decoy count refresh through HTTP polling.
+decoy count refresh through HTTP polling. Event and alert updates can also use
+the optional authenticated WebSocket stream when configured.
 
 The dashboard simulation buttons call a server-side Next.js route that adds the
 operator API key before contacting the gateway. The key remains outside the
@@ -60,4 +61,5 @@ docker compose --env-file .env -f infra/docker-compose.yml down
 - Routing is heuristic rather than model-driven.
 - The decoy is static; configured decoy credential reuse is tracked, but
   per-attacker honeytoken issuance is not implemented.
-- Dashboard updates are polled rather than streamed.
+- Aggregate dashboard metrics are polled; event and alert updates can stream
+  over WebSocket when configured.

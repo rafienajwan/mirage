@@ -35,5 +35,6 @@ in the browser bundle.
 | `npm run build` | Build production assets |
 | `npm start` | Serve a production build |
 
-Dashboard data is refreshed with HTTP polling. WebSocket streaming is not yet
-implemented.
+Dashboard data is refreshed with HTTP polling. Event and alert updates can use
+the optional `NEXT_PUBLIC_DASHBOARD_WS_URL` WebSocket stream when configured;
+polling remains the fallback for aggregate metrics.
