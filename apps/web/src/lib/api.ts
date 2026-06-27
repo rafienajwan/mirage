@@ -89,6 +89,21 @@ interface BackendMLShadowStatus {
   warnings: string[];
 }
 
+interface BackendRetrainingRun {
+  artifact_path: string;
+  training_summary: BackendTrainingDataSummary;
+  metrics: Record<string, number>;
+  review: {
+    artifact_path: string;
+    artifact_version: number | null;
+    shadow_ready: boolean;
+    metrics: Record<string, number>;
+    blockers: string[];
+    warnings: string[];
+  };
+  next_steps: string[];
+}
+
 interface BackendHoneytokenHit {
   hit_id: string;
   timestamp: string;
@@ -223,6 +238,21 @@ export interface MLShadowStatusData {
   metrics: Record<string, number>;
   blockers: string[];
   warnings: string[];
+}
+
+export interface RetrainingRun {
+  artifactPath: string;
+  trainingSummary: TrainingDataSummary;
+  metrics: Record<string, number>;
+  review: {
+    artifactPath: string;
+    artifactVersion: number | null;
+    shadowReady: boolean;
+    metrics: Record<string, number>;
+    blockers: string[];
+    warnings: string[];
+  };
+  nextSteps: string[];
 }
 
 export interface HoneytokenHit {
@@ -412,6 +442,47 @@ export async function fetchTrainingDataSummary(): Promise<TrainingDataSummary> {
     hasMinimumClassRows: data.has_minimum_class_rows,
     readyForTraining: data.ready_for_training,
     analystLabels: data.analyst_labels,
+  };
+}
+
+function mapTrainingSummary(data: BackendTrainingDataSummary): TrainingDataSummary {
+  return {
+    labeledRows: data.labeled_rows,
+    exportableRows: data.exportable_rows,
+    minimumRows: data.minimum_rows,
+    minimumRowsPerClass: data.minimum_rows_per_class,
+    normalRows: data.normal_rows,
+    suspiciousRows: data.suspicious_rows,
+    hasBothClasses: data.has_both_classes,
+    hasMinimumClassRows: data.has_minimum_class_rows,
+    readyForTraining: data.ready_for_training,
+    analystLabels: data.analyst_labels,
+  };
+}
+
+/** Train a local shadow-mode candidate from analyst-labeled events. */
+export async function runRetraining(): Promise<RetrainingRun> {
+  const res = await fetch("/api/training-data/retrain", {
+    method: "POST",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(`Retraining error: ${res.status} ${res.statusText}`);
+  }
+  const data = (await res.json()) as BackendRetrainingRun;
+  return {
+    artifactPath: data.artifact_path,
+    trainingSummary: mapTrainingSummary(data.training_summary),
+    metrics: data.metrics,
+    review: {
+      artifactPath: data.review.artifact_path,
+      artifactVersion: data.review.artifact_version,
+      shadowReady: data.review.shadow_ready,
+      metrics: data.review.metrics,
+      blockers: data.review.blockers,
+      warnings: data.review.warnings,
+    },
+    nextSteps: data.next_steps,
   };
 }
 

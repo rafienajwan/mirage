@@ -9,8 +9,8 @@ import ActorProfilesPanel from "@/components/dashboard/ActorProfilesPanel";
 import DecoyStatusCard from "@/components/dashboard/DecoyStatusCard";
 import AlertPanel from "@/components/dashboard/AlertPanel";
 import SimulationPanel from "@/components/dashboard/SimulationPanel";
-import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchHoneytokens, fetchActorProfiles, labelEvent, downloadTrainingData } from "@/lib/api";
-import type { ActorProfileSummary, AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, HoneytokenSummary } from "@/lib/api";
+import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchHoneytokens, fetchActorProfiles, labelEvent, downloadTrainingData, runRetraining } from "@/lib/api";
+import type { ActorProfileSummary, AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, HoneytokenSummary, RetrainingRun } from "@/lib/api";
 import { Globe, ShieldAlert, ArrowRightLeft, Bell, BrainCircuit, Database, Download, KeyRound, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -26,6 +26,10 @@ interface ToastNotification {
   description: string;
   severity: FeedAlert["severity"];
   timestamp: string;
+}
+
+function formatMetric(value: number | undefined) {
+  return typeof value === "number" ? value.toFixed(3) : "n/a";
 }
 
 /**
@@ -105,6 +109,8 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [labelingEventId, setLabelingEventId] = useState<string | null>(null);
   const [exportingTrainingData, setExportingTrainingData] = useState(false);
+  const [retraining, setRetraining] = useState(false);
+  const [retrainingRun, setRetrainingRun] = useState<RetrainingRun | null>(null);
 
   // Toast notifications & audio toggle
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
@@ -188,6 +194,19 @@ export default function DashboardPage() {
       setError(err instanceof Error ? err.message : "Failed to export training data");
     } finally {
       setExportingTrainingData(false);
+    }
+  }, []);
+
+  const handleRetraining = useCallback(async () => {
+    setRetraining(true);
+    try {
+      const result = await runRetraining();
+      setRetrainingRun(result);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to run retraining");
+    } finally {
+      setRetraining(false);
     }
   }, []);
 
@@ -338,6 +357,25 @@ export default function DashboardPage() {
               <span>EXPORT JSONL</span>
             </button>
 
+            <button
+              type="button"
+              onClick={handleRetraining}
+              disabled={retraining || !trainingSummary?.readyForTraining}
+              title={
+                trainingSummary?.readyForTraining
+                  ? "Train a shadow-mode candidate artifact"
+                  : "Training data is not ready"
+              }
+              className="flex items-center gap-2 px-4 py-2 rounded border border-brand-cyan/25 bg-brand-cyan/10 text-brand-cyan text-[10px] font-mono tracking-widest transition-all duration-300 hover:scale-[1.01] hover:border-brand-cyan/40 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {retraining ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <BrainCircuit className="w-3.5 h-3.5" />
+              )}
+              <span>RUN TRAINING</span>
+            </button>
+
             {/* Cyberpunk Audio Toggle */}
             <button
               type="button"
@@ -377,6 +415,31 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
+
+        {retrainingRun ? (
+          <div className="mb-6 rounded-lg border border-brand-cyan/15 bg-brand-cyan/5 p-4 text-[10px] font-mono text-white/45">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-brand-cyan">
+                Artifact: {retrainingRun.artifactPath}
+              </span>
+              <span
+                className={
+                  retrainingRun.review.shadowReady
+                    ? "text-brand-emerald"
+                    : "text-amber-300"
+                }
+              >
+                {retrainingRun.review.shadowReady ? "SHADOW READY" : "REVIEW BLOCKED"}
+              </span>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-3">
+              <span>F1 {formatMetric(retrainingRun.metrics.f1_score)}</span>
+              <span>Precision {formatMetric(retrainingRun.metrics.precision)}</span>
+              <span>Recall {formatMetric(retrainingRun.metrics.recall)}</span>
+              <span>FPR {formatMetric(retrainingRun.metrics.false_positive_rate)}</span>
+            </div>
+          </div>
+        ) : null}
 
         {/* Simulation panel */}
         <div className="mb-6">
