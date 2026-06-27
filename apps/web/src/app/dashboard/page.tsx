@@ -9,8 +9,8 @@ import ActorProfilesPanel from "@/components/dashboard/ActorProfilesPanel";
 import DecoyStatusCard from "@/components/dashboard/DecoyStatusCard";
 import AlertPanel from "@/components/dashboard/AlertPanel";
 import SimulationPanel from "@/components/dashboard/SimulationPanel";
-import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchHoneytokens, fetchActorProfiles, labelEvent, downloadTrainingData, runRetraining } from "@/lib/api";
-import type { ActorProfileSummary, AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, HoneytokenSummary, RetrainingRun } from "@/lib/api";
+import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchHoneytokens, fetchActorProfiles, labelEvent, downloadTrainingData, runRetraining, mapDashboardAlert, mapDashboardEvent } from "@/lib/api";
+import type { ActorProfileSummary, AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, HoneytokenSummary, RetrainingRun, DashboardStreamMessage } from "@/lib/api";
 import { Globe, ShieldAlert, ArrowRightLeft, Bell, BrainCircuit, Database, Download, KeyRound, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -19,6 +19,8 @@ const TrafficChart = dynamic(() => import("@/components/dashboard/TrafficChart")
 const RiskScoreWidget = dynamic(() => import("@/components/dashboard/RiskScoreWidget"), { ssr: false });
 
 const POLL_INTERVAL = 10_000; // 10 seconds
+const DASHBOARD_WS_URL = process.env.NEXT_PUBLIC_DASHBOARD_WS_URL;
+const DASHBOARD_WS_TOKEN = process.env.NEXT_PUBLIC_DASHBOARD_WS_TOKEN;
 
 interface ToastNotification {
   id: string;
@@ -118,10 +120,15 @@ export default function DashboardPage() {
   const soundEnabledRef = useRef(false);
   const alertsInitializedRef = useRef(false);
   const prevAlertIdsRef = useRef<Set<string>>(new Set());
+  const alertsRef = useRef<FeedAlert[]>([]);
 
   useEffect(() => {
     soundEnabledRef.current = soundEnabled;
   }, [soundEnabled]);
+
+  useEffect(() => {
+    alertsRef.current = alerts;
+  }, [alerts]);
 
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -251,6 +258,40 @@ export default function DashboardPage() {
       clearInterval(interval);
     };
   }, [load]);
+
+  useEffect(() => {
+    if (!DASHBOARD_WS_URL) return;
+
+    const url = new URL(DASHBOARD_WS_URL);
+    if (DASHBOARD_WS_TOKEN) {
+      url.searchParams.set("token", DASHBOARD_WS_TOKEN);
+    }
+    const socket = new WebSocket(url.toString());
+
+    socket.onmessage = (message) => {
+      const data = JSON.parse(message.data) as DashboardStreamMessage;
+      if (data.type === "snapshot") {
+        setEvents(data.payload.events.map(mapDashboardEvent));
+        handleAlertsUpdate(data.payload.alerts.map(mapDashboardAlert));
+        return;
+      }
+      if (data.type === "event") {
+        const event = mapDashboardEvent(data.payload);
+        setEvents((current) => [event, ...current.filter((item) => item.id !== event.id)].slice(0, 50));
+        return;
+      }
+      const alert = mapDashboardAlert(data.payload);
+      handleAlertsUpdate([alert, ...alertsRef.current.filter((item) => item.id !== alert.id)].slice(0, 100));
+    };
+
+    socket.onerror = () => {
+      socket.close();
+    };
+
+    return () => {
+      socket.close();
+    };
+  }, [handleAlertsUpdate]);
 
   const trainingRowsText = trainingSummary
     ? `${trainingSummary.exportableRows}/${trainingSummary.minimumRows} rows`

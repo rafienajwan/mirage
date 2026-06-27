@@ -317,7 +317,7 @@ function mapRiskLevel(riskScore: number): ThreatSeverity {
   return "low";
 }
 
-function mapEvent(e: BackendEvent): FeedEvent {
+export function mapDashboardEvent(e: BackendEvent): FeedEvent {
   return {
     id: e.event_id,
     timestamp: e.timestamp,
@@ -347,7 +347,7 @@ function mapMLShadow(shadow: BackendMlShadow | null): MLShadow | null {
   };
 }
 
-function mapAlert(a: BackendAlert): FeedAlert {
+export function mapDashboardAlert(a: BackendAlert): FeedAlert {
   return {
     id: a.alert_id,
     message: a.title,
@@ -395,7 +395,7 @@ export async function fetchOverview(): Promise<OverviewMetrics> {
 /** Fetch recent activity events. */
 export async function fetchEvents(): Promise<FeedEvent[]> {
   const { events } = await apiFetch<{ events: BackendEvent[] }>("/dashboard/events");
-  return events.map(mapEvent);
+  return events.map(mapDashboardEvent);
 }
 
 /** Apply an analyst label through the server-side API bridge. */
@@ -412,7 +412,7 @@ export async function labelEvent(
   if (!res.ok) {
     throw new Error(`Labeling error: ${res.status} ${res.statusText}`);
   }
-  return mapEvent(await res.json());
+  return mapDashboardEvent(await res.json());
 }
 
 /** Download analyst-labeled feature vectors as JSON Lines. */
@@ -547,8 +547,16 @@ export async function fetchActorProfiles(): Promise<ActorProfileSummary> {
 /** Fetch active alerts. */
 export async function fetchAlerts(): Promise<FeedAlert[]> {
   const { alerts } = await apiFetch<{ alerts: BackendAlert[] }>("/dashboard/alerts");
-  return alerts.map(mapAlert);
+  return alerts.map(mapDashboardAlert);
 }
+
+export type DashboardStreamMessage =
+  | {
+      type: "snapshot";
+      payload: { events: BackendEvent[]; alerts: BackendAlert[] };
+    }
+  | { type: "event"; payload: BackendEvent }
+  | { type: "alert"; payload: BackendAlert };
 
 // ─── Simulation triggers ────────────────────────────────────────
 
