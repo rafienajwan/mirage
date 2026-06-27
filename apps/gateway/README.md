@@ -130,4 +130,5 @@ rows for stratified splitting.
 - no trained artifact participates in live decisions;
 - actor profiles are computed from recent events; persistent actor records,
   clustering, and per-attacker honeytoken issuance are not implemented;
-- dashboard APIs are polled rather than streamed.
+- WebSocket streaming currently covers events and alerts; aggregate metrics are
+  still polled.

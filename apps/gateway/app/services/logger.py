@@ -10,6 +10,7 @@ from app.schemas.event import EventRecord
 from app.schemas.honeytoken import HoneytokenHit
 from app.schemas.ml import MLShadowScore
 from app.schemas.request import InspectRequest
+from app.services.dashboard_stream import broadcast_dashboard_update
 from app.services.honeytoken import HoneytokenMatch
 from app.storage import store
 from app.utils.time import utcnow
@@ -50,6 +51,7 @@ async def log_inspection(
         summary=f"{request.method} {request.path} → {decision.value} (score: {risk_score})",
     )
     await store.add_event(event)
+    await broadcast_dashboard_update("event", event.model_dump(mode="json"))
 
     for match in honeytoken_matches or []:
         hit = HoneytokenHit(
@@ -73,6 +75,7 @@ async def log_inspection(
             ),
             recommended_action="Treat as high-confidence deception interaction and review attacker activity.",
         )
+        await _broadcast_latest_alert()
 
     # Create alert for redirected traffic
     if decision == Decision.REDIRECT_TO_DECOY:
@@ -85,6 +88,7 @@ async def log_inspection(
             ),
             recommended_action="Review actor profile and consider IP block.",
         )
+        await _broadcast_latest_alert()
     elif decision == Decision.MONITOR:
         await store.add_alert(
             severity=AlertSeverity.WARNING,
@@ -95,5 +99,12 @@ async def log_inspection(
             ),
             recommended_action="Continue monitoring for escalation.",
         )
+        await _broadcast_latest_alert()
 
     return event
+
+
+async def _broadcast_latest_alert() -> None:
+    alerts = await store.get_alerts(limit=1)
+    if alerts:
+        await broadcast_dashboard_update("alert", alerts[0].model_dump(mode="json"))

@@ -26,7 +26,7 @@ the beginning of a real ML pipeline.
 | CICIDS2017 dataset | Partial | A basic CICIDS-style CSV adapter and train/test split workflow exist; reviewed raw dataset ingestion, cleaning, and provenance are still pending. |
 | Custom API logs | Partial | Runtime events, features, analyst-corrected labels, JSONL export, validation, split tooling, and local retraining are available; reviewed datasets are still pending. |
 | Precision/recall/F1/FPR evaluation | Implemented | The Random Forest trainer calculates all four metrics. |
-| Real-time WebSocket dashboard | Not implemented | Dashboard uses 10-second HTTP polling. |
+| Real-time WebSocket dashboard | Partial | An authenticated WebSocket stream can push events and alerts; dashboard polling remains as fallback and other metrics still poll. |
 | Security dashboard and alerts | Implemented for demo | Live metrics, events, risk history, decoy status, and internal alerts are available. |
 | Adaptive decoy generation | Not implemented | Decoy selection and payloads are static templates. |
 | Docker Compose | Configuration implemented | Compose, health checks, and Dockerfiles exist; image build still needs verification with Docker Desktop running. |
@@ -54,4 +54,4 @@ The current demo can accurately claim that MIRAGE:
 
 It should not yet claim arbitrary ingress interception, a production ML model,
 adaptive decoys, persistent actor clustering, per-attacker honeytoken issuance,
-WebSocket updates, or deployed Supabase/Railway/Vercel infrastructure.
+full dashboard streaming, or deployed Supabase/Railway/Vercel infrastructure.

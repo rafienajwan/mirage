@@ -19,6 +19,8 @@ appropriate example and this reference in the same change.
 | Variable | Required | Scope | Purpose |
 | --- | --- | --- | --- |
 | `NEXT_PUBLIC_API_URL` | No | Browser | Public gateway URL used for dashboard reads |
+| `NEXT_PUBLIC_DASHBOARD_WS_URL` | No | Browser | Optional gateway WebSocket URL for dashboard event/alert streaming |
+| `NEXT_PUBLIC_DASHBOARD_WS_TOKEN` | No | Browser | Optional local stream token; omit to keep polling fallback only |
 | `MIRAGE_INTERNAL_API_URL` | No | Web server | Internal gateway URL used by the simulation bridge |
 | `MIRAGE_API_KEY` | Yes | Gateway and web server | Protects operator writes and authenticates simulations |
 | `DATABASE_URL` | Yes | Gateway | Async PostgreSQL connection used by SQLAlchemy |
@@ -81,3 +83,8 @@ Only variables beginning with `NEXT_PUBLIC_` are safe to expose to browser code.
 `MIRAGE_API_KEY`, `DATABASE_URL`, `POSTGRES_PASSWORD`, and `DECOY_*` must remain
 server-side. Dashboard simulations use the Next.js server route
 `/api/simulate/{kind}` to avoid exposing the operator key.
+
+`NEXT_PUBLIC_DASHBOARD_WS_TOKEN` is browser-visible by design. Use it only for a
+local/demo read stream, and keep HTTP polling enabled as the fallback. For a
+production deployment, place the WebSocket behind a server-side session or edge
+auth layer instead of exposing the operator API key.
