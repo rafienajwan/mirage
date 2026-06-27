@@ -23,6 +23,7 @@ cloud-deployment capabilities remain proposal targets. See
 - JSONL export and readiness checks for analyst-labeled training records;
 - dataset preparation adapters for MIRAGE JSONL and CICIDS-style CSV sources;
 - honeytoken detection for configured decoy credentials;
+- adaptive in-process decoy responses with per-actor synthetic canary tokens;
 - computed actor profiles from fingerprints, event history, and honeytoken hits;
 - Docker Compose configuration for the five-service demo stack.
 
@@ -30,8 +31,8 @@ cloud-deployment capabilities remain proposal targets. See
 
 - The gateway only proxies its explicit `/api/v1/proxy/*` route.
 - Runtime routing uses heuristics; trained artifacts can be observed in shadow mode.
-- Decoy responses are static; configured decoy credential reuse is tracked, but
-  per-attacker honeytoken issuance is not implemented.
+- The external decoy service remains static; the authenticated in-process decoy
+  response API can issue per-actor synthetic canary tokens.
 - Dashboard updates use HTTP polling with an optional authenticated WebSocket
   stream for event and alert updates.
 - Docker image builds and cloud deployment are not yet verified in CI.
@@ -305,7 +306,7 @@ infra/
 2. Train the first reviewed model from prepared JSONL splits.
 3. Observe reviewed models in shadow mode before changing routing decisions.
 4. Expand WebSocket streaming beyond events/alerts and harden deployment auth.
-5. Add adaptive decoys and per-attacker honeytoken issuance.
+5. Extend adaptive decoys into the redirected decoy service.
 6. Add persistent actor records, clustering, and case-management workflows.
 7. Verify Docker image builds and deploy the stack.
 
