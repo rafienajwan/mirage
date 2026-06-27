@@ -11,8 +11,10 @@ from app.schemas.dashboard import (
     TrainingDataSummary,
 )
 from app.schemas.event import EventLabelRequest
+from app.schemas.retraining import RetrainingRun
 from app.services.ml_status import get_ml_shadow_status
 from app.services.actor_profiles import get_actor_profiles
+from app.services.retraining import train_from_labeled_events
 from app.services.threat_analysis import get_threat_summary
 from app.services.training_export import events_to_jsonl, training_data_summary
 from app.storage import store
@@ -79,6 +81,18 @@ async def training_data_readiness(limit: int = Query(default=10000, ge=1, le=500
     """Summarize whether analyst labels are sufficient for model training."""
     events = await store.get_labeled_events(limit=limit)
     return training_data_summary(events)
+
+
+@router.post(
+    "/training-data/retrain",
+    response_model=RetrainingRun,
+    dependencies=[Depends(require_api_key)],
+)
+async def retrain_from_training_data(
+    limit: int = Query(default=10000, ge=20, le=50000),
+):
+    """Train a local shadow-mode candidate from analyst-labeled events."""
+    return await train_from_labeled_events(limit=limit)
 
 
 @router.get("/ml-shadow/status", response_model=MLShadowStatus)

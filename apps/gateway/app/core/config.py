@@ -62,6 +62,11 @@ class Settings:
     ml_model_artifact: str | None = field(
         default_factory=lambda: os.getenv("MIRAGE_MODEL_ARTIFACT") or None
     )
+    retraining_artifact_dir: str = field(
+        default_factory=lambda: os.getenv(
+            "MIRAGE_RETRAINING_ARTIFACT_DIR", "artifacts/retraining"
+        )
+    )
     ml_shadow_monitor_threshold: float = field(
         default_factory=lambda: float(os.getenv("ML_SHADOW_MONITOR_THRESHOLD", "0.35"))
     )
