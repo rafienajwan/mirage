@@ -94,6 +94,16 @@ routing remains heuristic until a reviewed artifact is enabled in shadow mode.
 Set `MIRAGE_MODEL_ARTIFACT` to a trained artifact path to store model-only
 scores beside events without changing live routing.
 
+To train a local candidate directly from reviewed dashboard labels:
+
+```bash
+curl -X POST -H "X-Mirage-API-Key: YOUR_LOCAL_MIRAGE_API_KEY" \
+  http://localhost:8000/api/v1/dashboard/training-data/retrain
+```
+
+The response includes metrics and artifact review output. The endpoint does not
+change live routing or set `MIRAGE_MODEL_ARTIFACT`.
+
 Analyst-labeled events can be exported from the running gateway as JSON Lines:
 
 ```bash

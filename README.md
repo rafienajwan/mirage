@@ -192,8 +192,10 @@ All paths below use the `http://localhost:8000` base URL.
 | `GET /api/v1/dashboard/*` | Public | Dashboard metrics, events, alerts, and charts |
 | `GET /api/v1/dashboard/training-data/export` | API key | Export analyst-labeled feature vectors as JSONL |
 | `GET /api/v1/dashboard/training-data/summary` | API key | Check labeled row counts and class balance before training |
+| `POST /api/v1/dashboard/training-data/retrain` | API key | Train a local shadow-mode candidate artifact from analyst labels |
 | `GET /api/v1/dashboard/ml-shadow/status` | Public | Report sanitized ML shadow artifact readiness |
 | `GET /api/v1/dashboard/honeytokens` | Public | Show recent decoy credential interactions |
+| `GET /api/v1/dashboard/actors` | Public | Show recent actor profiles grouped by threat fingerprint |
 | `GET /api/v1/decoy/status` | Public | Current decoy metrics |
 | `POST /api/v1/decoy/respond` | API key | Generate an in-process synthetic response |
 
@@ -255,6 +257,17 @@ use the same export rules. A first local training run is considered ready when
 there are at least 20 exportable analyst-labeled rows and each binary class has
 at least two rows for stratified splitting.
 
+For a local candidate artifact directly from reviewed labels:
+
+```bash
+curl -X POST \
+  -H "X-Mirage-API-Key: YOUR_LOCAL_MIRAGE_API_KEY" \
+  http://localhost:8000/api/v1/dashboard/training-data/retrain
+```
+
+This writes to `MIRAGE_RETRAINING_ARTIFACT_DIR` and returns artifact metrics plus
+review blockers/warnings. It does not enable the artifact or change live routing.
+
 ## Repository Layout
 
 ```text
@@ -289,11 +302,10 @@ infra/
 1. Expand CICIDS2017 and custom API-log adapters with reviewed real datasets.
 2. Train the first reviewed model from prepared JSONL splits.
 3. Observe reviewed models in shadow mode before changing routing decisions.
-4. Add retraining workflows from analyst-corrected labels.
-5. Replace dashboard polling with authenticated WebSocket updates.
-6. Add adaptive decoys and per-attacker honeytoken issuance.
-7. Add persistent actor records, clustering, and case-management workflows.
-8. Verify Docker image builds and deploy the stack.
+4. Replace dashboard polling with authenticated WebSocket updates.
+5. Add adaptive decoys and per-attacker honeytoken issuance.
+6. Add persistent actor records, clustering, and case-management workflows.
+7. Verify Docker image builds and deploy the stack.
 
 ## License
 

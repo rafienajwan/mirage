@@ -32,6 +32,7 @@ appropriate example and this reference in the same change.
 | `PROXY_TIMEOUT_SECONDS` | No | Gateway | Upstream HTTP timeout |
 | `PROXY_MAX_BODY_BYTES` | No | Gateway | Maximum forwarded request body |
 | `MIRAGE_MODEL_ARTIFACT` | No | Gateway | Optional path to a trained model artifact for shadow scoring |
+| `MIRAGE_RETRAINING_ARTIFACT_DIR` | No | Gateway | Local directory for analyst-label retraining artifacts |
 | `ML_SHADOW_MONITOR_THRESHOLD` | No | Gateway | Probability threshold for model-only monitor decisions |
 | `ML_SHADOW_REDIRECT_THRESHOLD` | No | Gateway | Probability threshold for model-only decoy decisions |
 | `DECOY_LOGIN_TOKEN` | Yes | Gateway and decoy | Synthetic login token shown in decoy data |
@@ -55,6 +56,10 @@ the gateway stores the model's shadow score beside each event without changing
 the live allow/monitor/decoy decision.
 Run `python scripts/review_model_artifact.py --artifact <path>` from
 `apps/gateway` before setting this variable for a new artifact.
+
+`MIRAGE_RETRAINING_ARTIFACT_DIR` controls where the authenticated retraining
+endpoint stores local candidate artifacts. Keep this path ignored by Git and
+review the generated artifact before pointing `MIRAGE_MODEL_ARTIFACT` at it.
 
 ## Standalone-Only Gateway Variables
 
