@@ -91,3 +91,34 @@ async def test_actor_clusters_group_profiles_by_status_and_path(client, monkeypa
     assert cluster["status"] == "confirmed_interaction"
     assert cluster["shared_paths"] == ["/.env"]
     assert cluster["honeytoken_hits"] == 1
+
+
+@pytest.mark.asyncio
+async def test_actor_cases_recommend_investigations_from_clusters(client, monkeypatch):
+    monkeypatch.setattr(honeytoken, "settings", _settings())
+    request = {
+        "ip_address": "10.10.30.10",
+        "method": "GET",
+        "path": "/api/token/verify",
+        "user_agent": "curl/8",
+        "request_count": 80,
+        "payload_indicators": ["encoded"],
+        "payload_excerpt": "token=mirage-service-canary",
+    }
+
+    event_response = await client.post("/api/v1/inspect", json=request)
+    response = await client.get("/api/v1/dashboard/actor-cases")
+
+    assert event_response.status_code == 200
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["total_cases"] == 1
+
+    case = data["cases"][0]
+    assert case["case_id"].startswith("case-")
+    assert case["cluster_id"].startswith("cluster-")
+    assert case["severity"] == "critical"
+    assert case["status"] == "recommended"
+    assert case["actor_count"] == 1
+    assert case["recommended_action"].startswith("Investigate issued canary reuse")

@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from app.core.security import require_api_key
 from app.schemas.dashboard import (
+    ActorCaseSummary,
     DashboardOverview,
     ActorClusterSummary,
     ActorProfileSummary,
@@ -14,7 +15,7 @@ from app.schemas.dashboard import (
 from app.schemas.event import EventLabelRequest
 from app.schemas.retraining import RetrainingRun
 from app.services.ml_status import get_ml_shadow_status
-from app.services.actor_clusters import get_actor_clusters
+from app.services.actor_clusters import get_actor_cases, get_actor_clusters
 from app.services.actor_profiles import get_actor_profiles
 from app.services.retraining import train_from_labeled_events
 from app.services.threat_analysis import get_threat_summary
@@ -123,6 +124,12 @@ async def dashboard_actors(limit: int = Query(default=20, ge=1, le=100)):
 async def dashboard_actor_clusters(limit: int = Query(default=20, ge=1, le=100)):
     """Lightweight actor clusters for threat-hunting triage."""
     return await get_actor_clusters(limit=limit)
+
+
+@router.get("/actor-cases", response_model=ActorCaseSummary)
+async def dashboard_actor_cases(limit: int = Query(default=20, ge=1, le=100)):
+    """Read-only recommended cases derived from actor clusters."""
+    return await get_actor_cases(limit=limit)
 
 
 @router.get("/alerts")

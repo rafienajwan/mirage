@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import hashlib
 
-from app.schemas.actor import ActorCluster, ActorClusterSummary, ActorProfile
+from app.schemas.actor import (
+    ActorCase,
+    ActorCaseSummary,
+    ActorCluster,
+    ActorClusterSummary,
+    ActorProfile,
+)
 from app.services.actor_profiles import get_actor_profiles
 
 
@@ -16,6 +22,40 @@ def _cluster_key(profile: ActorProfile) -> tuple[str, str]:
 def _cluster_id(status: str, primary_path: str) -> str:
     digest = hashlib.sha256(f"{status}|{primary_path}".encode("utf-8")).hexdigest()
     return f"cluster-{digest[:10]}"
+
+
+def _case_severity(cluster: ActorCluster) -> str:
+    if cluster.honeytoken_hits > 0:
+        return "critical"
+    if cluster.decoy_redirects > 0 or cluster.max_risk_score >= 80:
+        return "high"
+    if cluster.status in {"suspicious", "watch"} or cluster.max_risk_score >= 60:
+        return "medium"
+    return "low"
+
+
+def _case_action(cluster: ActorCluster) -> str:
+    if cluster.honeytoken_hits > 0:
+        return "Investigate issued canary reuse and preserve related request evidence."
+    if cluster.decoy_redirects > 0:
+        return "Review redirected proxy traffic and compare shared target paths."
+    if cluster.max_risk_score >= 60:
+        return "Review clustered requests and decide whether to label events for training."
+    return "Monitor for repeated activity before opening a manual incident."
+
+
+def _case_evidence(cluster: ActorCluster) -> list[str]:
+    evidence = [
+        f"{cluster.actor_count} actor profile(s) grouped under {cluster.label}",
+        f"max risk score {cluster.max_risk_score}",
+    ]
+    if cluster.shared_paths:
+        evidence.append(f"shared target paths: {', '.join(cluster.shared_paths)}")
+    if cluster.honeytoken_hits:
+        evidence.append(f"{cluster.honeytoken_hits} honeytoken hit(s)")
+    if cluster.decoy_redirects:
+        evidence.append(f"{cluster.decoy_redirects} decoy redirect(s)")
+    return evidence
 
 
 async def get_actor_clusters(
@@ -81,3 +121,39 @@ async def get_actor_clusters(
         reverse=True,
     )
     return ActorClusterSummary(total_clusters=len(clusters), clusters=clusters[:limit])
+
+
+async def get_actor_cases(limit: int = 20) -> ActorCaseSummary:
+    """Recommend read-only investigation cases from actor clusters."""
+    cluster_summary = await get_actor_clusters(limit=100)
+    cases: list[ActorCase] = []
+    for cluster in cluster_summary.clusters:
+        severity = _case_severity(cluster)
+        if severity == "low" and cluster.actor_count < 2:
+            continue
+        case_digest = hashlib.sha256(cluster.cluster_id.encode("utf-8")).hexdigest()
+        cases.append(
+            ActorCase(
+                case_id=f"case-{case_digest[:10]}",
+                cluster_id=cluster.cluster_id,
+                title=f"Review {cluster.label}",
+                severity=severity,
+                status="recommended",
+                actor_count=cluster.actor_count,
+                actor_ids=cluster.actor_ids,
+                evidence=_case_evidence(cluster),
+                recommended_action=_case_action(cluster),
+                last_seen=cluster.last_seen,
+            )
+        )
+
+    severity_order = {"critical": 3, "high": 2, "medium": 1, "low": 0}
+    cases.sort(
+        key=lambda item: (
+            severity_order[item.severity],
+            item.actor_count,
+            item.last_seen,
+        ),
+        reverse=True,
+    )
+    return ActorCaseSummary(total_cases=len(cases), cases=cases[:limit])

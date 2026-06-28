@@ -199,6 +199,7 @@ All paths below use the `http://localhost:8000` base URL.
 | `GET /api/v1/dashboard/honeytokens` | Public | Show recent decoy credential interactions |
 | `GET /api/v1/dashboard/actors` | Public | Show recent actor profiles grouped by threat fingerprint |
 | `GET /api/v1/dashboard/actor-clusters` | Public | Show lightweight actor clusters for triage |
+| `GET /api/v1/dashboard/actor-cases` | Public | Show read-only recommended investigation cases |
 | `WS /api/v1/dashboard/ws` | API key token | Stream dashboard event and alert updates |
 | `GET /api/v1/decoy/status` | Public | Current decoy metrics |
 | `POST /api/v1/decoy/respond` | API key | Generate an in-process synthetic response |
@@ -307,7 +308,7 @@ infra/
 2. Train the first reviewed model from prepared JSONL splits.
 3. Observe reviewed models in shadow mode before changing routing decisions.
 4. Expand WebSocket streaming beyond events/alerts and harden deployment auth.
-5. Add case-management workflows and cluster visualization.
+5. Add persisted case-management workflows and cluster visualization.
 6. Add token rotation and assignment lifecycle controls.
 7. Verify Docker image builds and deploy the stack.
 
