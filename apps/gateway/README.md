@@ -128,7 +128,8 @@ rows for stratified splitting.
 
 - proxy coverage is limited to `/api/v1/proxy/*`;
 - no trained artifact participates in live decisions;
-- actor profiles are computed from recent events; persistent actor records,
-  clustering, external decoy issuance, and token rotation are not implemented;
+- actor profiles are persisted as aggregates and grouped into lightweight
+  dashboard clusters; case management, token rotation, and assignment lifecycle
+  controls are not implemented;
 - WebSocket streaming currently covers events and alerts; aggregate metrics are
   still polled.

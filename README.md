@@ -6,15 +6,15 @@ heuristics, forwards normal traffic to a protected demo app, redirects suspiciou
 traffic to an isolated static decoy, persists security events, and exposes them
 through a polling Next.js dashboard.
 
-The broader adaptive-ML, per-attacker honeytoken issuance/rotation, and
-cloud-deployment capabilities remain proposal targets. See
+The broader adaptive-ML, honeytoken rotation, and cloud-deployment capabilities
+remain proposal targets. See
 `docs/PROPOSAL_ALIGNMENT.md` for the exact implementation gap.
 
 ## What Works
 
 - guarded reverse proxy at `/api/v1/proxy/*`;
 - heuristic risk scoring, anomaly signals, fingerprints, and payload indicators;
-- isolated protected-demo and static-decoy services;
+- isolated protected-demo and adaptive static-decoy services;
 - bounded request bodies, upstream timeouts, credential filtering, and rate limits;
 - SQLite development storage and PostgreSQL/Alembic support;
 - dashboard metrics, events, alerts, traffic history, and simulation controls;
@@ -23,16 +23,16 @@ cloud-deployment capabilities remain proposal targets. See
 - JSONL export and readiness checks for analyst-labeled training records;
 - dataset preparation adapters for MIRAGE JSONL and CICIDS-style CSV sources;
 - honeytoken detection for configured decoy credentials;
-- adaptive in-process decoy responses with per-actor synthetic canary tokens;
-- computed actor profiles from fingerprints, event history, and honeytoken hits;
+- adaptive decoy responses with per-actor synthetic canary tokens;
+- persistent actor profiles and lightweight actor clusters for triage;
 - Docker Compose configuration for the five-service demo stack.
 
 ## Current Boundaries
 
 - The gateway only proxies its explicit `/api/v1/proxy/*` route.
 - Runtime routing uses heuristics; trained artifacts can be observed in shadow mode.
-- The external decoy service remains static; the authenticated in-process decoy
-  response API can issue per-actor synthetic canary tokens.
+- Decoy payloads are synthetic and can issue deterministic per-actor canary
+  tokens; token rotation and long-lived assignments are not implemented.
 - Dashboard updates use HTTP polling with an optional authenticated WebSocket
   stream for event and alert updates.
 - Docker image builds and cloud deployment are not yet verified in CI.
@@ -198,6 +198,7 @@ All paths below use the `http://localhost:8000` base URL.
 | `GET /api/v1/dashboard/ml-shadow/status` | Public | Report sanitized ML shadow artifact readiness |
 | `GET /api/v1/dashboard/honeytokens` | Public | Show recent decoy credential interactions |
 | `GET /api/v1/dashboard/actors` | Public | Show recent actor profiles grouped by threat fingerprint |
+| `GET /api/v1/dashboard/actor-clusters` | Public | Show lightweight actor clusters for triage |
 | `WS /api/v1/dashboard/ws` | API key token | Stream dashboard event and alert updates |
 | `GET /api/v1/decoy/status` | Public | Current decoy metrics |
 | `POST /api/v1/decoy/respond` | API key | Generate an in-process synthetic response |
@@ -306,8 +307,8 @@ infra/
 2. Train the first reviewed model from prepared JSONL splits.
 3. Observe reviewed models in shadow mode before changing routing decisions.
 4. Expand WebSocket streaming beyond events/alerts and harden deployment auth.
-5. Extend adaptive decoys into the redirected decoy service.
-6. Add persistent actor records, clustering, and case-management workflows.
+5. Add case-management workflows and cluster visualization.
+6. Add token rotation and assignment lifecycle controls.
 7. Verify Docker image builds and deploy the stack.
 
 ## License
