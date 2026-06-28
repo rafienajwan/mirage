@@ -10,6 +10,7 @@ and honeytoken hits.
 ```text
 GET /api/v1/dashboard/actors
 GET /api/v1/dashboard/actor-clusters
+GET /api/v1/dashboard/actor-cases
 ```
 
 Each profile includes:
@@ -28,9 +29,13 @@ cluster returns a stable cluster id, label, actor count, representative actor
 ids, shared paths, decoy redirect count, honeytoken hit count, maximum risk
 score, and latest seen timestamp.
 
+Actor cases are read-only recommendations derived from clusters. Each case
+includes severity, evidence, representative actor ids, and a recommended analyst
+action. They are not persisted as workflow records yet.
+
 ## Current Boundaries
 
 Profiles and clusters are intended for dashboard triage. MIRAGE now persists
 aggregate actor records and groups similar profiles, but it does not yet assign
-cases, rotate issued canary tokens, manage token assignment lifecycles, or run a
-trained clustering model.
+persisted cases, rotate issued canary tokens, manage token assignment
+lifecycles, or run a trained clustering model.

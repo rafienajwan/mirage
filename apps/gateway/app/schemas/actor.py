@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from app.schemas.decision import Decision
 
 ActorStatus = Literal["quiet", "watch", "suspicious", "confirmed_interaction"]
+CaseSeverity = Literal["low", "medium", "high", "critical"]
 
 
 class ActorProfile(BaseModel):
@@ -58,3 +59,25 @@ class ActorClusterSummary(BaseModel):
 
     total_clusters: int = Field(ge=0)
     clusters: list[ActorCluster]
+
+
+class ActorCase(BaseModel):
+    """Read-only case recommendation derived from actor clusters."""
+
+    case_id: str
+    cluster_id: str
+    title: str
+    severity: CaseSeverity
+    status: Literal["recommended"]
+    actor_count: int = Field(ge=0)
+    actor_ids: list[str]
+    evidence: list[str]
+    recommended_action: str
+    last_seen: datetime
+
+
+class ActorCaseSummary(BaseModel):
+    """Recommended actor cases for analyst triage."""
+
+    total_cases: int = Field(ge=0)
+    cases: list[ActorCase]
