@@ -24,7 +24,7 @@ remain proposal targets. See
 - dataset preparation adapters for MIRAGE JSONL and CICIDS-style CSV sources;
 - honeytoken detection for configured decoy credentials;
 - adaptive decoy responses with per-actor synthetic canary tokens;
-- persistent actor profiles and lightweight actor clusters for triage;
+- persistent actor profiles, lightweight actor clusters, and case triage visualization;
 - Docker Compose configuration for the five-service demo stack.
 
 ## Current Boundaries

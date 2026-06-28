@@ -27,7 +27,7 @@ the beginning of a real ML pipeline.
 | Custom API logs | Partial | Runtime events, features, analyst-corrected labels, JSONL export, validation, split tooling, and local retraining are available; reviewed datasets are still pending. |
 | Precision/recall/F1/FPR evaluation | Implemented | The Random Forest trainer calculates all four metrics. |
 | Real-time WebSocket dashboard | Partial | An authenticated WebSocket stream can push events and alerts; dashboard polling remains as fallback and other metrics still poll. |
-| Security dashboard and alerts | Implemented for demo | Live metrics, events, risk history, decoy status, and internal alerts are available. |
+| Security dashboard and alerts | Implemented for demo | Live metrics, events, risk history, decoy status, actor triage, and internal alerts are available. |
 | Adaptive decoy generation | Partial | The in-process decoy API and redirected external decoy service select variants and issue per-actor synthetic canary tokens; long-lived assignment lifecycle controls are pending. |
 | Docker Compose | Configuration implemented | Compose, health checks, and Dockerfiles exist; image build still needs verification with Docker Desktop running. |
 | Vercel/Railway/Supabase deployment | Not implemented | No verified online deployment configuration is present. |
@@ -52,7 +52,7 @@ The current demo can accurately claim that MIRAGE:
 - exports analyst-labeled feature vectors as JSON Lines for model training;
 - trains local shadow-mode candidate artifacts from analyst-labeled events;
 - prepares validated train/test splits from MIRAGE JSONL and CICIDS-style CSV sources;
-- displays live backend data on a dashboard;
+- displays live backend data, actor clusters, and recommended triage cases on a dashboard;
 - can train and evaluate a Random Forest model from labeled feature records.
 
 It should not yet claim arbitrary ingress interception, a production ML model,

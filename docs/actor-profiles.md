@@ -33,6 +33,9 @@ Actor cases are read-only recommendations derived from clusters. Each case
 includes severity, evidence, representative actor ids, and a recommended analyst
 action. They are not persisted as workflow records yet.
 
+The Next.js dashboard renders actor profiles, cluster signals, and recommended
+cases in the actor triage section.
+
 ## Current Boundaries
 
 Profiles and clusters are intended for dashboard triage. MIRAGE now persists

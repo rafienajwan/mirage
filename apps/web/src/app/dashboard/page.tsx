@@ -6,11 +6,12 @@ import Header from "@/components/layout/Header";
 import MetricCard from "@/components/ui/MetricCard";
 import ThreatFeed from "@/components/dashboard/ThreatFeed";
 import ActorProfilesPanel from "@/components/dashboard/ActorProfilesPanel";
+import ActorTriagePanel from "@/components/dashboard/ActorTriagePanel";
 import DecoyStatusCard from "@/components/dashboard/DecoyStatusCard";
 import AlertPanel from "@/components/dashboard/AlertPanel";
 import SimulationPanel from "@/components/dashboard/SimulationPanel";
-import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchHoneytokens, fetchActorProfiles, labelEvent, downloadTrainingData, runRetraining, mapDashboardAlert, mapDashboardEvent } from "@/lib/api";
-import type { ActorProfileSummary, AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, HoneytokenSummary, RetrainingRun, DashboardStreamMessage } from "@/lib/api";
+import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchHoneytokens, fetchActorProfiles, fetchActorClusters, fetchActorCases, labelEvent, downloadTrainingData, runRetraining, mapDashboardAlert, mapDashboardEvent } from "@/lib/api";
+import type { ActorCaseSummary, ActorClusterSummary, ActorProfileSummary, AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, HoneytokenSummary, RetrainingRun, DashboardStreamMessage } from "@/lib/api";
 import { Globe, ShieldAlert, ArrowRightLeft, Bell, BrainCircuit, Database, Download, KeyRound, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -107,6 +108,8 @@ export default function DashboardPage() {
   const [mlShadowStatus, setMlShadowStatus] = useState<MLShadowStatusData | null>(null);
   const [honeytokens, setHoneytokens] = useState<HoneytokenSummary | null>(null);
   const [actorProfiles, setActorProfiles] = useState<ActorProfileSummary | null>(null);
+  const [actorClusters, setActorClusters] = useState<ActorClusterSummary | null>(null);
+  const [actorCases, setActorCases] = useState<ActorCaseSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [labelingEventId, setLabelingEventId] = useState<string | null>(null);
@@ -219,7 +222,7 @@ export default function DashboardPage() {
 
   const load = useCallback(async () => {
     try {
-      const [ov, ev, al, tr, rh, ds, ts, ms, ht, ap] = await Promise.all([
+      const [ov, ev, al, tr, rh, ds, ts, ms, ht, ap, ac, cases] = await Promise.all([
         fetchOverview(),
         fetchEvents(),
         fetchAlerts(),
@@ -230,6 +233,8 @@ export default function DashboardPage() {
         fetchMLShadowStatus().catch(() => null),
         fetchHoneytokens().catch(() => null),
         fetchActorProfiles().catch(() => null),
+        fetchActorClusters().catch(() => null),
+        fetchActorCases().catch(() => null),
       ]);
       setOverview(ov);
       setEvents(ev);
@@ -241,6 +246,8 @@ export default function DashboardPage() {
       setMlShadowStatus(ms);
       setHoneytokens(ht);
       setActorProfiles(ap);
+      setActorClusters(ac);
+      setActorCases(cases);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch data");
@@ -542,6 +549,10 @@ export default function DashboardPage() {
         {/* Threat feed */}
         <div className="mb-8">
           <ActorProfilesPanel data={actorProfiles} />
+        </div>
+
+        <div className="mb-8">
+          <ActorTriagePanel clusters={actorClusters} cases={actorCases} />
         </div>
 
         {/* Threat feed */}

@@ -143,6 +143,42 @@ interface BackendActorProfileSummary {
   profiles: BackendActorProfile[];
 }
 
+interface BackendActorCluster {
+  cluster_id: string;
+  label: string;
+  status: "quiet" | "watch" | "suspicious" | "confirmed_interaction";
+  actor_count: number;
+  actor_ids: string[];
+  shared_paths: string[];
+  max_risk_score: number;
+  honeytoken_hits: number;
+  decoy_redirects: number;
+  last_seen: string;
+}
+
+interface BackendActorClusterSummary {
+  total_clusters: number;
+  clusters: BackendActorCluster[];
+}
+
+interface BackendActorCase {
+  case_id: string;
+  cluster_id: string;
+  title: string;
+  severity: "low" | "medium" | "high" | "critical";
+  status: "recommended";
+  actor_count: number;
+  actor_ids: string[];
+  evidence: string[];
+  recommended_action: string;
+  last_seen: string;
+}
+
+interface BackendActorCaseSummary {
+  total_cases: number;
+  cases: BackendActorCase[];
+}
+
 // ─── Frontend types (mapped from backend) ───────────────────────
 
 export interface OverviewMetrics {
@@ -292,6 +328,42 @@ export interface ActorProfile {
 export interface ActorProfileSummary {
   totalActors: number;
   profiles: ActorProfile[];
+}
+
+export interface ActorCluster {
+  id: string;
+  label: string;
+  status: ActorProfile["status"];
+  actorCount: number;
+  actorIds: string[];
+  sharedPaths: string[];
+  maxRiskScore: number;
+  honeytokenHits: number;
+  decoyRedirects: number;
+  lastSeen: string;
+}
+
+export interface ActorClusterSummary {
+  totalClusters: number;
+  clusters: ActorCluster[];
+}
+
+export interface ActorCase {
+  id: string;
+  clusterId: string;
+  title: string;
+  severity: ThreatSeverity;
+  status: "recommended";
+  actorCount: number;
+  actorIds: string[];
+  evidence: string[];
+  recommendedAction: string;
+  lastSeen: string;
+}
+
+export interface ActorCaseSummary {
+  totalCases: number;
+  cases: ActorCase[];
 }
 
 // ─── Mapping helpers ────────────────────────────────────────────
@@ -540,6 +612,46 @@ export async function fetchActorProfiles(): Promise<ActorProfileSummary> {
       topPaths: profile.top_paths,
       lastDecision: mapDecision(profile.last_decision),
       status: profile.status,
+    })),
+  };
+}
+
+/** Fetch lightweight actor clusters for dashboard triage. */
+export async function fetchActorClusters(): Promise<ActorClusterSummary> {
+  const data = await apiFetch<BackendActorClusterSummary>("/dashboard/actor-clusters");
+  return {
+    totalClusters: data.total_clusters,
+    clusters: data.clusters.map((cluster) => ({
+      id: cluster.cluster_id,
+      label: cluster.label,
+      status: cluster.status,
+      actorCount: cluster.actor_count,
+      actorIds: cluster.actor_ids,
+      sharedPaths: cluster.shared_paths,
+      maxRiskScore: cluster.max_risk_score,
+      honeytokenHits: cluster.honeytoken_hits,
+      decoyRedirects: cluster.decoy_redirects,
+      lastSeen: cluster.last_seen,
+    })),
+  };
+}
+
+/** Fetch read-only recommended actor cases for analyst triage. */
+export async function fetchActorCases(): Promise<ActorCaseSummary> {
+  const data = await apiFetch<BackendActorCaseSummary>("/dashboard/actor-cases");
+  return {
+    totalCases: data.total_cases,
+    cases: data.cases.map((item) => ({
+      id: item.case_id,
+      clusterId: item.cluster_id,
+      title: item.title,
+      severity: item.severity,
+      status: item.status,
+      actorCount: item.actor_count,
+      actorIds: item.actor_ids,
+      evidence: item.evidence,
+      recommendedAction: item.recommended_action,
+      lastSeen: item.last_seen,
     })),
   };
 }
