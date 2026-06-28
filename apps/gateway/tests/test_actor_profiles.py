@@ -54,3 +54,40 @@ async def test_actor_profiles_group_fingerprints_and_honeytoken_hits(client, mon
     assert profile["honeytoken_hits"] == 1
     assert profile["status"] == "confirmed_interaction"
     assert profile["top_paths"] == ["/api/token/verify"]
+
+
+@pytest.mark.asyncio
+async def test_actor_clusters_group_profiles_by_status_and_path(client, monkeypatch):
+    monkeypatch.setattr(honeytoken, "settings", _settings())
+    first = {
+        "ip_address": "10.10.20.10",
+        "method": "GET",
+        "path": "/.env",
+        "user_agent": "curl/8",
+        "request_count": 120,
+        "payload_indicators": ["path-traversal"],
+    }
+    second = {
+        **first,
+        "ip_address": "10.10.20.11",
+        "user_agent": "python-requests/2",
+        "payload_excerpt": "SERVICE_TOKEN=mirage-issued-service-canary-abcdef123456",
+    }
+
+    first_response = await client.post("/api/v1/inspect", json=first)
+    second_response = await client.post("/api/v1/inspect", json=second)
+    response = await client.get("/api/v1/dashboard/actor-clusters")
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["total_clusters"] >= 1
+
+    cluster = data["clusters"][0]
+    assert cluster["cluster_id"].startswith("cluster-")
+    assert cluster["actor_count"] == 1
+    assert cluster["status"] == "confirmed_interaction"
+    assert cluster["shared_paths"] == ["/.env"]
+    assert cluster["honeytoken_hits"] == 1

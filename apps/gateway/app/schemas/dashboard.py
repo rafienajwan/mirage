@@ -8,7 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.schemas.actor import ActorProfile
+from app.schemas.actor import ActorCluster, ActorProfile
 from app.schemas.honeytoken import HoneytokenHit
 
 
@@ -64,6 +64,13 @@ class ActorProfileSummary(BaseModel):
 
     total_actors: int = Field(ge=0)
     profiles: list[ActorProfile]
+
+
+class ActorClusterSummary(BaseModel):
+    """Lightweight actor clusters for threat-hunting triage."""
+
+    total_clusters: int = Field(ge=0)
+    clusters: list[ActorCluster]
 
 
 # ─── Alerts ────────────────────────────────────────────────────
