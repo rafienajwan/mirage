@@ -56,6 +56,9 @@ async def test_suspicious_request_is_forwarded_to_decoy(client, monkeypatch):
     assert response.status_code == 200
     assert captured["upstream_url"] == settings.decoy_service_url
     assert captured["is_decoy"] is True
+    assert captured["decoy_context"]["x-mirage-actor-hint"]
+    assert captured["decoy_context"]["x-mirage-risk-score"]
+    assert captured["decoy_context"]["x-mirage-decoy-type"] == "config"
 
 
 @pytest.mark.asyncio
@@ -144,20 +147,27 @@ def test_decoy_forwarding_strips_credentials():
                 (b"authorization", b"Bearer real-secret"),
                 (b"cookie", b"session=real-secret"),
                 (b"x-mirage-api-key", b"operator-secret"),
+                (b"x-mirage-actor-hint", b"spoofed"),
                 (b"user-agent", b"Mozilla/5.0"),
                 (b"accept", b"application/json"),
             ],
         }
     )
 
-    decoy_headers = _request_headers(request, is_decoy=True)
+    decoy_headers = _request_headers(
+        request,
+        is_decoy=True,
+        decoy_context={"x-mirage-actor-hint": "trusted-actor"},
+    )
     real_headers = _request_headers(request, is_decoy=False)
 
     assert "authorization" not in decoy_headers
     assert "cookie" not in decoy_headers
     assert "x-mirage-api-key" not in decoy_headers
+    assert decoy_headers["x-mirage-actor-hint"] == "trusted-actor"
     assert decoy_headers["user-agent"] == "Mozilla/5.0"
     assert real_headers["authorization"] == "Bearer real-secret"
+    assert "x-mirage-actor-hint" not in real_headers
 
 
 @pytest.mark.asyncio
