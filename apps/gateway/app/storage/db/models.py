@@ -70,3 +70,25 @@ class HoneytokenHitModel(Base):
     path: Mapped[str] = mapped_column(String(512))
     method: Mapped[str] = mapped_column(String(16))
     evidence: Mapped[str] = mapped_column(String(256))
+
+
+class ActorProfileModel(Base):
+    """Persisted actor aggregate derived from threat fingerprints."""
+
+    __tablename__ = "actor_profiles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    actor_id: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    fingerprint_hash: Mapped[str] = mapped_column(String(64), index=True)
+    source_ip: Mapped[str] = mapped_column(String(64))
+    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    request_count: Mapped[int] = mapped_column(Integer, default=0)
+    suspicious_requests: Mapped[int] = mapped_column(Integer, default=0)
+    decoy_redirects: Mapped[int] = mapped_column(Integer, default=0)
+    honeytoken_hits: Mapped[int] = mapped_column(Integer, default=0)
+    max_risk_score: Mapped[float] = mapped_column(Float, default=0.0)
+    total_risk_score: Mapped[float] = mapped_column(Float, default=0.0)
+    path_counts: Mapped[dict] = mapped_column(JSON, default=dict)
+    last_decision: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(32))
