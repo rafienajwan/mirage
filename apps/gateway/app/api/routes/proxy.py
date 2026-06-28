@@ -62,6 +62,15 @@ async def proxy_request(target_path: str, request: Request) -> Response:
     inspection = await inspect_and_log(metadata, event_type="proxy")
     is_decoy = inspection.decision == Decision.REDIRECT_TO_DECOY
     upstream_url = settings.decoy_service_url if is_decoy else settings.real_app_url
+    decoy_context = (
+        {
+            "x-mirage-actor-hint": inspection.fingerprint_hash,
+            "x-mirage-risk-score": f"{inspection.risk_score:.1f}",
+            "x-mirage-decoy-type": inspection.decoy_type or "auto",
+        }
+        if is_decoy
+        else None
+    )
 
     return await forward_request(
         request,
@@ -69,4 +78,5 @@ async def proxy_request(target_path: str, request: Request) -> Response:
         target_path=target_path,
         body=body,
         is_decoy=is_decoy,
+        decoy_context=decoy_context,
     )

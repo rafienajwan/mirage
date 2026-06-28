@@ -36,3 +36,25 @@ class ActorProfileSummary(BaseModel):
 
     total_actors: int = Field(ge=0)
     profiles: list[ActorProfile]
+
+
+class ActorCluster(BaseModel):
+    """Lightweight grouping of actors with similar operator-facing traits."""
+
+    cluster_id: str
+    label: str
+    status: ActorStatus
+    actor_count: int = Field(ge=0)
+    actor_ids: list[str]
+    shared_paths: list[str]
+    max_risk_score: float = Field(ge=0, le=100)
+    honeytoken_hits: int = Field(ge=0)
+    decoy_redirects: int = Field(ge=0)
+    last_seen: datetime
+
+
+class ActorClusterSummary(BaseModel):
+    """Actor cluster summary for threat-hunting triage."""
+
+    total_clusters: int = Field(ge=0)
+    clusters: list[ActorCluster]

@@ -1,7 +1,7 @@
 # Actor Profiles
 
-MIRAGE builds lightweight actor profiles from recent stored events. Profiles
-group repeated activity by the privacy-safe `fingerprint_hash` generated during
+MIRAGE persists lightweight actor profiles from stored events. Profiles group
+repeated activity by the privacy-safe `fingerprint_hash` generated during
 inspection, then enrich the profile with risk scores, decoy redirects, paths,
 and honeytoken hits.
 
@@ -9,6 +9,7 @@ and honeytoken hits.
 
 ```text
 GET /api/v1/dashboard/actors
+GET /api/v1/dashboard/actor-clusters
 ```
 
 Each profile includes:
@@ -22,8 +23,14 @@ Each profile includes:
 - latest routing decision;
 - profile status: `quiet`, `watch`, `suspicious`, or `confirmed_interaction`.
 
+Actor clusters group profiles by current status and dominant target path. Each
+cluster returns a stable cluster id, label, actor count, representative actor
+ids, shared paths, decoy redirect count, honeytoken hit count, maximum risk
+score, and latest seen timestamp.
+
 ## Current Boundaries
 
-Profiles are computed from recent events and are intended for dashboard
-triage. MIRAGE does not yet persist long-lived actor records, cluster related
-fingerprints, assign cases, or issue per-attacker honeytokens.
+Profiles and clusters are intended for dashboard triage. MIRAGE now persists
+aggregate actor records and groups similar profiles, but it does not yet assign
+cases, rotate issued canary tokens, manage token assignment lifecycles, or run a
+trained clustering model.

@@ -2,24 +2,21 @@
 
 from __future__ import annotations
 
-import hashlib
 from collections import Counter, defaultdict
 
 from app.schemas.actor import ActorProfile, ActorProfileSummary, ActorStatus
 from app.schemas.decision import Decision
 from app.schemas.event import EventRecord
+from app.services.actor_identity import actor_id_from_key, actor_key, actor_status
 from app.storage import store
 
 
 def _actor_key(event: EventRecord) -> str:
-    if event.fingerprint_hash:
-        return event.fingerprint_hash
-    return f"source:{event.ip_address}"
+    return actor_key(event)
 
 
 def _actor_id(key: str) -> str:
-    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:10]
-    return f"actor-{digest}"
+    return actor_id_from_key(key)
 
 
 def _status(
@@ -28,17 +25,21 @@ def _status(
     suspicious_requests: int,
     max_risk_score: float,
 ) -> ActorStatus:
-    if honeytoken_hits:
-        return "confirmed_interaction"
-    if decoy_redirects or max_risk_score >= 80:
-        return "suspicious"
-    if suspicious_requests:
-        return "watch"
-    return "quiet"
+    return actor_status(
+        honeytoken_hits,
+        decoy_redirects,
+        suspicious_requests,
+        max_risk_score,
+    )
 
 
 async def get_actor_profiles(limit: int = 20, event_limit: int = 500) -> ActorProfileSummary:
     """Build actor profiles from the newest stored events."""
+    if hasattr(store, "get_actor_profiles"):
+        profiles = await store.get_actor_profiles(limit=limit)
+        if profiles:
+            return ActorProfileSummary(total_actors=len(profiles), profiles=profiles)
+
     events = await store.get_recent_events(limit=event_limit)
     honeytoken_hits = await store.get_honeytoken_hits(limit=event_limit)
     honeytoken_hits_by_event = Counter(hit.event_id for hit in honeytoken_hits)

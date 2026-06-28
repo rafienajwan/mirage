@@ -40,7 +40,7 @@ interaction. Honeytoken hits also create critical alerts.
 
 ## Current Boundaries
 
-This is still a bounded tracking workflow. The authenticated in-process decoy
-response API can issue deterministic per-actor synthetic canary tokens, but
-token rotation, external decoy-service issuance, and persistent cross-session
-actor records are still future work.
+This is still a bounded tracking workflow. The in-process decoy response API and
+the redirected external decoy service can issue deterministic per-actor
+synthetic canary tokens, but token rotation, assignment lifecycle controls, and
+persistent cross-session actor records are still future work.

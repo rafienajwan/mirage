@@ -59,7 +59,7 @@ docker compose --env-file .env -f infra/docker-compose.yml down
 
 - Proxy coverage is limited to `/api/v1/proxy/*`.
 - Routing is heuristic rather than model-driven.
-- The redirected external decoy service is static; the authenticated in-process
-  decoy response API can issue per-actor synthetic canary tokens.
+- Decoy payloads are synthetic and can issue deterministic per-actor canary
+  tokens; token rotation and assignment lifecycle controls are still pending.
 - Aggregate dashboard metrics are polled; event and alert updates can stream
   over WebSocket when configured.

@@ -23,21 +23,36 @@ _HOP_BY_HOP_HEADERS = {
     "content-length",
 }
 _DECOY_SAFE_HEADERS = {"accept", "accept-language", "content-type", "user-agent"}
+_MIRAGE_INTERNAL_HEADERS = {
+    "x-mirage-api-key",
+    "x-mirage-actor-hint",
+    "x-mirage-risk-score",
+    "x-mirage-decoy-type",
+}
 
 
-def _request_headers(request: Request, *, is_decoy: bool) -> dict[str, str]:
+def _request_headers(
+    request: Request,
+    *,
+    is_decoy: bool,
+    decoy_context: dict[str, str] | None = None,
+) -> dict[str, str]:
     headers = {
         key: value
         for key, value in request.headers.items()
         if key.lower() not in _HOP_BY_HOP_HEADERS
     }
-    headers.pop("x-mirage-api-key", None)
+    for name in _MIRAGE_INTERNAL_HEADERS:
+        headers.pop(name, None)
     if is_decoy:
         headers = {
             key: value
             for key, value in headers.items()
             if key.lower() in _DECOY_SAFE_HEADERS
         }
+        for key, value in (decoy_context or {}).items():
+            if value:
+                headers[key] = value
     return headers
 
 
@@ -61,6 +76,7 @@ async def forward_request(
     target_path: str,
     body: bytes,
     is_decoy: bool,
+    decoy_context: dict[str, str] | None = None,
 ) -> Response:
     """Forward a request to one configured upstream and return its response."""
     encoded_path = quote("/" + target_path.lstrip("/"), safe="/:%@")
@@ -76,7 +92,11 @@ async def forward_request(
             upstream = await client.request(
                 request.method,
                 url,
-                headers=_request_headers(request, is_decoy=is_decoy),
+                headers=_request_headers(
+                    request,
+                    is_decoy=is_decoy,
+                    decoy_context=decoy_context,
+                ),
                 content=body,
             )
     except httpx.RequestError as exc:

@@ -10,12 +10,19 @@ from datetime import datetime, timezone
 
 from sqlalchemy import case, extract, func, select
 
+from app.schemas.actor import ActorProfile
 from app.schemas.dashboard import AlertRecord, AlertSeverity
 from app.schemas.decision import Decision
 from app.schemas.event import AnalystLabel, EventRecord
 from app.schemas.honeytoken import HoneytokenHit
+from app.services.actor_identity import actor_id_from_key, actor_key, actor_status
 from app.storage.db.database import get_session
-from app.storage.db.models import AlertModel, EventModel, HoneytokenHitModel
+from app.storage.db.models import (
+    ActorProfileModel,
+    AlertModel,
+    EventModel,
+    HoneytokenHitModel,
+)
 
 
 class DatabaseStore:
@@ -49,6 +56,7 @@ class DatabaseStore:
                 labeled_at=event.labeled_at,
             )
             session.add(row)
+            await self._upsert_actor_event(session, event)
 
     async def get_recent_events(self, limit: int = 50) -> list[EventRecord]:
         async with get_session() as session:
@@ -221,6 +229,27 @@ class DatabaseStore:
                     evidence=hit.evidence,
                 )
             )
+            event_result = await session.execute(
+                select(EventModel).where(EventModel.event_id == hit.event_id)
+            )
+            event = event_result.scalar_one_or_none()
+            if event is not None:
+                actor_key_value = event.fingerprint_hash or f"source:{event.ip_address}"
+                actor_id = actor_id_from_key(actor_key_value)
+                actor_result = await session.execute(
+                    select(ActorProfileModel).where(
+                        ActorProfileModel.actor_id == actor_id
+                    )
+                )
+                actor = actor_result.scalar_one_or_none()
+                if actor is not None:
+                    actor.honeytoken_hits += 1
+                    actor.status = actor_status(
+                        actor.honeytoken_hits,
+                        actor.decoy_redirects,
+                        actor.suspicious_requests,
+                        actor.max_risk_score,
+                    )
 
     async def get_honeytoken_hits(self, limit: int = 50) -> list[HoneytokenHit]:
         async with get_session() as session:
@@ -250,6 +279,21 @@ class DatabaseStore:
             stmt = select(func.count()).select_from(HoneytokenHitModel)
             result = await session.execute(stmt)
             return result.scalar() or 0
+
+    async def get_actor_profiles(self, limit: int = 20) -> list[ActorProfile]:
+        async with get_session() as session:
+            stmt = (
+                select(ActorProfileModel)
+                .order_by(
+                    ActorProfileModel.honeytoken_hits.desc(),
+                    ActorProfileModel.decoy_redirects.desc(),
+                    ActorProfileModel.max_risk_score.desc(),
+                    ActorProfileModel.last_seen.desc(),
+                )
+                .limit(limit)
+            )
+            result = await session.execute(stmt)
+            return [self._actor_profile_from_row(row) for row in result.scalars().all()]
 
     # ── Aggregate stats ────────────────────────────────────────
 
@@ -331,3 +375,76 @@ class DatabaseStore:
             )
             result = await session.execute(stmt)
             return result.scalar()
+
+    async def _upsert_actor_event(self, session, event: EventRecord) -> None:
+        key = actor_key(event)
+        actor_id = actor_id_from_key(key)
+        result = await session.execute(
+            select(ActorProfileModel).where(ActorProfileModel.actor_id == actor_id)
+        )
+        profile = result.scalar_one_or_none()
+        if profile is None:
+            profile = ActorProfileModel(
+                actor_id=actor_id,
+                fingerprint_hash=event.fingerprint_hash,
+                source_ip=event.ip_address,
+                first_seen=event.timestamp,
+                last_seen=event.timestamp,
+                request_count=0,
+                suspicious_requests=0,
+                decoy_redirects=0,
+                honeytoken_hits=0,
+                max_risk_score=0.0,
+                total_risk_score=0.0,
+                path_counts={},
+                last_decision=event.decision.value,
+                status="quiet",
+            )
+            session.add(profile)
+
+        profile.source_ip = event.ip_address
+        profile.last_seen = event.timestamp
+        profile.request_count += 1
+        profile.total_risk_score += event.risk_score
+        profile.max_risk_score = max(profile.max_risk_score, event.risk_score)
+        profile.last_decision = event.decision.value
+        path_counts = dict(profile.path_counts or {})
+        path_counts[event.path] = int(path_counts.get(event.path, 0)) + 1
+        profile.path_counts = path_counts
+        if event.decision != Decision.ALLOW:
+            profile.suspicious_requests += 1
+        if event.decision == Decision.REDIRECT_TO_DECOY:
+            profile.decoy_redirects += 1
+        profile.status = actor_status(
+            profile.honeytoken_hits,
+            profile.decoy_redirects,
+            profile.suspicious_requests,
+            profile.max_risk_score,
+        )
+
+    def _actor_profile_from_row(self, row: ActorProfileModel) -> ActorProfile:
+        path_counts = row.path_counts or {}
+        top_paths = [
+            path
+            for path, _ in sorted(
+                path_counts.items(),
+                key=lambda item: int(item[1]),
+                reverse=True,
+            )[:3]
+        ]
+        return ActorProfile(
+            actor_id=row.actor_id,
+            fingerprint_hash=row.fingerprint_hash,
+            source_ip=row.source_ip,
+            first_seen=row.first_seen,
+            last_seen=row.last_seen,
+            request_count=row.request_count,
+            suspicious_requests=row.suspicious_requests,
+            decoy_redirects=row.decoy_redirects,
+            honeytoken_hits=row.honeytoken_hits,
+            max_risk_score=round(row.max_risk_score, 1),
+            average_risk_score=round(row.total_risk_score / row.request_count, 1),
+            top_paths=top_paths,
+            last_decision=Decision(row.last_decision),
+            status=row.status,
+        )
