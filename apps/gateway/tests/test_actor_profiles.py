@@ -122,3 +122,49 @@ async def test_actor_cases_recommend_investigations_from_clusters(client, monkey
     assert case["status"] == "recommended"
     assert case["actor_count"] == 1
     assert case["recommended_action"].startswith("Investigate issued canary reuse")
+
+
+@pytest.mark.asyncio
+async def test_actor_case_workflows_open_and_update_recommended_case(client, monkeypatch):
+    monkeypatch.setattr(honeytoken, "settings", _settings())
+    request = {
+        "ip_address": "10.10.40.10",
+        "method": "GET",
+        "path": "/.env",
+        "user_agent": "curl/8",
+        "request_count": 90,
+        "payload_indicators": ["path-traversal"],
+        "payload_excerpt": "SERVICE_TOKEN=mirage-service-canary",
+    }
+
+    event_response = await client.post("/api/v1/inspect", json=request)
+    recommendations = await client.get("/api/v1/dashboard/actor-cases")
+    case_id = recommendations.json()["cases"][0]["case_id"]
+
+    open_response = await client.post(
+        f"/api/v1/dashboard/actor-cases/{case_id}/open",
+        json={"note": "Opened from triage"},
+    )
+    workflows = await client.get("/api/v1/dashboard/actor-case-workflows")
+    update_response = await client.patch(
+        f"/api/v1/dashboard/actor-case-workflows/{case_id}",
+        json={"status": "investigating", "note": "Analyst assigned"},
+    )
+
+    assert event_response.status_code == 200
+    assert open_response.status_code == 200
+    assert workflows.status_code == 200
+    assert update_response.status_code == 200
+
+    opened = open_response.json()
+    assert opened["case_id"] == case_id
+    assert opened["status"] == "open"
+    assert opened["analyst_note"] == "Opened from triage"
+
+    workflow_data = workflows.json()
+    assert workflow_data["total_cases"] == 1
+    assert workflow_data["cases"][0]["case_id"] == case_id
+
+    updated = update_response.json()
+    assert updated["status"] == "investigating"
+    assert updated["analyst_note"] == "Analyst assigned"

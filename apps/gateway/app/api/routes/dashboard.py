@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from app.core.security import require_api_key
 from app.schemas.dashboard import (
     ActorCaseSummary,
+    ActorCaseWorkflowSummary,
     DashboardOverview,
     ActorClusterSummary,
     ActorProfileSummary,
@@ -12,10 +13,17 @@ from app.schemas.dashboard import (
     MLShadowStatus,
     TrainingDataSummary,
 )
+from app.schemas.actor import ActorCaseOpenRequest, ActorCaseUpdateRequest
 from app.schemas.event import EventLabelRequest
 from app.schemas.retraining import RetrainingRun
 from app.services.ml_status import get_ml_shadow_status
-from app.services.actor_clusters import get_actor_cases, get_actor_clusters
+from app.services.actor_clusters import (
+    get_actor_case_workflows,
+    get_actor_cases,
+    get_actor_clusters,
+    open_actor_case_from_recommendation,
+    update_actor_case_workflow,
+)
 from app.services.actor_profiles import get_actor_profiles
 from app.services.retraining import train_from_labeled_events
 from app.services.threat_analysis import get_threat_summary
@@ -130,6 +138,42 @@ async def dashboard_actor_clusters(limit: int = Query(default=20, ge=1, le=100))
 async def dashboard_actor_cases(limit: int = Query(default=20, ge=1, le=100)):
     """Read-only recommended cases derived from actor clusters."""
     return await get_actor_cases(limit=limit)
+
+
+@router.get("/actor-case-workflows", response_model=ActorCaseWorkflowSummary)
+async def dashboard_actor_case_workflows(limit: int = Query(default=20, ge=1, le=100)):
+    """Persisted actor case workflow records."""
+    return await get_actor_case_workflows(limit=limit)
+
+
+@router.post(
+    "/actor-cases/{case_id}/open",
+    dependencies=[Depends(require_api_key)],
+)
+async def open_dashboard_actor_case(case_id: str, payload: ActorCaseOpenRequest):
+    """Open a recommended actor case as a persisted workflow record."""
+    opened = await open_actor_case_from_recommendation(case_id, payload)
+    if opened is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Recommended actor case not found",
+        )
+    return opened.model_dump(mode="json")
+
+
+@router.patch(
+    "/actor-case-workflows/{case_id}",
+    dependencies=[Depends(require_api_key)],
+)
+async def update_dashboard_actor_case(case_id: str, payload: ActorCaseUpdateRequest):
+    """Update a persisted actor case workflow status."""
+    updated = await update_actor_case_workflow(case_id, payload)
+    if updated is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Actor case workflow not found",
+        )
+    return updated.model_dump(mode="json")
 
 
 @router.get("/alerts")

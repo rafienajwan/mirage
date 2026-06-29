@@ -8,7 +8,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.schemas.actor import ActorCase, ActorCluster, ActorProfile
+from app.schemas.actor import ActorCase, ActorCaseWorkflow, ActorCluster, ActorProfile
 from app.schemas.honeytoken import HoneytokenHit
 
 
@@ -78,6 +78,13 @@ class ActorCaseSummary(BaseModel):
 
     total_cases: int = Field(ge=0)
     cases: list[ActorCase]
+
+
+class ActorCaseWorkflowSummary(BaseModel):
+    """Persisted actor case workflows for analyst triage."""
+
+    total_cases: int = Field(ge=0)
+    cases: list[ActorCaseWorkflow]
 
 
 # ─── Alerts ────────────────────────────────────────────────────
