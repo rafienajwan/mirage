@@ -179,6 +179,27 @@ interface BackendActorCaseSummary {
   cases: BackendActorCase[];
 }
 
+interface BackendActorCaseWorkflow {
+  case_id: string;
+  cluster_id: string;
+  title: string;
+  severity: "low" | "medium" | "high" | "critical";
+  status: "open" | "investigating" | "closed";
+  actor_count: number;
+  actor_ids: string[];
+  evidence: string[];
+  recommended_action: string;
+  analyst_note: string;
+  opened_at: string;
+  updated_at: string;
+  last_seen: string;
+}
+
+interface BackendActorCaseWorkflowSummary {
+  total_cases: number;
+  cases: BackendActorCaseWorkflow[];
+}
+
 // ─── Frontend types (mapped from backend) ───────────────────────
 
 export interface OverviewMetrics {
@@ -364,6 +385,27 @@ export interface ActorCase {
 export interface ActorCaseSummary {
   totalCases: number;
   cases: ActorCase[];
+}
+
+export interface ActorCaseWorkflow {
+  id: string;
+  clusterId: string;
+  title: string;
+  severity: ThreatSeverity;
+  status: "open" | "investigating" | "closed";
+  actorCount: number;
+  actorIds: string[];
+  evidence: string[];
+  recommendedAction: string;
+  analystNote: string;
+  openedAt: string;
+  updatedAt: string;
+  lastSeen: string;
+}
+
+export interface ActorCaseWorkflowSummary {
+  totalCases: number;
+  cases: ActorCaseWorkflow[];
 }
 
 // ─── Mapping helpers ────────────────────────────────────────────
@@ -654,6 +696,63 @@ export async function fetchActorCases(): Promise<ActorCaseSummary> {
       lastSeen: item.last_seen,
     })),
   };
+}
+
+function mapActorCaseWorkflow(item: BackendActorCaseWorkflow): ActorCaseWorkflow {
+  return {
+    id: item.case_id,
+    clusterId: item.cluster_id,
+    title: item.title,
+    severity: item.severity,
+    status: item.status,
+    actorCount: item.actor_count,
+    actorIds: item.actor_ids,
+    evidence: item.evidence,
+    recommendedAction: item.recommended_action,
+    analystNote: item.analyst_note,
+    openedAt: item.opened_at,
+    updatedAt: item.updated_at,
+    lastSeen: item.last_seen,
+  };
+}
+
+/** Fetch persisted actor case workflow records. */
+export async function fetchActorCaseWorkflows(): Promise<ActorCaseWorkflowSummary> {
+  const data = await apiFetch<BackendActorCaseWorkflowSummary>("/dashboard/actor-case-workflows");
+  return {
+    totalCases: data.total_cases,
+    cases: data.cases.map(mapActorCaseWorkflow),
+  };
+}
+
+/** Open a recommended actor case through the server-side API bridge. */
+export async function openActorCase(caseId: string, note = ""): Promise<ActorCaseWorkflow> {
+  const res = await fetch(`/api/actor-cases/${encodeURIComponent(caseId)}/open`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ note }),
+  });
+  if (!res.ok) {
+    throw new Error(`Open actor case error: ${res.status} ${res.statusText}`);
+  }
+  return mapActorCaseWorkflow(await res.json());
+}
+
+/** Update a persisted actor case through the server-side API bridge. */
+export async function updateActorCase(
+  caseId: string,
+  status: ActorCaseWorkflow["status"],
+  note = "",
+): Promise<ActorCaseWorkflow> {
+  const res = await fetch(`/api/actor-case-workflows/${encodeURIComponent(caseId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status, note }),
+  });
+  if (!res.ok) {
+    throw new Error(`Update actor case error: ${res.status} ${res.statusText}`);
+  }
+  return mapActorCaseWorkflow(await res.json());
 }
 
 /** Fetch active alerts. */

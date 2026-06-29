@@ -10,8 +10,8 @@ import ActorTriagePanel from "@/components/dashboard/ActorTriagePanel";
 import DecoyStatusCard from "@/components/dashboard/DecoyStatusCard";
 import AlertPanel from "@/components/dashboard/AlertPanel";
 import SimulationPanel from "@/components/dashboard/SimulationPanel";
-import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchHoneytokens, fetchActorProfiles, fetchActorClusters, fetchActorCases, labelEvent, downloadTrainingData, runRetraining, mapDashboardAlert, mapDashboardEvent } from "@/lib/api";
-import type { ActorCaseSummary, ActorClusterSummary, ActorProfileSummary, AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, HoneytokenSummary, RetrainingRun, DashboardStreamMessage } from "@/lib/api";
+import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchHoneytokens, fetchActorProfiles, fetchActorClusters, fetchActorCases, fetchActorCaseWorkflows, openActorCase, updateActorCase, labelEvent, downloadTrainingData, runRetraining, mapDashboardAlert, mapDashboardEvent } from "@/lib/api";
+import type { ActorCaseSummary, ActorCaseWorkflow, ActorCaseWorkflowSummary, ActorClusterSummary, ActorProfileSummary, AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, HoneytokenSummary, RetrainingRun, DashboardStreamMessage } from "@/lib/api";
 import { Globe, ShieldAlert, ArrowRightLeft, Bell, BrainCircuit, Database, Download, KeyRound, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -110,12 +110,14 @@ export default function DashboardPage() {
   const [actorProfiles, setActorProfiles] = useState<ActorProfileSummary | null>(null);
   const [actorClusters, setActorClusters] = useState<ActorClusterSummary | null>(null);
   const [actorCases, setActorCases] = useState<ActorCaseSummary | null>(null);
+  const [actorCaseWorkflows, setActorCaseWorkflows] = useState<ActorCaseWorkflowSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [labelingEventId, setLabelingEventId] = useState<string | null>(null);
   const [exportingTrainingData, setExportingTrainingData] = useState(false);
   const [retraining, setRetraining] = useState(false);
   const [retrainingRun, setRetrainingRun] = useState<RetrainingRun | null>(null);
+  const [workingActorCaseId, setWorkingActorCaseId] = useState<string | null>(null);
 
   // Toast notifications & audio toggle
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
@@ -220,9 +222,53 @@ export default function DashboardPage() {
     }
   }, []);
 
+  const handleOpenActorCase = useCallback(async (caseId: string) => {
+    setWorkingActorCaseId(caseId);
+    try {
+      const opened = await openActorCase(caseId, "Opened from dashboard triage");
+      setActorCaseWorkflows((current) => ({
+        totalCases: current?.cases.some((item) => item.id === opened.id)
+          ? current.totalCases
+          : (current?.totalCases ?? 0) + 1,
+        cases: [
+          opened,
+          ...(current?.cases.filter((item) => item.id !== opened.id) ?? []),
+        ],
+      }));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to open actor case");
+    } finally {
+      setWorkingActorCaseId(null);
+    }
+  }, []);
+
+  const handleUpdateActorCase = useCallback(
+    async (caseId: string, status: ActorCaseWorkflow["status"]) => {
+      const actionId = `${caseId}:${status}`;
+      setWorkingActorCaseId(actionId);
+      try {
+        const updated = await updateActorCase(caseId, status, `Marked ${status} from dashboard`);
+        setActorCaseWorkflows((current) => ({
+          totalCases: current?.totalCases ?? 1,
+          cases: [
+            updated,
+            ...(current?.cases.filter((item) => item.id !== updated.id) ?? []),
+          ],
+        }));
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to update actor case");
+      } finally {
+        setWorkingActorCaseId(null);
+      }
+    },
+    [],
+  );
+
   const load = useCallback(async () => {
     try {
-      const [ov, ev, al, tr, rh, ds, ts, ms, ht, ap, ac, cases] = await Promise.all([
+      const [ov, ev, al, tr, rh, ds, ts, ms, ht, ap, ac, cases, workflows] = await Promise.all([
         fetchOverview(),
         fetchEvents(),
         fetchAlerts(),
@@ -235,6 +281,7 @@ export default function DashboardPage() {
         fetchActorProfiles().catch(() => null),
         fetchActorClusters().catch(() => null),
         fetchActorCases().catch(() => null),
+        fetchActorCaseWorkflows().catch(() => null),
       ]);
       setOverview(ov);
       setEvents(ev);
@@ -248,6 +295,7 @@ export default function DashboardPage() {
       setActorProfiles(ap);
       setActorClusters(ac);
       setActorCases(cases);
+      setActorCaseWorkflows(workflows);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch data");
@@ -552,7 +600,14 @@ export default function DashboardPage() {
         </div>
 
         <div className="mb-8">
-          <ActorTriagePanel clusters={actorClusters} cases={actorCases} />
+          <ActorTriagePanel
+            clusters={actorClusters}
+            cases={actorCases}
+            workflows={actorCaseWorkflows}
+            workingCaseId={workingActorCaseId}
+            onOpenCase={handleOpenActorCase}
+            onUpdateCase={handleUpdateActorCase}
+          />
         </div>
 
         {/* Threat feed */}
