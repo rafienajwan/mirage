@@ -143,6 +143,63 @@ interface BackendActorProfileSummary {
   profiles: BackendActorProfile[];
 }
 
+interface BackendActorCluster {
+  cluster_id: string;
+  label: string;
+  status: "quiet" | "watch" | "suspicious" | "confirmed_interaction";
+  actor_count: number;
+  actor_ids: string[];
+  shared_paths: string[];
+  max_risk_score: number;
+  honeytoken_hits: number;
+  decoy_redirects: number;
+  last_seen: string;
+}
+
+interface BackendActorClusterSummary {
+  total_clusters: number;
+  clusters: BackendActorCluster[];
+}
+
+interface BackendActorCase {
+  case_id: string;
+  cluster_id: string;
+  title: string;
+  severity: "low" | "medium" | "high" | "critical";
+  status: "recommended";
+  actor_count: number;
+  actor_ids: string[];
+  evidence: string[];
+  recommended_action: string;
+  last_seen: string;
+}
+
+interface BackendActorCaseSummary {
+  total_cases: number;
+  cases: BackendActorCase[];
+}
+
+interface BackendActorCaseWorkflow {
+  case_id: string;
+  cluster_id: string;
+  title: string;
+  severity: "low" | "medium" | "high" | "critical";
+  status: "open" | "investigating" | "closed";
+  actor_count: number;
+  actor_ids: string[];
+  evidence: string[];
+  recommended_action: string;
+  analyst_note: string;
+  opened_at: string;
+  updated_at: string;
+  last_seen: string;
+}
+
+interface BackendActorCaseWorkflowSummary {
+  total_cases: number;
+  cases: BackendActorCaseWorkflow[];
+}
+
 // ─── Frontend types (mapped from backend) ───────────────────────
 
 export interface OverviewMetrics {
@@ -292,6 +349,63 @@ export interface ActorProfile {
 export interface ActorProfileSummary {
   totalActors: number;
   profiles: ActorProfile[];
+}
+
+export interface ActorCluster {
+  id: string;
+  label: string;
+  status: ActorProfile["status"];
+  actorCount: number;
+  actorIds: string[];
+  sharedPaths: string[];
+  maxRiskScore: number;
+  honeytokenHits: number;
+  decoyRedirects: number;
+  lastSeen: string;
+}
+
+export interface ActorClusterSummary {
+  totalClusters: number;
+  clusters: ActorCluster[];
+}
+
+export interface ActorCase {
+  id: string;
+  clusterId: string;
+  title: string;
+  severity: ThreatSeverity;
+  status: "recommended";
+  actorCount: number;
+  actorIds: string[];
+  evidence: string[];
+  recommendedAction: string;
+  lastSeen: string;
+}
+
+export interface ActorCaseSummary {
+  totalCases: number;
+  cases: ActorCase[];
+}
+
+export interface ActorCaseWorkflow {
+  id: string;
+  clusterId: string;
+  title: string;
+  severity: ThreatSeverity;
+  status: "open" | "investigating" | "closed";
+  actorCount: number;
+  actorIds: string[];
+  evidence: string[];
+  recommendedAction: string;
+  analystNote: string;
+  openedAt: string;
+  updatedAt: string;
+  lastSeen: string;
+}
+
+export interface ActorCaseWorkflowSummary {
+  totalCases: number;
+  cases: ActorCaseWorkflow[];
 }
 
 // ─── Mapping helpers ────────────────────────────────────────────
@@ -542,6 +656,103 @@ export async function fetchActorProfiles(): Promise<ActorProfileSummary> {
       status: profile.status,
     })),
   };
+}
+
+/** Fetch lightweight actor clusters for dashboard triage. */
+export async function fetchActorClusters(): Promise<ActorClusterSummary> {
+  const data = await apiFetch<BackendActorClusterSummary>("/dashboard/actor-clusters");
+  return {
+    totalClusters: data.total_clusters,
+    clusters: data.clusters.map((cluster) => ({
+      id: cluster.cluster_id,
+      label: cluster.label,
+      status: cluster.status,
+      actorCount: cluster.actor_count,
+      actorIds: cluster.actor_ids,
+      sharedPaths: cluster.shared_paths,
+      maxRiskScore: cluster.max_risk_score,
+      honeytokenHits: cluster.honeytoken_hits,
+      decoyRedirects: cluster.decoy_redirects,
+      lastSeen: cluster.last_seen,
+    })),
+  };
+}
+
+/** Fetch read-only recommended actor cases for analyst triage. */
+export async function fetchActorCases(): Promise<ActorCaseSummary> {
+  const data = await apiFetch<BackendActorCaseSummary>("/dashboard/actor-cases");
+  return {
+    totalCases: data.total_cases,
+    cases: data.cases.map((item) => ({
+      id: item.case_id,
+      clusterId: item.cluster_id,
+      title: item.title,
+      severity: item.severity,
+      status: item.status,
+      actorCount: item.actor_count,
+      actorIds: item.actor_ids,
+      evidence: item.evidence,
+      recommendedAction: item.recommended_action,
+      lastSeen: item.last_seen,
+    })),
+  };
+}
+
+function mapActorCaseWorkflow(item: BackendActorCaseWorkflow): ActorCaseWorkflow {
+  return {
+    id: item.case_id,
+    clusterId: item.cluster_id,
+    title: item.title,
+    severity: item.severity,
+    status: item.status,
+    actorCount: item.actor_count,
+    actorIds: item.actor_ids,
+    evidence: item.evidence,
+    recommendedAction: item.recommended_action,
+    analystNote: item.analyst_note,
+    openedAt: item.opened_at,
+    updatedAt: item.updated_at,
+    lastSeen: item.last_seen,
+  };
+}
+
+/** Fetch persisted actor case workflow records. */
+export async function fetchActorCaseWorkflows(): Promise<ActorCaseWorkflowSummary> {
+  const data = await apiFetch<BackendActorCaseWorkflowSummary>("/dashboard/actor-case-workflows");
+  return {
+    totalCases: data.total_cases,
+    cases: data.cases.map(mapActorCaseWorkflow),
+  };
+}
+
+/** Open a recommended actor case through the server-side API bridge. */
+export async function openActorCase(caseId: string, note = ""): Promise<ActorCaseWorkflow> {
+  const res = await fetch(`/api/actor-cases/${encodeURIComponent(caseId)}/open`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ note }),
+  });
+  if (!res.ok) {
+    throw new Error(`Open actor case error: ${res.status} ${res.statusText}`);
+  }
+  return mapActorCaseWorkflow(await res.json());
+}
+
+/** Update a persisted actor case through the server-side API bridge. */
+export async function updateActorCase(
+  caseId: string,
+  status: ActorCaseWorkflow["status"],
+  note = "",
+): Promise<ActorCaseWorkflow> {
+  const res = await fetch(`/api/actor-case-workflows/${encodeURIComponent(caseId)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status, note }),
+  });
+  if (!res.ok) {
+    throw new Error(`Update actor case error: ${res.status} ${res.statusText}`);
+  }
+  return mapActorCaseWorkflow(await res.json());
 }
 
 /** Fetch active alerts. */

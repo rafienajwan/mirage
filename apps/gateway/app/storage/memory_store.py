@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from collections import defaultdict
 
-from app.schemas.actor import ActorProfile
+from app.schemas.actor import ActorCase, ActorCaseWorkflow, CaseWorkflowStatus, ActorProfile
 from app.schemas.dashboard import AlertRecord, AlertSeverity
 from app.schemas.decision import Decision
 from app.schemas.event import AnalystLabel, EventRecord
@@ -24,6 +24,7 @@ class MemoryStore:
         self.alerts: list[AlertRecord] = []
         self.honeytoken_hits: list[HoneytokenHit] = []
         self.actor_profiles: dict[str, dict] = {}
+        self.actor_cases: dict[str, ActorCaseWorkflow] = {}
         self._alert_counter: int = 0
 
     # ── Events ─────────────────────────────────────────────────
@@ -118,6 +119,73 @@ class MemoryStore:
             reverse=True,
         )
         return profiles[:limit]
+
+    async def open_actor_case(
+        self,
+        recommendation: ActorCase,
+        note: str = "",
+    ) -> ActorCaseWorkflow:
+        existing = self.actor_cases.get(recommendation.case_id)
+        now = datetime.now(timezone.utc)
+        if existing is not None:
+            updated = existing.model_copy(
+                update={
+                    "actor_count": recommendation.actor_count,
+                    "actor_ids": recommendation.actor_ids,
+                    "evidence": recommendation.evidence,
+                    "recommended_action": recommendation.recommended_action,
+                    "analyst_note": note or existing.analyst_note,
+                    "updated_at": now,
+                    "last_seen": recommendation.last_seen,
+                }
+            )
+            self.actor_cases[recommendation.case_id] = updated
+            return updated
+
+        case = ActorCaseWorkflow(
+            case_id=recommendation.case_id,
+            cluster_id=recommendation.cluster_id,
+            title=recommendation.title,
+            severity=recommendation.severity,
+            status="open",
+            actor_count=recommendation.actor_count,
+            actor_ids=recommendation.actor_ids,
+            evidence=recommendation.evidence,
+            recommended_action=recommendation.recommended_action,
+            analyst_note=note,
+            opened_at=now,
+            updated_at=now,
+            last_seen=recommendation.last_seen,
+        )
+        self.actor_cases[case.case_id] = case
+        return case
+
+    async def update_actor_case(
+        self,
+        case_id: str,
+        status: CaseWorkflowStatus,
+        note: str = "",
+    ) -> ActorCaseWorkflow | None:
+        existing = self.actor_cases.get(case_id)
+        if existing is None:
+            return None
+        updated = existing.model_copy(
+            update={
+                "status": status,
+                "analyst_note": note or existing.analyst_note,
+                "updated_at": datetime.now(timezone.utc),
+            }
+        )
+        self.actor_cases[case_id] = updated
+        return updated
+
+    async def get_actor_case_workflows(self, limit: int = 20) -> list[ActorCaseWorkflow]:
+        cases = sorted(
+            self.actor_cases.values(),
+            key=lambda item: (item.status != "closed", item.severity, item.updated_at),
+            reverse=True,
+        )
+        return cases[:limit]
 
     # ── Aggregate stats ────────────────────────────────────────
 

@@ -6,12 +6,17 @@ import hashlib
 
 from app.schemas.actor import (
     ActorCase,
+    ActorCaseOpenRequest,
     ActorCaseSummary,
+    ActorCaseUpdateRequest,
+    ActorCaseWorkflow,
+    ActorCaseWorkflowSummary,
     ActorCluster,
     ActorClusterSummary,
     ActorProfile,
 )
 from app.services.actor_profiles import get_actor_profiles
+from app.storage import store
 
 
 def _cluster_key(profile: ActorProfile) -> tuple[str, str]:
@@ -157,3 +162,36 @@ async def get_actor_cases(limit: int = 20) -> ActorCaseSummary:
         reverse=True,
     )
     return ActorCaseSummary(total_cases=len(cases), cases=cases[:limit])
+
+
+async def get_actor_case_workflows(limit: int = 20) -> ActorCaseWorkflowSummary:
+    """Return persisted actor case workflow records."""
+    if not hasattr(store, "get_actor_case_workflows"):
+        return ActorCaseWorkflowSummary(total_cases=0, cases=[])
+    cases = await store.get_actor_case_workflows(limit=limit)
+    return ActorCaseWorkflowSummary(total_cases=len(cases), cases=cases)
+
+
+async def open_actor_case_from_recommendation(
+    case_id: str,
+    payload: ActorCaseOpenRequest,
+) -> ActorCaseWorkflow | None:
+    """Persist a recommended actor case if it still exists."""
+    recommendations = await get_actor_cases(limit=100)
+    recommendation = next(
+        (item for item in recommendations.cases if item.case_id == case_id),
+        None,
+    )
+    if recommendation is None or not hasattr(store, "open_actor_case"):
+        return None
+    return await store.open_actor_case(recommendation, payload.note)
+
+
+async def update_actor_case_workflow(
+    case_id: str,
+    payload: ActorCaseUpdateRequest,
+) -> ActorCaseWorkflow | None:
+    """Update an existing persisted actor case workflow."""
+    if not hasattr(store, "update_actor_case"):
+        return None
+    return await store.update_actor_case(case_id, payload.status, payload.note)

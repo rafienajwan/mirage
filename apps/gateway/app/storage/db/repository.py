@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import case, extract, func, select
 
-from app.schemas.actor import ActorProfile
+from app.schemas.actor import ActorCase, ActorCaseWorkflow, CaseWorkflowStatus, ActorProfile
 from app.schemas.dashboard import AlertRecord, AlertSeverity
 from app.schemas.decision import Decision
 from app.schemas.event import AnalystLabel, EventRecord
@@ -19,6 +19,7 @@ from app.services.actor_identity import actor_id_from_key, actor_key, actor_stat
 from app.storage.db.database import get_session
 from app.storage.db.models import (
     ActorProfileModel,
+    ActorCaseModel,
     AlertModel,
     EventModel,
     HoneytokenHitModel,
@@ -295,6 +296,80 @@ class DatabaseStore:
             result = await session.execute(stmt)
             return [self._actor_profile_from_row(row) for row in result.scalars().all()]
 
+    async def open_actor_case(
+        self,
+        recommendation: ActorCase,
+        note: str = "",
+    ) -> ActorCaseWorkflow:
+        now = datetime.now(timezone.utc)
+        async with get_session() as session:
+            result = await session.execute(
+                select(ActorCaseModel).where(
+                    ActorCaseModel.case_id == recommendation.case_id
+                )
+            )
+            row = result.scalar_one_or_none()
+            if row is None:
+                row = ActorCaseModel(
+                    case_id=recommendation.case_id,
+                    cluster_id=recommendation.cluster_id,
+                    title=recommendation.title,
+                    severity=recommendation.severity,
+                    status="open",
+                    actor_count=recommendation.actor_count,
+                    actor_ids=recommendation.actor_ids,
+                    evidence=recommendation.evidence,
+                    recommended_action=recommendation.recommended_action,
+                    analyst_note=note,
+                    opened_at=now,
+                    updated_at=now,
+                    last_seen=recommendation.last_seen,
+                )
+                session.add(row)
+            else:
+                row.actor_count = recommendation.actor_count
+                row.actor_ids = recommendation.actor_ids
+                row.evidence = recommendation.evidence
+                row.recommended_action = recommendation.recommended_action
+                row.analyst_note = note or row.analyst_note
+                row.updated_at = now
+                row.last_seen = recommendation.last_seen
+            await session.flush()
+            return self._actor_case_from_row(row)
+
+    async def update_actor_case(
+        self,
+        case_id: str,
+        status: CaseWorkflowStatus,
+        note: str = "",
+    ) -> ActorCaseWorkflow | None:
+        async with get_session() as session:
+            result = await session.execute(
+                select(ActorCaseModel).where(ActorCaseModel.case_id == case_id)
+            )
+            row = result.scalar_one_or_none()
+            if row is None:
+                return None
+            row.status = status
+            row.analyst_note = note or row.analyst_note
+            row.updated_at = datetime.now(timezone.utc)
+            await session.flush()
+            return self._actor_case_from_row(row)
+
+    async def get_actor_case_workflows(self, limit: int = 20) -> list[ActorCaseWorkflow]:
+        async with get_session() as session:
+            stmt = (
+                select(ActorCaseModel)
+                .order_by(
+                    ActorCaseModel.status.asc(),
+                    ActorCaseModel.severity.desc(),
+                    ActorCaseModel.updated_at.desc(),
+                )
+                .limit(limit)
+            )
+            result = await session.execute(stmt)
+            return [self._actor_case_from_row(row) for row in result.scalars().all()]
+
     # ── Aggregate stats ────────────────────────────────────────
 
     async def get_total_requests(self) -> int:
@@ -447,4 +522,21 @@ class DatabaseStore:
             top_paths=top_paths,
             last_decision=Decision(row.last_decision),
             status=row.status,
+        )
+
+    def _actor_case_from_row(self, row: ActorCaseModel) -> ActorCaseWorkflow:
+        return ActorCaseWorkflow(
+            case_id=row.case_id,
+            cluster_id=row.cluster_id,
+            title=row.title,
+            severity=row.severity,
+            status=row.status,
+            actor_count=row.actor_count,
+            actor_ids=list(row.actor_ids or []),
+            evidence=list(row.evidence or []),
+            recommended_action=row.recommended_action,
+            analyst_note=row.analyst_note or "",
+            opened_at=row.opened_at,
+            updated_at=row.updated_at,
+            last_seen=row.last_seen,
         )

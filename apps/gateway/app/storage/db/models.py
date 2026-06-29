@@ -92,3 +92,28 @@ class ActorProfileModel(Base):
     path_counts: Mapped[dict] = mapped_column(JSON, default=dict)
     last_decision: Mapped[str] = mapped_column(String(32))
     status: Mapped[str] = mapped_column(String(32))
+
+
+class ActorCaseModel(Base):
+    """Persisted analyst workflow case derived from an actor cluster."""
+
+    __tablename__ = "actor_cases"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    case_id: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    cluster_id: Mapped[str] = mapped_column(String(32), index=True)
+    title: Mapped[str] = mapped_column(String(256))
+    severity: Mapped[str] = mapped_column(String(16), index=True)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    actor_count: Mapped[int] = mapped_column(Integer, default=0)
+    actor_ids: Mapped[list] = mapped_column(JSON, default=list)
+    evidence: Mapped[list] = mapped_column(JSON, default=list)
+    recommended_action: Mapped[str] = mapped_column(String(512))
+    analyst_note: Mapped[str] = mapped_column(Text, default="")
+    opened_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)

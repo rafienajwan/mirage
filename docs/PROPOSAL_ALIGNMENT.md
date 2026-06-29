@@ -17,7 +17,7 @@ the beginning of a real ML pipeline.
 | FastAPI defense gateway | Partial | `/api/v1/proxy/*` inspects and forwards traffic, but arbitrary application ingress is not intercepted. |
 | Hybrid risk scoring | Partial | Heuristic risk scoring is active. A Random Forest training/inference path can run in reviewed shadow mode, but it does not control live routing. |
 | Scikit-learn anomaly detection | Partial | Scikit-learn is configured and training/shadow inference plus artifact review are implemented; runtime anomaly detection remains heuristic. |
-| Threat fingerprint matching | Partial | Stable request fingerprints, persistent actor profiles, lightweight triage clusters, and read-only case recommendations exist; persisted case workflows and trained clustering do not. |
+| Threat fingerprint matching | Partial | Stable request fingerprints, persistent actor profiles, lightweight triage clusters, and persisted case workflows exist; trained clustering does not. |
 | Automated real/decoy routing | Implemented for demo | The proxy routes to separate real-app and decoy services using the live decision engine. |
 | Fake endpoints and fake data | Implemented for demo | The isolated decoy service exposes static, synthetic responses without real secrets. |
 | Honeytoken detection | Partial | Configured decoy credential use and per-actor canary tokens are detected, stored, alerted, and shown on the dashboard; rotation is pending. |
@@ -27,7 +27,7 @@ the beginning of a real ML pipeline.
 | Custom API logs | Partial | Runtime events, features, analyst-corrected labels, JSONL export, validation, split tooling, and local retraining are available; reviewed datasets are still pending. |
 | Precision/recall/F1/FPR evaluation | Implemented | The Random Forest trainer calculates all four metrics. |
 | Real-time WebSocket dashboard | Partial | An authenticated WebSocket stream can push events and alerts; dashboard polling remains as fallback and other metrics still poll. |
-| Security dashboard and alerts | Implemented for demo | Live metrics, events, risk history, decoy status, and internal alerts are available. |
+| Security dashboard and alerts | Implemented for demo | Live metrics, events, risk history, decoy status, actor triage, and internal alerts are available. |
 | Adaptive decoy generation | Partial | The in-process decoy API and redirected external decoy service select variants and issue per-actor synthetic canary tokens; long-lived assignment lifecycle controls are pending. |
 | Docker Compose | Configuration implemented | Compose, health checks, and Dockerfiles exist; image build still needs verification with Docker Desktop running. |
 | Vercel/Railway/Supabase deployment | Not implemented | No verified online deployment configuration is present. |
@@ -47,15 +47,15 @@ The current demo can accurately claim that MIRAGE:
 - generates adaptive decoy responses with synthetic per-actor canary tokens;
 - persists actor profiles from fingerprints, events, and honeytoken hits;
 - groups actor profiles into lightweight dashboard triage clusters;
-- recommends read-only investigation cases from actor clusters;
+- recommends and persists investigation case workflows from actor clusters;
 - supports analyst labels for correcting event classification outcomes;
 - exports analyst-labeled feature vectors as JSON Lines for model training;
 - trains local shadow-mode candidate artifacts from analyst-labeled events;
 - prepares validated train/test splits from MIRAGE JSONL and CICIDS-style CSV sources;
-- displays live backend data on a dashboard;
+- displays live backend data, actor clusters, and recommended triage cases on a dashboard;
 - can train and evaluate a Random Forest model from labeled feature records.
 
 It should not yet claim arbitrary ingress interception, a production ML model,
-trained actor clustering, persisted case workflows, token rotation, assignment
-lifecycle controls, full dashboard streaming, or deployed
-Supabase/Railway/Vercel infrastructure.
+trained actor clustering, case ownership queues, token rotation, assignment
+lifecycle controls, full dashboard streaming, or deployed Supabase/Railway/Vercel
+infrastructure.

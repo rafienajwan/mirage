@@ -11,6 +11,7 @@ from app.schemas.decision import Decision
 
 ActorStatus = Literal["quiet", "watch", "suspicious", "confirmed_interaction"]
 CaseSeverity = Literal["low", "medium", "high", "critical"]
+CaseWorkflowStatus = Literal["open", "investigating", "closed"]
 
 
 class ActorProfile(BaseModel):
@@ -81,3 +82,41 @@ class ActorCaseSummary(BaseModel):
 
     total_cases: int = Field(ge=0)
     cases: list[ActorCase]
+
+
+class ActorCaseOpenRequest(BaseModel):
+    """Request to persist a recommended actor case."""
+
+    note: str = Field(default="", max_length=500)
+
+
+class ActorCaseUpdateRequest(BaseModel):
+    """Operator update for a persisted actor case."""
+
+    status: CaseWorkflowStatus
+    note: str = Field(default="", max_length=500)
+
+
+class ActorCaseWorkflow(BaseModel):
+    """Persisted actor case workflow record."""
+
+    case_id: str
+    cluster_id: str
+    title: str
+    severity: CaseSeverity
+    status: CaseWorkflowStatus
+    actor_count: int = Field(ge=0)
+    actor_ids: list[str]
+    evidence: list[str]
+    recommended_action: str
+    analyst_note: str = ""
+    opened_at: datetime
+    updated_at: datetime
+    last_seen: datetime
+
+
+class ActorCaseWorkflowSummary(BaseModel):
+    """Persisted actor case workflow summary."""
+
+    total_cases: int = Field(ge=0)
+    cases: list[ActorCaseWorkflow]

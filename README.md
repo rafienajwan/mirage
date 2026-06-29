@@ -24,7 +24,7 @@ remain proposal targets. See
 - dataset preparation adapters for MIRAGE JSONL and CICIDS-style CSV sources;
 - honeytoken detection for configured decoy credentials;
 - adaptive decoy responses with per-actor synthetic canary tokens;
-- persistent actor profiles and lightweight actor clusters for triage;
+- persistent actor profiles, lightweight actor clusters, and persisted case triage workflows;
 - Docker Compose configuration for the five-service demo stack.
 
 ## Current Boundaries
@@ -199,7 +199,10 @@ All paths below use the `http://localhost:8000` base URL.
 | `GET /api/v1/dashboard/honeytokens` | Public | Show recent decoy credential interactions |
 | `GET /api/v1/dashboard/actors` | Public | Show recent actor profiles grouped by threat fingerprint |
 | `GET /api/v1/dashboard/actor-clusters` | Public | Show lightweight actor clusters for triage |
-| `GET /api/v1/dashboard/actor-cases` | Public | Show read-only recommended investigation cases |
+| `GET /api/v1/dashboard/actor-cases` | Public | Show recommended investigation cases |
+| `GET /api/v1/dashboard/actor-case-workflows` | Public | Show persisted actor case workflow records |
+| `POST /api/v1/dashboard/actor-cases/{case_id}/open` | API key | Open a recommended actor case workflow |
+| `PATCH /api/v1/dashboard/actor-case-workflows/{case_id}` | API key | Update an actor case workflow status |
 | `WS /api/v1/dashboard/ws` | API key token | Stream dashboard event and alert updates |
 | `GET /api/v1/decoy/status` | Public | Current decoy metrics |
 | `POST /api/v1/decoy/respond` | API key | Generate an in-process synthetic response |
@@ -308,7 +311,7 @@ infra/
 2. Train the first reviewed model from prepared JSONL splits.
 3. Observe reviewed models in shadow mode before changing routing decisions.
 4. Expand WebSocket streaming beyond events/alerts and harden deployment auth.
-5. Add persisted case-management workflows and cluster visualization.
+5. Expand case-management workflow ownership and filtering.
 6. Add token rotation and assignment lifecycle controls.
 7. Verify Docker image builds and deploy the stack.
 
