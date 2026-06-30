@@ -300,6 +300,7 @@ class DatabaseStore:
         self,
         recommendation: ActorCase,
         note: str = "",
+        assigned_to: str = "",
     ) -> ActorCaseWorkflow:
         now = datetime.now(timezone.utc)
         async with get_session() as session:
@@ -320,6 +321,7 @@ class DatabaseStore:
                     actor_ids=recommendation.actor_ids,
                     evidence=recommendation.evidence,
                     recommended_action=recommendation.recommended_action,
+                    assigned_to=assigned_to,
                     analyst_note=note,
                     opened_at=now,
                     updated_at=now,
@@ -331,6 +333,7 @@ class DatabaseStore:
                 row.actor_ids = recommendation.actor_ids
                 row.evidence = recommendation.evidence
                 row.recommended_action = recommendation.recommended_action
+                row.assigned_to = assigned_to or row.assigned_to
                 row.analyst_note = note or row.analyst_note
                 row.updated_at = now
                 row.last_seen = recommendation.last_seen
@@ -342,6 +345,7 @@ class DatabaseStore:
         case_id: str,
         status: CaseWorkflowStatus,
         note: str = "",
+        assigned_to: str | None = None,
     ) -> ActorCaseWorkflow | None:
         async with get_session() as session:
             result = await session.execute(
@@ -351,15 +355,28 @@ class DatabaseStore:
             if row is None:
                 return None
             row.status = status
+            if assigned_to is not None:
+                row.assigned_to = assigned_to
             row.analyst_note = note or row.analyst_note
             row.updated_at = datetime.now(timezone.utc)
             await session.flush()
             return self._actor_case_from_row(row)
 
-    async def get_actor_case_workflows(self, limit: int = 20) -> list[ActorCaseWorkflow]:
+    async def get_actor_case_workflows(
+        self,
+        limit: int = 20,
+        status: CaseWorkflowStatus | None = None,
+        assigned_to: str | None = None,
+    ) -> list[ActorCaseWorkflow]:
         async with get_session() as session:
+            filters = []
+            if status is not None:
+                filters.append(ActorCaseModel.status == status)
+            if assigned_to:
+                filters.append(ActorCaseModel.assigned_to == assigned_to)
             stmt = (
                 select(ActorCaseModel)
+                .where(*filters)
                 .order_by(
                     ActorCaseModel.status.asc(),
                     ActorCaseModel.severity.desc(),
@@ -535,6 +552,7 @@ class DatabaseStore:
             actor_ids=list(row.actor_ids or []),
             evidence=list(row.evidence or []),
             recommended_action=row.recommended_action,
+            assigned_to=row.assigned_to or "",
             analyst_note=row.analyst_note or "",
             opened_at=row.opened_at,
             updated_at=row.updated_at,

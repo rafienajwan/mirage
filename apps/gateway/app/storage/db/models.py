@@ -109,6 +109,7 @@ class ActorCaseModel(Base):
     actor_ids: Mapped[list] = mapped_column(JSON, default=list)
     evidence: Mapped[list] = mapped_column(JSON, default=list)
     recommended_action: Mapped[str] = mapped_column(String(512))
+    assigned_to: Mapped[str] = mapped_column(String(120), default="", index=True)
     analyst_note: Mapped[str] = mapped_column(Text, default="")
     opened_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

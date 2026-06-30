@@ -88,6 +88,7 @@ class ActorCaseOpenRequest(BaseModel):
     """Request to persist a recommended actor case."""
 
     note: str = Field(default="", max_length=500)
+    assigned_to: str = Field(default="", max_length=120)
 
 
 class ActorCaseUpdateRequest(BaseModel):
@@ -95,6 +96,7 @@ class ActorCaseUpdateRequest(BaseModel):
 
     status: CaseWorkflowStatus
     note: str = Field(default="", max_length=500)
+    assigned_to: str | None = Field(default=None, max_length=120)
 
 
 class ActorCaseWorkflow(BaseModel):
@@ -109,6 +111,7 @@ class ActorCaseWorkflow(BaseModel):
     actor_ids: list[str]
     evidence: list[str]
     recommended_action: str
+    assigned_to: str = ""
     analyst_note: str = ""
     opened_at: datetime
     updated_at: datetime

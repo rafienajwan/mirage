@@ -124,6 +124,7 @@ class MemoryStore:
         self,
         recommendation: ActorCase,
         note: str = "",
+        assigned_to: str = "",
     ) -> ActorCaseWorkflow:
         existing = self.actor_cases.get(recommendation.case_id)
         now = datetime.now(timezone.utc)
@@ -134,6 +135,7 @@ class MemoryStore:
                     "actor_ids": recommendation.actor_ids,
                     "evidence": recommendation.evidence,
                     "recommended_action": recommendation.recommended_action,
+                    "assigned_to": assigned_to or existing.assigned_to,
                     "analyst_note": note or existing.analyst_note,
                     "updated_at": now,
                     "last_seen": recommendation.last_seen,
@@ -152,6 +154,7 @@ class MemoryStore:
             actor_ids=recommendation.actor_ids,
             evidence=recommendation.evidence,
             recommended_action=recommendation.recommended_action,
+            assigned_to=assigned_to,
             analyst_note=note,
             opened_at=now,
             updated_at=now,
@@ -165,6 +168,7 @@ class MemoryStore:
         case_id: str,
         status: CaseWorkflowStatus,
         note: str = "",
+        assigned_to: str | None = None,
     ) -> ActorCaseWorkflow | None:
         existing = self.actor_cases.get(case_id)
         if existing is None:
@@ -172,6 +176,7 @@ class MemoryStore:
         updated = existing.model_copy(
             update={
                 "status": status,
+                "assigned_to": existing.assigned_to if assigned_to is None else assigned_to,
                 "analyst_note": note or existing.analyst_note,
                 "updated_at": datetime.now(timezone.utc),
             }
@@ -179,9 +184,19 @@ class MemoryStore:
         self.actor_cases[case_id] = updated
         return updated
 
-    async def get_actor_case_workflows(self, limit: int = 20) -> list[ActorCaseWorkflow]:
+    async def get_actor_case_workflows(
+        self,
+        limit: int = 20,
+        status: CaseWorkflowStatus | None = None,
+        assigned_to: str | None = None,
+    ) -> list[ActorCaseWorkflow]:
+        values = list(self.actor_cases.values())
+        if status is not None:
+            values = [item for item in values if item.status == status]
+        if assigned_to:
+            values = [item for item in values if item.assigned_to == assigned_to]
         cases = sorted(
-            self.actor_cases.values(),
+            values,
             key=lambda item: (item.status != "closed", item.severity, item.updated_at),
             reverse=True,
         )

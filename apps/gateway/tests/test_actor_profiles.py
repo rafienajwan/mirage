@@ -143,12 +143,18 @@ async def test_actor_case_workflows_open_and_update_recommended_case(client, mon
 
     open_response = await client.post(
         f"/api/v1/dashboard/actor-cases/{case_id}/open",
-        json={"note": "Opened from triage"},
+        json={"note": "Opened from triage", "assigned_to": "rafie"},
     )
-    workflows = await client.get("/api/v1/dashboard/actor-case-workflows")
+    workflows = await client.get(
+        "/api/v1/dashboard/actor-case-workflows?assigned_to=rafie"
+    )
     update_response = await client.patch(
         f"/api/v1/dashboard/actor-case-workflows/{case_id}",
-        json={"status": "investigating", "note": "Analyst assigned"},
+        json={
+            "status": "investigating",
+            "note": "Analyst assigned",
+            "assigned_to": "rafie",
+        },
     )
 
     assert event_response.status_code == 200
@@ -159,6 +165,7 @@ async def test_actor_case_workflows_open_and_update_recommended_case(client, mon
     opened = open_response.json()
     assert opened["case_id"] == case_id
     assert opened["status"] == "open"
+    assert opened["assigned_to"] == "rafie"
     assert opened["analyst_note"] == "Opened from triage"
 
     workflow_data = workflows.json()
@@ -167,4 +174,5 @@ async def test_actor_case_workflows_open_and_update_recommended_case(client, mon
 
     updated = update_response.json()
     assert updated["status"] == "investigating"
+    assert updated["assigned_to"] == "rafie"
     assert updated["analyst_note"] == "Analyst assigned"
