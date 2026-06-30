@@ -58,14 +58,21 @@ python scripts/prepare_dataset.py \
 Then train from the prepared split:
 
 ```bash
+python scripts/review_dataset.py \
+  --manifest data/prepared/runtime-v1/manifest.json
+```
+
+Only continue when the dataset review reports `ready_for_training: true`.
+
+```bash
 python scripts/train_model.py \
   --input data/prepared/runtime-v1/train.jsonl \
   --output artifacts/risk_model.joblib
 ```
 
-Review `data/prepared/runtime-v1/manifest.json` before enabling the artifact in
-shadow mode. It records row counts, label balance, split ratio, seed, feature
-names, and generated files.
+Review `data/prepared/runtime-v1/manifest.json` before training or enabling an
+artifact in shadow mode. It records row counts, label balance, split ratio,
+seed, feature names, and generated files.
 
 ## Prepare CICIDS-Style CSV
 
@@ -96,3 +103,21 @@ Preparation fails unless:
 
 These rules match the dashboard training readiness indicator and prevent a
 dataset from being marked ready when the trainer would fail immediately.
+
+## Dataset Review Gate
+
+Run the review gate after preparing a split:
+
+```bash
+cd apps/gateway
+python scripts/review_dataset.py \
+  --manifest data/prepared/runtime-v1/manifest.json \
+  --min-total-rows 20 \
+  --min-train-rows 15 \
+  --min-test-rows 5
+```
+
+The command checks manifest integrity, train/test file row counts, label
+presence in both splits, and the feature contract. It exits with code `1` when
+blockers are found. Passing this review means the split is ready for local
+training review, not that the resulting model should control live routing.

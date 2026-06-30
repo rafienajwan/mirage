@@ -254,6 +254,7 @@ python scripts/train_model.py --input data/prepared/runtime-v1/train.jsonl --out
 Review the artifact before enabling shadow mode:
 
 ```bash
+python scripts/review_dataset.py --manifest data/prepared/runtime-v1/manifest.json
 python scripts/review_model_artifact.py --artifact artifacts/risk_model.joblib
 ```
 
