@@ -13,7 +13,11 @@ from app.schemas.dashboard import (
     MLShadowStatus,
     TrainingDataSummary,
 )
-from app.schemas.actor import ActorCaseOpenRequest, ActorCaseUpdateRequest
+from app.schemas.actor import (
+    ActorCaseOpenRequest,
+    ActorCaseUpdateRequest,
+    CaseWorkflowStatus,
+)
 from app.schemas.event import EventLabelRequest
 from app.schemas.retraining import RetrainingRun
 from app.services.ml_status import get_ml_shadow_status
@@ -143,7 +147,7 @@ async def dashboard_actor_cases(limit: int = Query(default=20, ge=1, le=100)):
 @router.get("/actor-case-workflows", response_model=ActorCaseWorkflowSummary)
 async def dashboard_actor_case_workflows(
     limit: int = Query(default=20, ge=1, le=100),
-    status_filter: str | None = Query(default=None, alias="status"),
+    status_filter: CaseWorkflowStatus | None = Query(default=None, alias="status"),
     assigned_to: str | None = Query(default=None, max_length=120),
 ):
     """Persisted actor case workflow records."""

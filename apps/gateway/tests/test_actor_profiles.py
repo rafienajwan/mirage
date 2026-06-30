@@ -156,11 +156,37 @@ async def test_actor_case_workflows_open_and_update_recommended_case(client, mon
             "assigned_to": "rafie",
         },
     )
+    close_response = await client.patch(
+        f"/api/v1/dashboard/actor-case-workflows/{case_id}",
+        json={
+            "status": "closed",
+            "note": "Confirmed resolved",
+            "assigned_to": "rafie",
+        },
+    )
+    closed_workflows = await client.get(
+        "/api/v1/dashboard/actor-case-workflows?status=closed"
+    )
+    reopen_response = await client.patch(
+        f"/api/v1/dashboard/actor-case-workflows/{case_id}",
+        json={
+            "status": "open",
+            "note": "Reopened after new signal",
+            "assigned_to": "rafie",
+        },
+    )
+    invalid_filter = await client.get(
+        "/api/v1/dashboard/actor-case-workflows?status=triaged"
+    )
 
     assert event_response.status_code == 200
     assert open_response.status_code == 200
     assert workflows.status_code == 200
     assert update_response.status_code == 200
+    assert close_response.status_code == 200
+    assert closed_workflows.status_code == 200
+    assert reopen_response.status_code == 200
+    assert invalid_filter.status_code == 422
 
     opened = open_response.json()
     assert opened["case_id"] == case_id
@@ -176,3 +202,12 @@ async def test_actor_case_workflows_open_and_update_recommended_case(client, mon
     assert updated["status"] == "investigating"
     assert updated["assigned_to"] == "rafie"
     assert updated["analyst_note"] == "Analyst assigned"
+
+    closed = close_response.json()
+    assert closed["status"] == "closed"
+    assert closed["analyst_note"] == "Confirmed resolved"
+    assert closed_workflows.json()["cases"][0]["case_id"] == case_id
+
+    reopened = reopen_response.json()
+    assert reopened["status"] == "open"
+    assert reopened["analyst_note"] == "Reopened after new signal"
