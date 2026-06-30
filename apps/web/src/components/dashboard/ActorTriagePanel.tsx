@@ -190,6 +190,15 @@ export default function ActorTriagePanel({
                             onUpdateCase={onUpdateCase}
                           />
                         ) : null}
+                        {item.status === "closed" ? (
+                          <WorkflowButton
+                            label="Reopen"
+                            caseId={item.id}
+                            status="open"
+                            workingCaseId={workingCaseId}
+                            onUpdateCase={onUpdateCase}
+                          />
+                        ) : null}
                       </div>
                     </div>
                   ))}

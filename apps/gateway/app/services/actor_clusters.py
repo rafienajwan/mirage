@@ -14,6 +14,7 @@ from app.schemas.actor import (
     ActorCluster,
     ActorClusterSummary,
     ActorProfile,
+    CaseWorkflowStatus,
 )
 from app.services.actor_profiles import get_actor_profiles
 from app.storage import store
@@ -174,7 +175,7 @@ async def get_actor_case_workflows(limit: int = 20) -> ActorCaseWorkflowSummary:
 
 async def get_filtered_actor_case_workflows(
     limit: int = 20,
-    status: str | None = None,
+    status: CaseWorkflowStatus | None = None,
     assigned_to: str | None = None,
 ) -> ActorCaseWorkflowSummary:
     """Return persisted actor case workflows with optional filters."""
