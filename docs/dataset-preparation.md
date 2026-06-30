@@ -10,6 +10,7 @@ directly into the trainer.
 | Source | Adapter | Status |
 | --- | --- | --- |
 | Analyst-labeled MIRAGE export | `mirage-jsonl` | Ready |
+| Custom API JSONL logs | `api-log-jsonl` | Ready for labeled request metadata |
 | CICIDS2017-style CSV | `cicids-csv` | Basic adapter for compatible columns |
 
 Raw and prepared datasets should stay under local ignored `data/` directories.
@@ -32,6 +33,34 @@ Labels are binary:
 
 Missing known features are filled with `0.0`. Unknown features are ignored so
 training and inference keep the same feature order.
+
+## Prepare Custom API Logs
+
+Use this adapter when you have labeled request logs that have not already been
+exported by MIRAGE. Each JSON Lines row can provide request fields at the top
+level or inside a nested `request` object:
+
+```json
+{"id":"req-1","label":"normal","source_ip":"10.0.0.10","method":"GET","path":"/api/products","user_agent":"Mozilla/5.0","request_count":3}
+{"id":"req-2","label":"suspicious","request":{"client_ip":"10.0.0.66","http_method":"POST","endpoint":"/.env","ua":"curl/8.0","payload_indicators":["path-traversal","sql-like"],"destination_port":443}}
+```
+
+Supported labels are `normal`, `benign`, `allow`, `allowed`, `false_positive`,
+or `0` for normal traffic, and `suspicious`, `malicious`, `attack`, `monitor`,
+`redirect_to_decoy`, `false_negative`, `true_positive`, or `1` for suspicious
+traffic.
+
+Prepare a split with the same production feature extractor used by the gateway:
+
+```bash
+cd apps/gateway
+python scripts/prepare_dataset.py \
+  --source api-log-jsonl \
+  --input data/raw/api-logs/labeled_requests.jsonl \
+  --output-dir data/prepared/api-logs-v1 \
+  --dataset-name api-logs \
+  --dataset-version v1
+```
 
 ## Prepare MIRAGE Runtime Export
 
