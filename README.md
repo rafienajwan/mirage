@@ -258,6 +258,7 @@ Review the artifact before enabling shadow mode:
 
 ```bash
 python scripts/review_dataset.py --manifest data/prepared/runtime-v1/manifest.json
+python scripts/evaluate_model_artifact.py --artifact artifacts/risk_model.joblib --input data/prepared/runtime-v1/test.jsonl
 python scripts/review_model_artifact.py --artifact artifacts/risk_model.joblib
 ```
 

@@ -31,9 +31,28 @@ The training script stores:
 - precision, recall, F1, false-positive rate, training rows, and test rows;
 - an artifact version.
 
+## Evaluate The Holdout Split
+
+Evaluate the artifact against the prepared `test.jsonl` split before enabling
+shadow mode:
+
+```bash
+python scripts/evaluate_model_artifact.py \
+  --artifact artifacts/risk_model.joblib \
+  --input data/prepared/runtime-v1/test.jsonl \
+  --min-precision 0.5 \
+  --min-recall 0.5 \
+  --min-f1-score 0.5 \
+  --max-false-positive-rate 0.5
+```
+
+The command exits with code `1` when holdout thresholds fail. This is separate
+from the training script's internal validation and should be treated as the
+operator-facing check for a prepared dataset split.
+
 ## Review The Artifact
 
-Review the artifact before enabling it:
+Review the artifact payload before enabling it:
 
 ```bash
 cd apps/gateway
