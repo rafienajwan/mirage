@@ -25,7 +25,10 @@ export async function POST(
           "Content-Type": "application/json",
           "X-Mirage-API-Key": apiKey,
         },
-        body: JSON.stringify({ note: payload.note ?? "" }),
+        body: JSON.stringify({
+          note: payload.note ?? "",
+          assigned_to: payload.assigned_to ?? "",
+        }),
         cache: "no-store",
       },
     );

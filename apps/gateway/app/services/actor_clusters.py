@@ -172,6 +172,22 @@ async def get_actor_case_workflows(limit: int = 20) -> ActorCaseWorkflowSummary:
     return ActorCaseWorkflowSummary(total_cases=len(cases), cases=cases)
 
 
+async def get_filtered_actor_case_workflows(
+    limit: int = 20,
+    status: str | None = None,
+    assigned_to: str | None = None,
+) -> ActorCaseWorkflowSummary:
+    """Return persisted actor case workflows with optional filters."""
+    if not hasattr(store, "get_actor_case_workflows"):
+        return ActorCaseWorkflowSummary(total_cases=0, cases=[])
+    cases = await store.get_actor_case_workflows(
+        limit=limit,
+        status=status,
+        assigned_to=assigned_to,
+    )
+    return ActorCaseWorkflowSummary(total_cases=len(cases), cases=cases)
+
+
 async def open_actor_case_from_recommendation(
     case_id: str,
     payload: ActorCaseOpenRequest,
@@ -184,7 +200,11 @@ async def open_actor_case_from_recommendation(
     )
     if recommendation is None or not hasattr(store, "open_actor_case"):
         return None
-    return await store.open_actor_case(recommendation, payload.note)
+    return await store.open_actor_case(
+        recommendation,
+        payload.note,
+        payload.assigned_to,
+    )
 
 
 async def update_actor_case_workflow(
@@ -194,4 +214,9 @@ async def update_actor_case_workflow(
     """Update an existing persisted actor case workflow."""
     if not hasattr(store, "update_actor_case"):
         return None
-    return await store.update_actor_case(case_id, payload.status, payload.note)
+    return await store.update_actor_case(
+        case_id,
+        payload.status,
+        payload.note,
+        payload.assigned_to,
+    )

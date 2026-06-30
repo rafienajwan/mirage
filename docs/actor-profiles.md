@@ -33,8 +33,9 @@ ids, shared paths, decoy redirect count, honeytoken hit count, maximum risk
 score, and latest seen timestamp.
 
 Actor cases begin as recommendations derived from clusters. Operators can open
-one into a persisted workflow record, then move it between `open`,
-`investigating`, and `closed`.
+one into a persisted workflow record, assign it to an operator, filter workflow
+records by status or assignee, then move it between `open`, `investigating`, and
+`closed`.
 
 The Next.js dashboard renders actor profiles, cluster signals, and recommended
 cases in the actor triage section.
@@ -42,6 +43,7 @@ cases in the actor triage section.
 ## Current Boundaries
 
 Profiles and clusters are intended for dashboard triage. MIRAGE now persists
-aggregate actor records, groups similar profiles, and persists basic case
-workflows, but it does not yet assign case owners, rotate issued canary tokens,
-manage token assignment lifecycles, or run a trained clustering model.
+aggregate actor records, groups similar profiles, and persists basic assigned
+case workflows, but it does not yet provide multi-analyst queues, rotate issued
+canary tokens, manage token assignment lifecycles, or run a trained clustering
+model.

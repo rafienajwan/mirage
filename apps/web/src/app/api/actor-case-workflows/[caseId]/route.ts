@@ -33,6 +33,7 @@ export async function PATCH(
         body: JSON.stringify({
           status: payload.status,
           note: payload.note ?? "",
+          assigned_to: payload.assigned_to,
         }),
         cache: "no-store",
       },

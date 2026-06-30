@@ -157,9 +157,9 @@ export default function ActorTriagePanel({
                           <p className="truncate text-[10px] font-semibold text-white/75">
                             {item.title}
                           </p>
-                          <p className="mt-1 truncate font-mono text-[8px] text-white/30">
-                            {item.status} | {item.id}
-                          </p>
+                        <p className="mt-1 truncate font-mono text-[8px] text-white/30">
+                            {item.status} | {item.assignedTo || "unassigned"} | {item.id}
+                        </p>
                         </div>
                         <span
                           className={cn(
