@@ -200,7 +200,7 @@ All paths below use the `http://localhost:8000` base URL.
 | `GET /api/v1/dashboard/actors` | Public | Show recent actor profiles grouped by threat fingerprint |
 | `GET /api/v1/dashboard/actor-clusters` | Public | Show lightweight actor clusters for triage |
 | `GET /api/v1/dashboard/actor-cases` | Public | Show recommended investigation cases |
-| `GET /api/v1/dashboard/actor-case-workflows` | Public | Show persisted actor case workflow records |
+| `GET /api/v1/dashboard/actor-case-workflows` | Public | Show persisted actor case workflow records, optionally filtered by status or assignee |
 | `POST /api/v1/dashboard/actor-cases/{case_id}/open` | API key | Open a recommended actor case workflow |
 | `PATCH /api/v1/dashboard/actor-case-workflows/{case_id}` | API key | Update an actor case workflow status |
 | `WS /api/v1/dashboard/ws` | API key token | Stream dashboard event and alert updates |
@@ -311,7 +311,7 @@ infra/
 2. Train the first reviewed model from prepared JSONL splits.
 3. Observe reviewed models in shadow mode before changing routing decisions.
 4. Expand WebSocket streaming beyond events/alerts and harden deployment auth.
-5. Expand case-management workflow ownership and filtering.
+5. Expand case-management workflow queues and analyst collaboration.
 6. Add token rotation and assignment lifecycle controls.
 7. Verify Docker image builds and deploy the stack.
 

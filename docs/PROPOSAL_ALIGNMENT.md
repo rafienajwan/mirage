@@ -17,7 +17,7 @@ the beginning of a real ML pipeline.
 | FastAPI defense gateway | Partial | `/api/v1/proxy/*` inspects and forwards traffic, but arbitrary application ingress is not intercepted. |
 | Hybrid risk scoring | Partial | Heuristic risk scoring is active. A Random Forest training/inference path can run in reviewed shadow mode, but it does not control live routing. |
 | Scikit-learn anomaly detection | Partial | Scikit-learn is configured and training/shadow inference plus artifact review are implemented; runtime anomaly detection remains heuristic. |
-| Threat fingerprint matching | Partial | Stable request fingerprints, persistent actor profiles, lightweight triage clusters, and persisted case workflows exist; trained clustering does not. |
+| Threat fingerprint matching | Partial | Stable request fingerprints, persistent actor profiles, lightweight triage clusters, and assigned case workflows exist; trained clustering does not. |
 | Automated real/decoy routing | Implemented for demo | The proxy routes to separate real-app and decoy services using the live decision engine. |
 | Fake endpoints and fake data | Implemented for demo | The isolated decoy service exposes static, synthetic responses without real secrets. |
 | Honeytoken detection | Partial | Configured decoy credential use and per-actor canary tokens are detected, stored, alerted, and shown on the dashboard; rotation is pending. |
@@ -47,7 +47,7 @@ The current demo can accurately claim that MIRAGE:
 - generates adaptive decoy responses with synthetic per-actor canary tokens;
 - persists actor profiles from fingerprints, events, and honeytoken hits;
 - groups actor profiles into lightweight dashboard triage clusters;
-- recommends and persists investigation case workflows from actor clusters;
+- recommends, assigns, filters, and persists investigation case workflows from actor clusters;
 - supports analyst labels for correcting event classification outcomes;
 - exports analyst-labeled feature vectors as JSON Lines for model training;
 - trains local shadow-mode candidate artifacts from analyst-labeled events;
@@ -56,6 +56,6 @@ The current demo can accurately claim that MIRAGE:
 - can train and evaluate a Random Forest model from labeled feature records.
 
 It should not yet claim arbitrary ingress interception, a production ML model,
-trained actor clustering, case ownership queues, token rotation, assignment
+trained actor clustering, multi-analyst queues, token rotation, assignment
 lifecycle controls, full dashboard streaming, or deployed Supabase/Railway/Vercel
 infrastructure.
