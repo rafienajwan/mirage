@@ -12,6 +12,7 @@ from app.ml.datasets import (
     load_cicids_csv,
     load_mirage_jsonl,
     prepare_dataset,
+    review_prepared_dataset,
     stratified_split,
 )
 from app.services.feature_extraction import FEATURE_NAMES
@@ -104,6 +105,87 @@ def test_prepare_dataset_writes_split_and_manifest(tmp_path):
     assert manifest_data["label_counts"] == {"0": 10, "1": 10}
     assert len(train_rows) == 16
     assert len(test_rows) == 4
+
+
+def test_review_prepared_dataset_marks_valid_split_ready(tmp_path):
+    source = tmp_path / "training_events.jsonl"
+    rows = [
+        {"label": label, "features": _features(float(index))}
+        for label in (0, 1)
+        for index in range(12)
+    ]
+    _write_jsonl(source, rows)
+    prepare_dataset(
+        source,
+        tmp_path / "prepared" / "runtime-v1",
+        source_kind="mirage-jsonl",
+        dataset_name="runtime-export",
+        dataset_version="v1",
+        train_ratio=0.75,
+        random_seed=7,
+    )
+
+    review = review_prepared_dataset(
+        tmp_path / "prepared" / "runtime-v1" / "manifest.json",
+    )
+
+    assert review.ready_for_training is True
+    assert review.blockers == []
+    assert review.total_rows == 24
+    assert review.train_label_counts["0"] >= 1
+    assert review.test_label_counts["1"] >= 1
+
+
+def test_review_prepared_dataset_blocks_manifest_row_mismatch(tmp_path):
+    source = tmp_path / "training_events.jsonl"
+    rows = [
+        {"label": label, "features": _features(float(index))}
+        for label in (0, 1)
+        for index in range(10)
+    ]
+    _write_jsonl(source, rows)
+    prepare_dataset(
+        source,
+        tmp_path / "prepared" / "runtime-v1",
+        source_kind="mirage-jsonl",
+        dataset_name="runtime-export",
+        dataset_version="v1",
+    )
+    train_path = tmp_path / "prepared" / "runtime-v1" / "train.jsonl"
+    train_path.write_text("", encoding="utf-8")
+
+    review = review_prepared_dataset(
+        tmp_path / "prepared" / "runtime-v1" / "manifest.json",
+    )
+
+    assert review.ready_for_training is False
+    assert any("Train file row count" in blocker for blocker in review.blockers)
+
+
+def test_review_prepared_dataset_blocks_malformed_counts(tmp_path):
+    source = tmp_path / "training_events.jsonl"
+    rows = [
+        {"label": label, "features": _features(float(index))}
+        for label in (0, 1)
+        for index in range(10)
+    ]
+    _write_jsonl(source, rows)
+    prepare_dataset(
+        source,
+        tmp_path / "prepared" / "runtime-v1",
+        source_kind="mirage-jsonl",
+        dataset_name="runtime-export",
+        dataset_version="v1",
+    )
+    manifest_path = tmp_path / "prepared" / "runtime-v1" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["label_counts"] = {"0": "bad", "1": 10}
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    review = review_prepared_dataset(manifest_path)
+
+    assert review.ready_for_training is False
+    assert "manifest label_counts.0 must be an integer" in review.blockers
 
 
 def test_load_cicids_csv_maps_known_columns(tmp_path):
