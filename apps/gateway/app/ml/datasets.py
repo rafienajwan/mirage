@@ -47,6 +47,28 @@ class DatasetManifest:
     files: dict[str, str]
 
 
+@dataclass(frozen=True)
+class DatasetReview:
+    """Review result for deciding whether a prepared split is trainable."""
+
+    manifest_path: str
+    ready_for_training: bool
+    dataset_name: str
+    dataset_version: str
+    source_kind: str
+    total_rows: int
+    train_rows: int
+    test_rows: int
+    label_counts: dict[str, int]
+    train_label_counts: dict[str, int]
+    test_label_counts: dict[str, int]
+    blockers: list[str]
+    warnings: list[str]
+
+    def to_dict(self) -> dict:
+        return asdict(self)
+
+
 class DatasetValidationError(ValueError):
     """Raised when source data cannot be converted into trainable rows."""
 
@@ -343,3 +365,131 @@ def prepare_dataset(
         encoding="utf-8",
     )
     return manifest
+
+
+def _load_manifest(path: Path) -> dict:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise DatasetValidationError(f"manifest not found: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise DatasetValidationError("manifest is not valid JSON") from exc
+    if not isinstance(data, dict):
+        raise DatasetValidationError("manifest must be a JSON object")
+    return data
+
+
+def _count_jsonl(path: Path) -> int:
+    try:
+        with path.open(encoding="utf-8") as source:
+            return sum(1 for line in source if line.strip())
+    except FileNotFoundError as exc:
+        raise DatasetValidationError(f"prepared file not found: {path}") from exc
+
+
+def _manifest_int(manifest: dict, key: str, blockers: list[str]) -> int:
+    try:
+        return int(manifest.get(key) or 0)
+    except (TypeError, ValueError):
+        blockers.append(f"manifest {key} must be an integer")
+        return 0
+
+
+def _manifest_counts(manifest: dict, key: str, blockers: list[str]) -> dict[str, int]:
+    raw_counts = manifest.get(key) or {}
+    if not isinstance(raw_counts, dict):
+        blockers.append(f"manifest {key} must be an object")
+        return {}
+
+    counts: dict[str, int] = {}
+    for label, count in raw_counts.items():
+        try:
+            counts[str(label)] = int(count)
+        except (TypeError, ValueError):
+            blockers.append(f"manifest {key}.{label} must be an integer")
+            counts[str(label)] = 0
+    return counts
+
+
+def review_prepared_dataset(
+    manifest_path: Path,
+    *,
+    min_total_rows: int = 20,
+    min_train_rows: int = 15,
+    min_test_rows: int = 5,
+    min_rows_per_class: int = 2,
+) -> DatasetReview:
+    """Review a prepared dataset manifest before training."""
+    blockers: list[str] = []
+    warnings: list[str] = []
+    manifest = _load_manifest(manifest_path)
+    base_dir = manifest_path.parent
+    files = manifest.get("files", {})
+    if not isinstance(files, dict):
+        files = {}
+        blockers.append("manifest files must be an object")
+
+    train_file = files.get("train")
+    test_file = files.get("test")
+    if not isinstance(train_file, str):
+        blockers.append("manifest is missing train file")
+    if not isinstance(test_file, str):
+        blockers.append("manifest is missing test file")
+
+    train_rows_actual = (
+        _count_jsonl(base_dir / train_file) if isinstance(train_file, str) else 0
+    )
+    test_rows_actual = (
+        _count_jsonl(base_dir / test_file) if isinstance(test_file, str) else 0
+    )
+
+    total_rows = _manifest_int(manifest, "total_rows", blockers)
+    train_rows = _manifest_int(manifest, "train_rows", blockers)
+    test_rows = _manifest_int(manifest, "test_rows", blockers)
+    label_counts = _manifest_counts(manifest, "label_counts", blockers)
+    train_label_counts = _manifest_counts(manifest, "train_label_counts", blockers)
+    test_label_counts = _manifest_counts(manifest, "test_label_counts", blockers)
+
+    if total_rows < min_total_rows:
+        blockers.append(f"Total rows {total_rows} is below {min_total_rows}")
+    if train_rows < min_train_rows:
+        blockers.append(f"Train rows {train_rows} is below {min_train_rows}")
+    if test_rows < min_test_rows:
+        blockers.append(f"Test rows {test_rows} is below {min_test_rows}")
+    if train_rows_actual != train_rows:
+        blockers.append(
+            f"Train file row count {train_rows_actual} does not match manifest {train_rows}"
+        )
+    if test_rows_actual != test_rows:
+        blockers.append(
+            f"Test file row count {test_rows_actual} does not match manifest {test_rows}"
+        )
+
+    for label in ("0", "1"):
+        if label_counts.get(label, 0) < min_rows_per_class:
+            blockers.append(f"Label {label} has fewer than {min_rows_per_class} rows")
+        if train_label_counts.get(label, 0) < 1:
+            blockers.append(f"Train split is missing label {label}")
+        if test_label_counts.get(label, 0) < 1:
+            blockers.append(f"Test split is missing label {label}")
+
+    if tuple(manifest.get("feature_names", ())) != FEATURE_NAMES:
+        blockers.append("Feature contract does not match the gateway")
+    if total_rows and total_rows < 100:
+        warnings.append("Dataset is small; keep any trained artifact in shadow mode")
+
+    return DatasetReview(
+        manifest_path=str(manifest_path),
+        ready_for_training=not blockers,
+        dataset_name=str(manifest.get("dataset_name") or ""),
+        dataset_version=str(manifest.get("dataset_version") or ""),
+        source_kind=str(manifest.get("source_kind") or ""),
+        total_rows=total_rows,
+        train_rows=train_rows,
+        test_rows=test_rows,
+        label_counts=label_counts,
+        train_label_counts=train_label_counts,
+        test_label_counts=test_label_counts,
+        blockers=blockers,
+        warnings=warnings,
+    )

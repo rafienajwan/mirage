@@ -7,10 +7,18 @@ decisions beside events without changing live routing.
 
 ## Train From A Prepared Split
 
-Prepare a dataset first as described in `docs/dataset-preparation.md`, then run:
+Prepare and review a dataset first as described in
+`docs/dataset-preparation.md`, then run:
 
 ```bash
 cd apps/gateway
+python scripts/review_dataset.py \
+  --manifest data/prepared/runtime-v1/manifest.json
+```
+
+If the dataset review passes, train from the reviewed split:
+
+```bash
 python scripts/train_model.py \
   --input data/prepared/runtime-v1/train.jsonl \
   --output artifacts/risk_model.joblib
