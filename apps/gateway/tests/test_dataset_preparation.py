@@ -9,6 +9,7 @@ import pytest
 from app.ml.datasets import (
     DatasetValidationError,
     PreparedTrainingRow,
+    load_api_log_jsonl,
     load_cicids_csv,
     load_mirage_jsonl,
     prepare_dataset,
@@ -63,6 +64,66 @@ def test_load_mirage_jsonl_rejects_bad_label(tmp_path):
 
     with pytest.raises(DatasetValidationError, match="label must be 0 or 1"):
         load_mirage_jsonl(source)
+
+
+def test_load_api_log_jsonl_extracts_request_features(tmp_path):
+    source = tmp_path / "api_logs.jsonl"
+    _write_jsonl(
+        source,
+        [
+            {
+                "event_id": "evt-normal",
+                "label": "normal",
+                "source_ip": "10.0.0.10",
+                "method": "GET",
+                "path": "/api/products",
+                "user_agent": "Mozilla/5.0",
+                "request_count": 3,
+            },
+            {
+                "event_id": "evt-suspicious",
+                "label": "suspicious",
+                "request": {
+                    "client_ip": "10.0.0.66",
+                    "http_method": "POST",
+                    "endpoint": "/.env",
+                    "ua": "curl/8.0",
+                    "request_count": "30",
+                    "payload_indicators": "path-traversal,sql-like",
+                    "payload_excerpt": "SERVICE_TOKEN=mirage-service-canary",
+                    "destination_port": "443",
+                },
+            },
+        ],
+    )
+
+    rows = load_api_log_jsonl(source)
+
+    assert [row.label for row in rows] == [0, 1]
+    assert rows[0].record_id == "evt-normal"
+    assert rows[1].record_id == "evt-suspicious"
+    assert rows[1].features["method_post"] == 1.0
+    assert rows[1].features["sensitive_path"] == 1.0
+    assert rows[1].features["high_risk_indicator_count"] == 2.0
+    assert rows[1].features["destination_port"] == 443.0
+
+
+def test_load_api_log_jsonl_rejects_unknown_label(tmp_path):
+    source = tmp_path / "api_logs.jsonl"
+    _write_jsonl(
+        source,
+        [
+            {
+                "label": "maybe",
+                "source_ip": "10.0.0.10",
+                "method": "GET",
+                "path": "/api/products",
+            }
+        ],
+    )
+
+    with pytest.raises(DatasetValidationError, match="API log label"):
+        load_api_log_jsonl(source)
 
 
 def test_stratified_split_requires_two_rows_per_class():
