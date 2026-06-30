@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import random
 from collections import Counter
 from dataclasses import asdict, dataclass
@@ -84,12 +85,13 @@ def normalize_features(features: object, *, line_number: int | None = None) -> F
     for name in FEATURE_NAMES:
         value = features.get(name, 0.0)
         try:
-            normalized[name] = float(value)
+            numeric_value = float(value)
         except (TypeError, ValueError) as exc:
             location = f" on line {line_number}" if line_number else ""
             raise DatasetValidationError(
                 f"feature {name!r} must be numeric{location}"
             ) from exc
+        normalized[name] = numeric_value if math.isfinite(numeric_value) else 0.0
     return normalized
 
 
@@ -142,9 +144,11 @@ def load_mirage_jsonl(path: Path) -> list[PreparedTrainingRow]:
 
 
 def _first_present(row: dict[str, str], *names: str) -> str | None:
+    normalized_row = {key.strip(): value for key, value in row.items()}
     for name in names:
-        if name in row and row[name] != "":
-            return row[name]
+        value = normalized_row.get(name)
+        if value != "":
+            return value
     return None
 
 

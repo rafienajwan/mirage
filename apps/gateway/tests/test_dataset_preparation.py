@@ -269,6 +269,45 @@ def test_load_cicids_csv_maps_known_columns(tmp_path):
     assert rows[1].features["flow_packets_per_second"] == 95.0
 
 
+def test_load_cicids_csv_accepts_headers_with_extra_spaces(tmp_path):
+    source = tmp_path / "cicids.csv"
+    source.write_text(
+        "\n".join(
+            [
+                " Destination Port, Flow Duration, Flow Packets/s, Packet Length Mean, SYN Flag Count, Average Packet Size, Label",
+                "443,1200,15.5,42.0,2,64.0,BENIGN",
+                "8080,5000,95.0,128.0,4,256.0,DDoS",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    rows = load_cicids_csv(source)
+
+    assert rows[0].features["destination_port"] == 443.0
+    assert rows[0].features["flow_duration_ms"] == 1200.0
+    assert rows[1].features["syn_flag_count"] == 4.0
+
+
+def test_load_cicids_csv_zeroes_non_finite_values(tmp_path):
+    source = tmp_path / "cicids.csv"
+    source.write_text(
+        "\n".join(
+            [
+                "Destination Port,Flow Duration,Flow Packets/s,Packet Length Mean,SYN Flag Count,Average Packet Size,Label",
+                "443,Infinity,Infinity,42.0,2,64.0,BENIGN",
+                "8080,5000,95.0,128.0,4,256.0,DDoS",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    rows = load_cicids_csv(source)
+
+    assert rows[0].features["flow_duration_ms"] == 0.0
+    assert rows[0].features["flow_packets_per_second"] == 0.0
+
+
 def load_rows(label: int, count: int):
     return [
         PreparedTrainingRow(features=_features(float(i)), label=label)
