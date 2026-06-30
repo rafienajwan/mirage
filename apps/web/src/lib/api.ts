@@ -189,6 +189,7 @@ interface BackendActorCaseWorkflow {
   actor_ids: string[];
   evidence: string[];
   recommended_action: string;
+  assigned_to: string;
   analyst_note: string;
   opened_at: string;
   updated_at: string;
@@ -397,6 +398,7 @@ export interface ActorCaseWorkflow {
   actorIds: string[];
   evidence: string[];
   recommendedAction: string;
+  assignedTo: string;
   analystNote: string;
   openedAt: string;
   updatedAt: string;
@@ -709,6 +711,7 @@ function mapActorCaseWorkflow(item: BackendActorCaseWorkflow): ActorCaseWorkflow
     actorIds: item.actor_ids,
     evidence: item.evidence,
     recommendedAction: item.recommended_action,
+    assignedTo: item.assigned_to,
     analystNote: item.analyst_note,
     openedAt: item.opened_at,
     updatedAt: item.updated_at,
@@ -717,8 +720,15 @@ function mapActorCaseWorkflow(item: BackendActorCaseWorkflow): ActorCaseWorkflow
 }
 
 /** Fetch persisted actor case workflow records. */
-export async function fetchActorCaseWorkflows(): Promise<ActorCaseWorkflowSummary> {
-  const data = await apiFetch<BackendActorCaseWorkflowSummary>("/dashboard/actor-case-workflows");
+export async function fetchActorCaseWorkflows(filters?: {
+  status?: ActorCaseWorkflow["status"];
+  assignedTo?: string;
+}): Promise<ActorCaseWorkflowSummary> {
+  const params = new URLSearchParams();
+  if (filters?.status) params.set("status", filters.status);
+  if (filters?.assignedTo) params.set("assigned_to", filters.assignedTo);
+  const query = params.size ? `?${params.toString()}` : "";
+  const data = await apiFetch<BackendActorCaseWorkflowSummary>(`/dashboard/actor-case-workflows${query}`);
   return {
     totalCases: data.total_cases,
     cases: data.cases.map(mapActorCaseWorkflow),
@@ -726,11 +736,15 @@ export async function fetchActorCaseWorkflows(): Promise<ActorCaseWorkflowSummar
 }
 
 /** Open a recommended actor case through the server-side API bridge. */
-export async function openActorCase(caseId: string, note = ""): Promise<ActorCaseWorkflow> {
+export async function openActorCase(
+  caseId: string,
+  note = "",
+  assignedTo = "",
+): Promise<ActorCaseWorkflow> {
   const res = await fetch(`/api/actor-cases/${encodeURIComponent(caseId)}/open`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ note }),
+    body: JSON.stringify({ note, assigned_to: assignedTo }),
   });
   if (!res.ok) {
     throw new Error(`Open actor case error: ${res.status} ${res.statusText}`);
@@ -743,11 +757,12 @@ export async function updateActorCase(
   caseId: string,
   status: ActorCaseWorkflow["status"],
   note = "",
+  assignedTo?: string,
 ): Promise<ActorCaseWorkflow> {
   const res = await fetch(`/api/actor-case-workflows/${encodeURIComponent(caseId)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status, note }),
+    body: JSON.stringify({ status, note, assigned_to: assignedTo }),
   });
   if (!res.ok) {
     throw new Error(`Update actor case error: ${res.status} ${res.statusText}`);

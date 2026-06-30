@@ -225,7 +225,7 @@ export default function DashboardPage() {
   const handleOpenActorCase = useCallback(async (caseId: string) => {
     setWorkingActorCaseId(caseId);
     try {
-      const opened = await openActorCase(caseId, "Opened from dashboard triage");
+      const opened = await openActorCase(caseId, "Opened from dashboard triage", "operator");
       setActorCaseWorkflows((current) => ({
         totalCases: current?.cases.some((item) => item.id === opened.id)
           ? current.totalCases
@@ -248,7 +248,12 @@ export default function DashboardPage() {
       const actionId = `${caseId}:${status}`;
       setWorkingActorCaseId(actionId);
       try {
-        const updated = await updateActorCase(caseId, status, `Marked ${status} from dashboard`);
+        const updated = await updateActorCase(
+          caseId,
+          status,
+          `Marked ${status} from dashboard`,
+          "operator",
+        );
         setActorCaseWorkflows((current) => ({
           totalCases: current?.totalCases ?? 1,
           cases: [
