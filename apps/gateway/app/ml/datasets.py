@@ -11,10 +11,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Literal
 
-from app.services.feature_extraction import FEATURE_NAMES, FeatureVector
+from app.schemas.request import InspectRequest
+from app.services.feature_extraction import FEATURE_NAMES, FeatureVector, extract_features
 
 
-DatasetSource = Literal["mirage-jsonl", "cicids-csv"]
+DatasetSource = Literal["mirage-jsonl", "api-log-jsonl", "cicids-csv"]
 
 
 @dataclass(frozen=True)
@@ -163,6 +164,151 @@ def _label_from_cicids(value: str | None) -> int:
     return 0 if value.strip().upper() == "BENIGN" else 1
 
 
+API_LOG_LABELS = {
+    "0": 0,
+    "normal": 0,
+    "benign": 0,
+    "allow": 0,
+    "allowed": 0,
+    "false_positive": 0,
+    "1": 1,
+    "suspicious": 1,
+    "malicious": 1,
+    "attack": 1,
+    "monitor": 1,
+    "redirect_to_decoy": 1,
+    "false_negative": 1,
+    "true_positive": 1,
+}
+
+
+def _label_from_api_log(value: object, *, line_number: int) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int) and value in {0, 1}:
+        return value
+    if isinstance(value, str):
+        normalized = API_LOG_LABELS.get(value.strip().lower())
+        if normalized is not None:
+            return normalized
+    raise DatasetValidationError(
+        f"API log label must be normal/suspicious or 0/1 on line {line_number}"
+    )
+
+
+def _first_object_value(record: dict, *names: str) -> object:
+    for name in names:
+        value = record.get(name)
+        if value not in (None, ""):
+            return value
+    return None
+
+
+def _api_payload_indicators(value: object, *, line_number: int) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(",") if item.strip()]
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return value
+    raise DatasetValidationError(
+        f"payload_indicators must be a list of strings on line {line_number}"
+    )
+
+
+def _optional_float(value: object) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _optional_int(value: object) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _api_log_request(record: dict, *, line_number: int) -> InspectRequest:
+    request = record.get("request")
+    request_data = request if isinstance(request, dict) else record
+    try:
+        return InspectRequest(
+            ip_address=str(
+                _first_object_value(request_data, "ip_address", "source_ip", "client_ip")
+                or ""
+            ),
+            method=str(_first_object_value(request_data, "method", "http_method") or ""),
+            path=str(
+                _first_object_value(request_data, "path", "endpoint", "url_path") or ""
+            ),
+            user_agent=str(
+                _first_object_value(request_data, "user_agent", "userAgent", "ua") or ""
+            ),
+            request_count=_optional_int(request_data.get("request_count")) or 1,
+            payload_indicators=_api_payload_indicators(
+                request_data.get("payload_indicators"),
+                line_number=line_number,
+            ),
+            payload_excerpt=str(request_data.get("payload_excerpt") or ""),
+            timestamp=request_data.get("timestamp"),
+            flow_duration_ms=_optional_float(request_data.get("flow_duration_ms")),
+            flow_packets_per_second=_optional_float(
+                request_data.get("flow_packets_per_second")
+            ),
+            packet_length_mean=_optional_float(request_data.get("packet_length_mean")),
+            syn_flag_count=_optional_int(request_data.get("syn_flag_count")),
+            destination_port=_optional_int(request_data.get("destination_port")),
+            average_packet_size=_optional_float(request_data.get("average_packet_size")),
+        )
+    except ValueError as exc:
+        raise DatasetValidationError(
+            f"invalid API log request fields on line {line_number}"
+        ) from exc
+
+
+def load_api_log_jsonl(path: Path) -> list[PreparedTrainingRow]:
+    """Load labeled custom API logs and extract MIRAGE production features."""
+    rows: list[PreparedTrainingRow] = []
+    with path.open(encoding="utf-8") as source:
+        for line_number, line in enumerate(source, start=1):
+            if not line.strip():
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise DatasetValidationError(
+                    f"invalid JSON on line {line_number}"
+                ) from exc
+            if not isinstance(record, dict):
+                raise DatasetValidationError(
+                    f"API log row must be an object on line {line_number}"
+                )
+
+            label = _label_from_api_log(
+                _first_object_value(record, "label", "analyst_label", "class"),
+                line_number=line_number,
+            )
+            request = _api_log_request(record, line_number=line_number)
+            rows.append(
+                PreparedTrainingRow(
+                    features=extract_features(request),
+                    label=label,
+                    source="api-log-jsonl",
+                    record_id=str(
+                        _first_object_value(record, "event_id", "request_id", "id")
+                        or line_number
+                    ),
+                )
+            )
+    return rows
+
+
 def load_cicids_csv(path: Path) -> list[PreparedTrainingRow]:
     """Load a CICIDS-style CSV into the MIRAGE feature schema.
 
@@ -235,6 +381,8 @@ def load_dataset(path: Path, source_kind: DatasetSource) -> list[PreparedTrainin
     """Load source data using the selected adapter."""
     if source_kind == "mirage-jsonl":
         return load_mirage_jsonl(path)
+    if source_kind == "api-log-jsonl":
+        return load_api_log_jsonl(path)
     if source_kind == "cicids-csv":
         return load_cicids_csv(path)
     raise DatasetValidationError(f"Unsupported dataset source kind: {source_kind}")

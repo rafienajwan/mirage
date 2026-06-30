@@ -89,6 +89,9 @@ python scripts/review_model_artifact.py \
   --artifact artifacts/risk_model.joblib
 ```
 
+Use `--source api-log-jsonl` for labeled custom API request logs and
+`--source cicids-csv` for compatible CICIDS-style CSV exports.
+
 Training computes precision, recall, F1, and false-positive rate. Runtime
 routing remains heuristic until a reviewed artifact is enabled in shadow mode.
 Set `MIRAGE_MODEL_ARTIFACT` to a trained artifact path to store model-only

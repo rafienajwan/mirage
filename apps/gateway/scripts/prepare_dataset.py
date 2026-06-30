@@ -15,7 +15,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument(
         "--source",
-        choices=["mirage-jsonl", "cicids-csv"],
+        choices=["mirage-jsonl", "api-log-jsonl", "cicids-csv"],
         required=True,
         dest="source_kind",
     )
