@@ -10,6 +10,7 @@ from app.schemas.dashboard import (
     ActorClusterSummary,
     ActorProfileSummary,
     HoneytokenSummary,
+    MLShadowSummary,
     MLShadowStatus,
     TrainingDataSummary,
 )
@@ -21,6 +22,7 @@ from app.schemas.actor import (
 from app.schemas.event import EventLabelRequest
 from app.schemas.retraining import RetrainingRun
 from app.services.ml_status import get_ml_shadow_status
+from app.services.ml_shadow_summary import get_ml_shadow_summary
 from app.services.actor_clusters import (
     get_actor_cases,
     get_actor_clusters,
@@ -114,6 +116,12 @@ async def retrain_from_training_data(
 async def ml_shadow_status():
     """Current artifact and threshold status for model-only shadow scoring."""
     return get_ml_shadow_status()
+
+
+@router.get("/ml-shadow/summary", response_model=MLShadowSummary)
+async def ml_shadow_summary(limit: int = Query(default=200, ge=1, le=1000)):
+    """Recent agreement between live decisions and model-only shadow decisions."""
+    return await get_ml_shadow_summary(limit=limit)
 
 
 @router.get("/honeytokens", response_model=HoneytokenSummary)

@@ -52,6 +52,28 @@ class MLShadowStatus(BaseModel):
     warnings: list[str]
 
 
+class MLShadowDecisionBreakdown(BaseModel):
+    """Decision counts observed in model-only shadow scores."""
+
+    allow: int = Field(ge=0)
+    monitor: int = Field(ge=0)
+    redirect_to_decoy: int = Field(ge=0)
+
+
+class MLShadowSummary(BaseModel):
+    """Recent model-only decision agreement summary."""
+
+    inspected_events: int = Field(ge=0)
+    shadow_events: int = Field(ge=0)
+    agreements: int = Field(ge=0)
+    disagreements: int = Field(ge=0)
+    agreement_rate: float = Field(ge=0, le=1)
+    average_probability: float = Field(ge=0, le=1)
+    average_score: float = Field(ge=0, le=100)
+    live_decisions: MLShadowDecisionBreakdown
+    shadow_decisions: MLShadowDecisionBreakdown
+
+
 class HoneytokenSummary(BaseModel):
     """Recent honeytoken activity for the dashboard."""
 

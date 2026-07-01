@@ -105,10 +105,13 @@ The dashboard also reads:
 
 ```text
 GET /api/v1/dashboard/ml-shadow/status
+GET /api/v1/dashboard/ml-shadow/summary
 ```
 
-This endpoint returns a sanitized status object for operator visibility. It does
-not expose the full filesystem path of the configured artifact.
+The status endpoint returns sanitized artifact readiness and does not expose the
+full filesystem path. The summary endpoint reports recent model-only agreement,
+disagreements, average probability, average score, and live-versus-shadow
+decision counts for operator review.
 
 ## Safe Claims
 
