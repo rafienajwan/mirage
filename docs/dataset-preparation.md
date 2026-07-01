@@ -38,17 +38,33 @@ training and inference keep the same feature order.
 
 Use this adapter when you have labeled request logs that have not already been
 exported by MIRAGE. Each JSON Lines row can provide request fields at the top
-level or inside a nested `request` object:
+level or inside a nested `request`, `httpRequest`, `http_request`, or `http`
+object:
 
 ```json
 {"id":"req-1","label":"normal","source_ip":"10.0.0.10","method":"GET","path":"/api/products","user_agent":"Mozilla/5.0","request_count":3}
 {"id":"req-2","label":"suspicious","request":{"client_ip":"10.0.0.66","http_method":"POST","endpoint":"/.env","ua":"curl/8.0","payload_indicators":["path-traversal","sql-like"],"destination_port":443}}
+{"request_id":"req-3","decision":"redirected","httpRequest":{"remote_addr":"203.0.113.10","request_method":"GET","url":"https://target.example/.env?debug=true","headers":{"User-Agent":"sqlmap/1.8"},"tags":["sql-like","encoded"],"query_string":"debug=true","destinationPort":443}}
 ```
 
-Supported labels are `normal`, `benign`, `allow`, `allowed`, `false_positive`,
-or `0` for normal traffic, and `suspicious`, `malicious`, `attack`, `monitor`,
-`redirect_to_decoy`, `false_negative`, `true_positive`, or `1` for suspicious
-traffic.
+Supported label fields are `label`, `analyst_label`, `class`, `decision`,
+`outcome`, `verdict`, and `classification`. Supported normal labels include
+`normal`, `benign`, `allow`, `allowed`, `clean`, `ok`, `pass`,
+`false_positive`, and `0`. Supported suspicious labels include `suspicious`,
+`malicious`, `attack`, `monitor`, `redirect_to_decoy`, `redirected`, `blocked`,
+`denied`, `decoy`, `threat`, `false_negative`, `true_positive`, and `1`.
+
+Common field aliases are accepted to reduce preprocessing:
+
+| MIRAGE field | Accepted aliases |
+| --- | --- |
+| Source IP | `ip_address`, `source_ip`, `client_ip`, `src_ip`, `remote_addr`, `remoteAddress`, `clientIp` |
+| Method | `method`, `http_method`, `httpMethod`, `request_method` |
+| Path | `path`, `endpoint`, `url_path`, `route`, `uri`, `url`, `request_uri` |
+| User agent | `user_agent`, `userAgent`, `ua`, `user-agent`, or `headers.User-Agent` |
+| Request count | `request_count`, `source_request_count`, `count`, `hits` |
+| Payload indicators | `payload_indicators`, `indicators`, `signals`, `tags` |
+| Payload excerpt | `payload_excerpt`, `body_excerpt`, `request_body`, `body`, `payload`, `query`, `query_string` |
 
 Prepare a split with the same production feature extractor used by the gateway:
 

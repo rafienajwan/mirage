@@ -11,6 +11,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Literal
+from urllib.parse import urlsplit
 
 from app.schemas.request import InspectRequest
 from app.services.feature_extraction import FEATURE_NAMES, FeatureVector, extract_features
@@ -174,6 +175,9 @@ API_LOG_LABELS = {
     "benign": 0,
     "allow": 0,
     "allowed": 0,
+    "clean": 0,
+    "ok": 0,
+    "pass": 0,
     "false_positive": 0,
     "1": 1,
     "suspicious": 1,
@@ -183,7 +187,23 @@ API_LOG_LABELS = {
     "redirect_to_decoy": 1,
     "false_negative": 1,
     "true_positive": 1,
+    "deny": 1,
+    "denied": 1,
+    "blocked": 1,
+    "redirected": 1,
+    "decoy": 1,
+    "threat": 1,
 }
+
+API_LOG_LABEL_FIELDS = (
+    "label",
+    "analyst_label",
+    "class",
+    "decision",
+    "outcome",
+    "verdict",
+    "classification",
+)
 
 
 def _label_from_api_log(value: object, *, line_number: int) -> int:
@@ -206,6 +226,53 @@ def _first_object_value(record: dict, *names: str) -> object:
         if value not in (None, ""):
             return value
     return None
+
+
+def _headers_value(record: dict, *names: str) -> object:
+    headers = record.get("headers")
+    if not isinstance(headers, dict):
+        return None
+
+    normalized_headers = {str(key).lower(): value for key, value in headers.items()}
+    for name in names:
+        value = normalized_headers.get(name.lower())
+        if value not in (None, ""):
+            return value
+    return None
+
+
+def _request_object(record: dict) -> dict:
+    for name in ("request", "http_request", "httpRequest", "http"):
+        value = record.get(name)
+        if isinstance(value, dict):
+            return value
+    return record
+
+
+def _path_from_value(value: object) -> str:
+    if value in (None, ""):
+        return ""
+    raw_path = str(value)
+    parsed = urlsplit(raw_path)
+    if parsed.scheme and parsed.netloc:
+        return parsed.path or "/"
+    if "?" in raw_path:
+        return raw_path.split("?", 1)[0] or "/"
+    return raw_path
+
+
+def _payload_excerpt(request_data: dict) -> str:
+    value = _first_object_value(
+        request_data,
+        "payload_excerpt",
+        "body_excerpt",
+        "request_body",
+        "body",
+        "payload",
+        "query",
+        "query_string",
+    )
+    return str(value or "")[:4096]
 
 
 def _api_payload_indicators(value: object, *, line_number: int) -> list[str]:
@@ -239,36 +306,119 @@ def _optional_int(value: object) -> int | None:
 
 
 def _api_log_request(record: dict, *, line_number: int) -> InspectRequest:
-    request = record.get("request")
-    request_data = request if isinstance(request, dict) else record
+    request_data = _request_object(record)
+    user_agent = _first_object_value(
+        request_data,
+        "user_agent",
+        "userAgent",
+        "ua",
+        "user-agent",
+    ) or _headers_value(request_data, "user-agent")
     try:
         return InspectRequest(
             ip_address=str(
-                _first_object_value(request_data, "ip_address", "source_ip", "client_ip")
+                _first_object_value(
+                    request_data,
+                    "ip_address",
+                    "source_ip",
+                    "client_ip",
+                    "src_ip",
+                    "remote_addr",
+                    "remoteAddress",
+                    "clientIp",
+                )
                 or ""
             ),
-            method=str(_first_object_value(request_data, "method", "http_method") or ""),
-            path=str(
-                _first_object_value(request_data, "path", "endpoint", "url_path") or ""
+            method=str(
+                _first_object_value(
+                    request_data,
+                    "method",
+                    "http_method",
+                    "httpMethod",
+                    "request_method",
+                )
+                or ""
             ),
-            user_agent=str(
-                _first_object_value(request_data, "user_agent", "userAgent", "ua") or ""
+            path=_path_from_value(
+                _first_object_value(
+                    request_data,
+                    "path",
+                    "endpoint",
+                    "url_path",
+                    "route",
+                    "uri",
+                    "url",
+                    "request_uri",
+                )
             ),
-            request_count=_optional_int(request_data.get("request_count")) or 1,
+            user_agent=str(user_agent or ""),
+            request_count=_optional_int(
+                _first_object_value(
+                    request_data,
+                    "request_count",
+                    "source_request_count",
+                    "count",
+                    "hits",
+                )
+            )
+            or 1,
             payload_indicators=_api_payload_indicators(
-                request_data.get("payload_indicators"),
+                _first_object_value(
+                    request_data,
+                    "payload_indicators",
+                    "indicators",
+                    "signals",
+                    "tags",
+                ),
                 line_number=line_number,
             ),
-            payload_excerpt=str(request_data.get("payload_excerpt") or ""),
+            payload_excerpt=_payload_excerpt(request_data),
             timestamp=request_data.get("timestamp"),
-            flow_duration_ms=_optional_float(request_data.get("flow_duration_ms")),
-            flow_packets_per_second=_optional_float(
-                request_data.get("flow_packets_per_second")
+            flow_duration_ms=_optional_float(
+                _first_object_value(
+                    request_data,
+                    "flow_duration_ms",
+                    "duration_ms",
+                    "durationMs",
+                    "latency_ms",
+                )
             ),
-            packet_length_mean=_optional_float(request_data.get("packet_length_mean")),
-            syn_flag_count=_optional_int(request_data.get("syn_flag_count")),
-            destination_port=_optional_int(request_data.get("destination_port")),
-            average_packet_size=_optional_float(request_data.get("average_packet_size")),
+            flow_packets_per_second=_optional_float(
+                _first_object_value(
+                    request_data,
+                    "flow_packets_per_second",
+                    "flowPacketsPerSecond",
+                    "packets_per_second",
+                )
+            ),
+            packet_length_mean=_optional_float(
+                _first_object_value(
+                    request_data,
+                    "packet_length_mean",
+                    "packetLengthMean",
+                    "avg_packet_length",
+                )
+            ),
+            syn_flag_count=_optional_int(
+                _first_object_value(request_data, "syn_flag_count", "synFlagCount")
+            ),
+            destination_port=_optional_int(
+                _first_object_value(
+                    request_data,
+                    "destination_port",
+                    "destinationPort",
+                    "dst_port",
+                    "port",
+                )
+            ),
+            average_packet_size=_optional_float(
+                _first_object_value(
+                    request_data,
+                    "average_packet_size",
+                    "averagePacketSize",
+                    "avg_packet_size",
+                )
+            ),
         )
     except ValueError as exc:
         raise DatasetValidationError(
@@ -295,7 +445,7 @@ def load_api_log_jsonl(path: Path) -> list[PreparedTrainingRow]:
                 )
 
             label = _label_from_api_log(
-                _first_object_value(record, "label", "analyst_label", "class"),
+                _first_object_value(record, *API_LOG_LABEL_FIELDS),
                 line_number=line_number,
             )
             request = _api_log_request(record, line_number=line_number)
