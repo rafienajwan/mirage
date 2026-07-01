@@ -52,6 +52,7 @@ export default function VideoBackground() {
         muted
         loop
         playsInline
+        suppressHydrationWarning
         className="w-full h-full object-cover opacity-45 blur-[3px] scale-105"
       />
 
