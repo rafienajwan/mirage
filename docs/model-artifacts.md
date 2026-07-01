@@ -161,6 +161,40 @@ The artifact review returned `shadow_ready: true` with no blockers or warnings.
 This supports shadow-mode observation only. It does not justify switching live
 routing from heuristics to model control.
 
+## Smoke-Test Shadow Scoring
+
+Use the smoke script to verify a local artifact can be loaded by the gateway
+scoring path, attached to inspected events, and summarized without writing to
+the configured database:
+
+```bash
+cd apps/gateway
+python scripts/smoke_ml_shadow.py \
+  --artifact artifacts/cicids2017-ddos-risk-model.joblib \
+  --memory-store \
+  --monitor-threshold 0.35 \
+  --redirect-threshold 0.65
+```
+
+The command exits with code `1` when the artifact is not `shadow_ready` or when
+the smoke requests do not produce shadow-scored events.
+
+Current local smoke result for the reviewed CICIDS2017 DDoS artifact:
+
+| Signal | Value |
+| --- | ---: |
+| Artifact mode | `shadow_ready` |
+| Shadow events | 2 |
+| Agreements | 1 |
+| Disagreements | 1 |
+| Agreement rate | 0.5 |
+| Average probability | 0.27 |
+
+The disagreement is expected for this smoke run: the heuristic redirects the
+high-risk `/.env` probe, while the CICIDS-trained model scores it as monitor.
+That difference is useful operator evidence that the current artifact should
+remain in shadow mode until runtime API-domain data is collected and reviewed.
+
 ## Retrain From Analyst Labels
 
 After enough dashboard events have analyst labels and feature vectors, the

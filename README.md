@@ -19,8 +19,8 @@ capabilities remain proposal targets. See
 - SQLite development storage and PostgreSQL/Alembic support;
 - dashboard metrics, events, alerts, traffic history, and simulation controls;
 - ML-ready feature vectors, optional ML shadow scoring, and an offline Random Forest training pipeline;
-- a locally reviewed CICIDS2017 DDoS split that can produce a shadow-ready
-  Random Forest artifact;
+- a locally reviewed CICIDS2017 DDoS split, shadow-ready Random Forest artifact,
+  and repeatable ML shadow smoke test;
 - analyst event labels for future training data curation;
 - JSONL export and readiness checks for analyst-labeled training records;
 - dataset preparation adapters for MIRAGE JSONL, custom API-log JSONL, and CICIDS-style CSV sources;
@@ -321,8 +321,8 @@ infra/
 ## Next Priorities
 
 1. Expand CICIDS2017 and custom API-log adapters with reviewed real datasets.
-2. Run the reviewed CICIDS2017 DDoS artifact in shadow mode against live local
-   traffic and inspect agreement/disagreement.
+2. Run longer shadow-mode observation against live local traffic and inspect
+   agreement/disagreement trends.
 3. Add reviewed custom API-log datasets so model training matches the protected
    API domain more closely.
 4. Expand WebSocket streaming beyond events/alerts and harden deployment auth.
