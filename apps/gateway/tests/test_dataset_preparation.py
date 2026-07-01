@@ -108,6 +108,55 @@ def test_load_api_log_jsonl_extracts_request_features(tmp_path):
     assert rows[1].features["destination_port"] == 443.0
 
 
+def test_load_api_log_jsonl_accepts_access_log_aliases(tmp_path):
+    source = tmp_path / "api_logs.jsonl"
+    _write_jsonl(
+        source,
+        [
+            {
+                "request_id": "access-1",
+                "decision": "redirected",
+                "httpRequest": {
+                    "remote_addr": "203.0.113.10",
+                    "request_method": "GET",
+                    "url": "https://target.example/.env?debug=true",
+                    "headers": {"User-Agent": "sqlmap/1.8"},
+                    "hits": "42",
+                    "tags": ["sql-like", "encoded"],
+                    "query_string": "debug=true",
+                    "durationMs": "250",
+                    "flowPacketsPerSecond": "120.5",
+                    "packetLengthMean": "512",
+                    "synFlagCount": "8",
+                    "destinationPort": "443",
+                    "averagePacketSize": "640",
+                },
+            },
+            {
+                "id": "access-2",
+                "outcome": "clean",
+                "http": {
+                    "clientIp": "203.0.113.11",
+                    "httpMethod": "GET",
+                    "uri": "/api/products?page=1",
+                    "headers": {"user-agent": "Mozilla/5.0"},
+                },
+            },
+        ],
+    )
+
+    rows = load_api_log_jsonl(source)
+
+    assert [row.label for row in rows] == [1, 0]
+    assert rows[0].record_id == "access-1"
+    assert rows[0].features["sensitive_path"] == 1.0
+    assert rows[0].features["suspicious_user_agent"] == 1.0
+    assert rows[0].features["high_risk_indicator_count"] == 1.0
+    assert rows[0].features["medium_risk_indicator_count"] == 1.0
+    assert rows[0].features["destination_port"] == 443.0
+    assert rows[1].features["path_depth"] == 2.0
+
+
 def test_load_api_log_jsonl_rejects_unknown_label(tmp_path):
     source = tmp_path / "api_logs.jsonl"
     _write_jsonl(
