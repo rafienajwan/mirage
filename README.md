@@ -196,6 +196,7 @@ All paths below use the `http://localhost:8000` base URL.
 | `GET /api/v1/dashboard/training-data/summary` | API key | Check labeled row counts and class balance before training |
 | `POST /api/v1/dashboard/training-data/retrain` | API key | Train a local shadow-mode candidate artifact from analyst labels |
 | `GET /api/v1/dashboard/ml-shadow/status` | Public | Report sanitized ML shadow artifact readiness |
+| `GET /api/v1/dashboard/ml-shadow/summary` | Public | Summarize recent model-only agreement with live routing |
 | `GET /api/v1/dashboard/honeytokens` | Public | Show recent decoy credential interactions |
 | `GET /api/v1/dashboard/actors` | Public | Show recent actor profiles grouped by threat fingerprint |
 | `GET /api/v1/dashboard/actor-clusters` | Public | Show lightweight actor clusters for triage |
