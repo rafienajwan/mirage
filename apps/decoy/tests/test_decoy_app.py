@@ -37,6 +37,7 @@ def test_decoy_service_issues_actor_token_from_gateway_context():
     assert first_body["access_token"] != other.json()["access_token"]
     assert first_body["mirage_decoy"]["variant"] == "high_interaction"
     assert first_body["mirage_assignment"]["mode"] == "per_actor"
+    assert first_body["mirage_assignment"]["rotation_epoch"] == "v1"
 
 
 def test_decoy_env_response_uses_actor_service_canary():
