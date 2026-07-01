@@ -10,8 +10,8 @@ import ActorTriagePanel from "@/components/dashboard/ActorTriagePanel";
 import DecoyStatusCard from "@/components/dashboard/DecoyStatusCard";
 import AlertPanel from "@/components/dashboard/AlertPanel";
 import SimulationPanel from "@/components/dashboard/SimulationPanel";
-import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchHoneytokens, fetchActorProfiles, fetchActorClusters, fetchActorCases, fetchActorCaseWorkflows, openActorCase, updateActorCase, labelEvent, downloadTrainingData, runRetraining, mapDashboardAlert, mapDashboardEvent } from "@/lib/api";
-import type { ActorCaseSummary, ActorCaseWorkflow, ActorCaseWorkflowSummary, ActorClusterSummary, ActorProfileSummary, AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, HoneytokenSummary, RetrainingRun, DashboardStreamMessage } from "@/lib/api";
+import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchMLShadowSummary, fetchHoneytokens, fetchActorProfiles, fetchActorClusters, fetchActorCases, fetchActorCaseWorkflows, openActorCase, updateActorCase, labelEvent, downloadTrainingData, runRetraining, mapDashboardAlert, mapDashboardEvent } from "@/lib/api";
+import type { ActorCaseSummary, ActorCaseWorkflow, ActorCaseWorkflowSummary, ActorClusterSummary, ActorProfileSummary, AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, MLShadowSummaryData, HoneytokenSummary, RetrainingRun, DashboardStreamMessage } from "@/lib/api";
 import { Globe, ShieldAlert, ArrowRightLeft, Bell, BrainCircuit, Database, Download, KeyRound, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -106,6 +106,7 @@ export default function DashboardPage() {
   const [decoyStatus, setDecoyStatus] = useState<DecoyStatusData | null>(null);
   const [trainingSummary, setTrainingSummary] = useState<TrainingDataSummary | null>(null);
   const [mlShadowStatus, setMlShadowStatus] = useState<MLShadowStatusData | null>(null);
+  const [mlShadowSummary, setMlShadowSummary] = useState<MLShadowSummaryData | null>(null);
   const [honeytokens, setHoneytokens] = useState<HoneytokenSummary | null>(null);
   const [actorProfiles, setActorProfiles] = useState<ActorProfileSummary | null>(null);
   const [actorClusters, setActorClusters] = useState<ActorClusterSummary | null>(null);
@@ -273,7 +274,7 @@ export default function DashboardPage() {
 
   const load = useCallback(async () => {
     try {
-      const [ov, ev, al, tr, rh, ds, ts, ms, ht, ap, ac, cases, workflows] = await Promise.all([
+      const [ov, ev, al, tr, rh, ds, ts, ms, mss, ht, ap, ac, cases, workflows] = await Promise.all([
         fetchOverview(),
         fetchEvents(),
         fetchAlerts(),
@@ -282,6 +283,7 @@ export default function DashboardPage() {
         fetchDecoyStatus(),
         fetchTrainingDataSummary().catch(() => null),
         fetchMLShadowStatus().catch(() => null),
+        fetchMLShadowSummary().catch(() => null),
         fetchHoneytokens().catch(() => null),
         fetchActorProfiles().catch(() => null),
         fetchActorClusters().catch(() => null),
@@ -296,6 +298,7 @@ export default function DashboardPage() {
       setDecoyStatus(ds);
       setTrainingSummary(ts);
       setMlShadowStatus(ms);
+      setMlShadowSummary(mss);
       setHoneytokens(ht);
       setActorProfiles(ap);
       setActorClusters(ac);
@@ -370,6 +373,9 @@ export default function DashboardPage() {
   const mlShadowDetail = mlShadowStatus?.artifact
     ? `${mlShadowStatus.artifact} | monitor ${mlShadowStatus.monitorThreshold} / redirect ${mlShadowStatus.redirectThreshold}`
     : "heuristic routing only";
+  const mlShadowObservation = mlShadowSummary?.shadowEvents
+    ? `${Math.round(mlShadowSummary.agreementRate * 100)}% agree over ${mlShadowSummary.shadowEvents} events | avg score ${mlShadowSummary.averageScore.toFixed(1)}`
+    : "no shadow observations yet";
   const latestHoneytoken = honeytokens?.hits[0];
   const honeytokenLabel = honeytokens?.totalHits
     ? `HONEYTOKEN HITS: ${honeytokens.totalHits}`
@@ -411,7 +417,7 @@ export default function DashboardPage() {
             </div>
 
             <div
-              title={`Model status: ${mlShadowLabel}; ${mlShadowDetail}`}
+              title={`Model status: ${mlShadowLabel}; ${mlShadowDetail}; ${mlShadowObservation}`}
               className={`flex items-center gap-2 px-3 py-2 rounded border text-[10px] font-mono tracking-widest ${
                 mlShadowStatus?.mode === "shadow_ready"
                   ? "border-brand-cyan/30 bg-brand-cyan/10 text-brand-cyan"
@@ -423,7 +429,7 @@ export default function DashboardPage() {
               <BrainCircuit className="w-3.5 h-3.5 shrink-0" />
               <span>{mlShadowLabel}</span>
               <span className="hidden xl:inline text-white/35">
-                {mlShadowDetail}
+                {mlShadowObservation}
               </span>
             </div>
 

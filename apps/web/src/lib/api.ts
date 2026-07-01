@@ -89,6 +89,24 @@ interface BackendMLShadowStatus {
   warnings: string[];
 }
 
+interface BackendMLShadowDecisionBreakdown {
+  allow: number;
+  monitor: number;
+  redirect_to_decoy: number;
+}
+
+interface BackendMLShadowSummary {
+  inspected_events: number;
+  shadow_events: number;
+  agreements: number;
+  disagreements: number;
+  agreement_rate: number;
+  average_probability: number;
+  average_score: number;
+  live_decisions: BackendMLShadowDecisionBreakdown;
+  shadow_decisions: BackendMLShadowDecisionBreakdown;
+}
+
 interface BackendRetrainingRun {
   artifact_path: string;
   training_summary: BackendTrainingDataSummary;
@@ -296,6 +314,24 @@ export interface MLShadowStatusData {
   metrics: Record<string, number>;
   blockers: string[];
   warnings: string[];
+}
+
+export interface MLShadowDecisionBreakdown {
+  allow: number;
+  monitor: number;
+  redirectToDecoy: number;
+}
+
+export interface MLShadowSummaryData {
+  inspectedEvents: number;
+  shadowEvents: number;
+  agreements: number;
+  disagreements: number;
+  agreementRate: number;
+  averageProbability: number;
+  averageScore: number;
+  liveDecisions: MLShadowDecisionBreakdown;
+  shadowDecisions: MLShadowDecisionBreakdown;
 }
 
 export interface RetrainingRun {
@@ -614,6 +650,32 @@ export async function fetchMLShadowStatus(): Promise<MLShadowStatusData> {
     metrics: data.metrics,
     blockers: data.blockers,
     warnings: data.warnings,
+  };
+}
+
+function mapMLShadowBreakdown(
+  data: BackendMLShadowDecisionBreakdown,
+): MLShadowDecisionBreakdown {
+  return {
+    allow: data.allow,
+    monitor: data.monitor,
+    redirectToDecoy: data.redirect_to_decoy,
+  };
+}
+
+/** Fetch recent model-only shadow scoring agreement summary. */
+export async function fetchMLShadowSummary(): Promise<MLShadowSummaryData> {
+  const data = await apiFetch<BackendMLShadowSummary>("/dashboard/ml-shadow/summary");
+  return {
+    inspectedEvents: data.inspected_events,
+    shadowEvents: data.shadow_events,
+    agreements: data.agreements,
+    disagreements: data.disagreements,
+    agreementRate: data.agreement_rate,
+    averageProbability: data.average_probability,
+    averageScore: data.average_score,
+    liveDecisions: mapMLShadowBreakdown(data.live_decisions),
+    shadowDecisions: mapMLShadowBreakdown(data.shadow_decisions),
   };
 }
 
