@@ -40,6 +40,7 @@ appropriate example and this reference in the same change.
 | `DECOY_LOGIN_TOKEN` | Yes | Gateway and decoy | Synthetic login token shown in decoy data |
 | `DECOY_OAUTH_TOKEN` | Yes | Gateway and decoy | Synthetic OAuth token shown in decoy data |
 | `DECOY_SERVICE_TOKEN` | Yes | Gateway and decoy | Synthetic service token shown in decoy data |
+| `DECOY_CANARY_EPOCH` | No | Gateway and decoy | Rotation epoch used when issuing deterministic per-actor canary tokens |
 | `DECOY_DATABASE_URL` | Yes | Gateway and decoy | Synthetic database location shown in decoy data |
 
 `DATABASE_URL` must use the `postgresql+asyncpg` driver and Docker host `db`.
@@ -50,6 +51,11 @@ All `DECOY_*` values are attacker-facing demo material. They must never be valid
 credentials or locations for a real environment.
 If a later request reuses a configured `DECOY_*` value, MIRAGE records a
 honeytoken hit and raises a critical alert.
+
+`DECOY_CANARY_EPOCH` lets operators rotate newly issued per-actor canary tokens
+without changing the token detector. Increase it, for example from `v1` to
+`v2`, and restart gateway/decoy services to issue a new deterministic token set.
+Previously issued canary-shaped tokens are still detected as honeytoken use.
 
 `MIRAGE_MODEL_ARTIFACT` is optional. When it is empty or points to a missing
 artifact, runtime routing remains fully heuristic and events store no ML shadow

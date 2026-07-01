@@ -60,6 +60,7 @@ docker compose --env-file .env -f infra/docker-compose.yml down
 - Proxy coverage is limited to `/api/v1/proxy/*`.
 - Routing is heuristic rather than model-driven.
 - Decoy payloads are synthetic and can issue deterministic per-actor canary
-  tokens; token rotation and assignment lifecycle controls are still pending.
+  tokens with epoch-based rotation; persistent assignment and revoke controls
+  are still pending.
 - Aggregate dashboard metrics are polled; event and alert updates can stream
   over WebSocket when configured.

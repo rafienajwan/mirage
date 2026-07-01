@@ -41,6 +41,7 @@ Open `http://localhost:8000/docs` for the generated API reference.
 | `MIRAGE_MODEL_ARTIFACT` | Optional trained artifact path for shadow scoring |
 | `ML_SHADOW_*` | Model-only thresholds; live routing remains heuristic |
 | `DECOY_*` | Synthetic values only; never real credentials |
+| `DECOY_CANARY_EPOCH` | Rotation epoch for newly issued per-actor canary tokens |
 
 Docker Compose requires `MIRAGE_API_KEY`; standalone development permits it to
 be empty. Send protected requests with `X-Mirage-API-Key`.
@@ -132,7 +133,7 @@ rows for stratified splitting.
 - proxy coverage is limited to `/api/v1/proxy/*`;
 - no trained artifact participates in live decisions;
 - actor profiles are persisted as aggregates and grouped into lightweight
-  dashboard clusters with assigned case workflows; multi-analyst queues, token
-  rotation, and assignment lifecycle controls are not implemented;
+  dashboard clusters with assigned case workflows; multi-analyst queues,
+  persistent canary assignment records, and revoke controls are not implemented;
 - WebSocket streaming currently covers events and alerts; aggregate metrics are
   still polled.

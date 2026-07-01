@@ -20,7 +20,7 @@ the beginning of a real ML pipeline.
 | Threat fingerprint matching | Partial | Stable request fingerprints, persistent actor profiles, lightweight triage clusters, and assigned case workflows exist; trained clustering does not. |
 | Automated real/decoy routing | Implemented for demo | The proxy routes to separate real-app and decoy services using the live decision engine. |
 | Fake endpoints and fake data | Implemented for demo | The isolated decoy service exposes static, synthetic responses without real secrets. |
-| Honeytoken detection | Partial | Configured decoy credential use and per-actor canary tokens are detected, stored, alerted, and shown on the dashboard; rotation is pending. |
+| Honeytoken detection | Partial | Configured decoy credential use and per-actor canary tokens are detected, stored, alerted, and shown on the dashboard; newly issued canaries can rotate by epoch, but persistent assignment and revoke controls are pending. |
 | PostgreSQL/Supabase storage | Partial | Async PostgreSQL and Alembic are supported for events, alerts, honeytoken hits, and actor profiles; Supabase deployment is pending. |
 | Feature-vector storage | Implemented | Request and optional CICIDS-style flow features are stored with events. |
 | CICIDS2017 dataset | Partial | A basic CICIDS-style CSV adapter and train/test split workflow exist; reviewed raw dataset ingestion, cleaning, and provenance are still pending. |
@@ -28,7 +28,7 @@ the beginning of a real ML pipeline.
 | Precision/recall/F1/FPR evaluation | Implemented | The Random Forest trainer calculates all four metrics. |
 | Real-time WebSocket dashboard | Partial | An authenticated WebSocket stream can push events and alerts; dashboard polling remains as fallback and other metrics still poll. |
 | Security dashboard and alerts | Implemented for demo | Live metrics, events, risk history, decoy status, actor triage, and internal alerts are available. |
-| Adaptive decoy generation | Partial | The in-process decoy API and redirected external decoy service select variants and issue per-actor synthetic canary tokens; long-lived assignment lifecycle controls are pending. |
+| Adaptive decoy generation | Partial | The in-process decoy API and redirected external decoy service select variants and issue epoch-rotatable per-actor synthetic canary tokens; long-lived assignment lifecycle controls are pending. |
 | Docker Compose | Configuration implemented | Compose, health checks, and Dockerfiles exist; image build still needs verification with Docker Desktop running. |
 | Vercel/Railway/Supabase deployment | Not implemented | No verified online deployment configuration is present. |
 
@@ -44,7 +44,8 @@ The current demo can accurately claim that MIRAGE:
 - can store model-only shadow scores beside events when a reviewed artifact is configured;
 - can review trained artifacts for feature-contract and metric readiness before shadow mode;
 - records and alerts on configured and per-actor issued decoy credential reuse as honeytoken hits;
-- generates adaptive decoy responses with synthetic per-actor canary tokens;
+- generates adaptive decoy responses with epoch-rotatable synthetic per-actor
+  canary tokens;
 - persists actor profiles from fingerprints, events, and honeytoken hits;
 - groups actor profiles into lightweight dashboard triage clusters;
 - recommends, assigns, filters, and persists investigation case workflows from actor clusters;
@@ -56,6 +57,6 @@ The current demo can accurately claim that MIRAGE:
 - can train and evaluate a Random Forest model from labeled feature records.
 
 It should not yet claim arbitrary ingress interception, a production ML model,
-trained actor clustering, multi-analyst queues, token rotation, assignment
-lifecycle controls, full dashboard streaming, or deployed Supabase/Railway/Vercel
-infrastructure.
+trained actor clustering, multi-analyst queues, persistent token assignment
+records, revoke workflows, full dashboard streaming, or deployed
+Supabase/Railway/Vercel infrastructure.
