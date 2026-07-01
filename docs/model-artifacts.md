@@ -72,6 +72,95 @@ The default thresholds are intentionally modest for local prototypes. For a
 real demonstration or deployment, raise them and review dataset provenance,
 holdout behavior, label quality, and false-positive tradeoffs manually.
 
+## Local CICIDS2017 DDoS Review
+
+A local ignored CICIDS2017 DDoS split has been reviewed and used to train a
+shadow-ready artifact. The raw CSV files, prepared split, and `.joblib` artifact
+remain ignored local files and should not be committed.
+
+Dataset review:
+
+```bash
+cd apps/gateway
+python scripts/review_dataset.py \
+  --manifest data/prepared/cicids2017-ddos-v1/manifest.json \
+  --min-total-rows 20 \
+  --min-train-rows 15 \
+  --min-test-rows 5
+```
+
+Review result:
+
+| Metric | Value |
+| --- | ---: |
+| Total rows | 225745 |
+| Train rows | 169308 |
+| Test rows | 56437 |
+| Normal rows | 97718 |
+| Suspicious rows | 128027 |
+| Blockers | 0 |
+| Warnings | 0 |
+
+Training command:
+
+```bash
+python scripts/train_model.py \
+  --input data/prepared/cicids2017-ddos-v1/train.jsonl \
+  --output artifacts/cicids2017-ddos-risk-model.joblib
+```
+
+Internal training-script validation:
+
+| Metric | Value |
+| --- | ---: |
+| Precision | 0.9994169581875729 |
+| Recall | 0.9997083940845657 |
+| F1 score | 0.9995626548930587 |
+| False-positive rate | 0.0007641087217552669 |
+| Training rows | 126981 |
+| Test rows | 42327 |
+
+Holdout evaluation command:
+
+```bash
+python scripts/evaluate_model_artifact.py \
+  --artifact artifacts/cicids2017-ddos-risk-model.joblib \
+  --input data/prepared/cicids2017-ddos-v1/test.jsonl \
+  --min-precision 0.9 \
+  --min-recall 0.9 \
+  --min-f1-score 0.9 \
+  --max-false-positive-rate 0.05 \
+  --min-rows 1000
+```
+
+Holdout evaluation:
+
+| Metric | Value |
+| --- | ---: |
+| Evaluated rows | 56437 |
+| Precision | 0.9993752342871424 |
+| Recall | 0.9995313525166369 |
+| F1 score | 0.9994532873053312 |
+| False-positive rate | 0.0008186655751125665 |
+| Blockers | 0 |
+
+Artifact review command:
+
+```bash
+python scripts/review_model_artifact.py \
+  --artifact artifacts/cicids2017-ddos-risk-model.joblib \
+  --min-precision 0.9 \
+  --min-recall 0.9 \
+  --min-f1-score 0.9 \
+  --max-false-positive-rate 0.05 \
+  --min-training-rows 1000 \
+  --min-test-rows 1000
+```
+
+The artifact review returned `shadow_ready: true` with no blockers or warnings.
+This supports shadow-mode observation only. It does not justify switching live
+routing from heuristics to model control.
+
 ## Retrain From Analyst Labels
 
 After enough dashboard events have analyst labels and feature vectors, the

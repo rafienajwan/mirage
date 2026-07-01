@@ -19,6 +19,8 @@ capabilities remain proposal targets. See
 - SQLite development storage and PostgreSQL/Alembic support;
 - dashboard metrics, events, alerts, traffic history, and simulation controls;
 - ML-ready feature vectors, optional ML shadow scoring, and an offline Random Forest training pipeline;
+- a locally reviewed CICIDS2017 DDoS split that can produce a shadow-ready
+  Random Forest artifact;
 - analyst event labels for future training data curation;
 - JSONL export and readiness checks for analyst-labeled training records;
 - dataset preparation adapters for MIRAGE JSONL, custom API-log JSONL, and CICIDS-style CSV sources;
@@ -36,7 +38,8 @@ capabilities remain proposal targets. See
   controls are not implemented.
 - Dashboard updates use HTTP polling with an optional authenticated WebSocket
   stream for event and alert updates.
-- Docker image builds and cloud deployment are not yet verified in CI.
+- Docker image builds are locally verified; cloud deployment is not yet
+  verified in CI.
 
 ## Architecture
 
@@ -98,7 +101,8 @@ docker compose --env-file .env -f infra/docker-compose.yml up --build
 
 Open:
 
-- dashboard: `http://localhost:3000/dashboard`;
+- dashboard: `http://localhost:3000/dashboard` by default, or the port set in
+  `WEB_PORT`;
 - gateway docs: `http://localhost:8000/docs`;
 - gateway health: `http://localhost:8000/health`.
 
@@ -317,13 +321,15 @@ infra/
 ## Next Priorities
 
 1. Expand CICIDS2017 and custom API-log adapters with reviewed real datasets.
-2. Train the first reviewed model from prepared JSONL splits.
-3. Observe reviewed models in shadow mode before changing routing decisions.
+2. Run the reviewed CICIDS2017 DDoS artifact in shadow mode against live local
+   traffic and inspect agreement/disagreement.
+3. Add reviewed custom API-log datasets so model training matches the protected
+   API domain more closely.
 4. Expand WebSocket streaming beyond events/alerts and harden deployment auth.
 5. Expand case-management workflow queues and analyst collaboration.
 6. Add persistent canary assignment records, revoke controls, and lifecycle
    audit trails.
-7. Verify Docker image builds and deploy the stack.
+7. Deploy the stack to managed infrastructure and verify production env wiring.
 
 ## License
 
