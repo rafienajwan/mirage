@@ -88,6 +88,9 @@ class Settings:
             "DECOY_SERVICE_TOKEN", "DECOY_SERVICE_TOKEN_NOT_CONFIGURED"
         )
     )
+    decoy_canary_epoch: str = field(
+        default_factory=lambda: os.getenv("DECOY_CANARY_EPOCH", "v1")
+    )
     decoy_database_url: str = field(
         default_factory=lambda: os.getenv(
             "DECOY_DATABASE_URL", "postgresql://db:5432/decoy"

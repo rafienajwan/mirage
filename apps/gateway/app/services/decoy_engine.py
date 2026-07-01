@@ -111,7 +111,8 @@ def _variant_for(decoy_type: str, risk_score: float | None) -> str:
 
 
 def _assigned_token(actor_hint: str, token_kind: str) -> str:
-    seed = f"{actor_hint}:{token_kind}:{settings.decoy_service_token}"
+    canary_epoch = getattr(settings, "decoy_canary_epoch", "v1")
+    seed = f"{actor_hint}:{token_kind}:{canary_epoch}:{settings.decoy_service_token}"
     digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()[:12]
     return f"mirage-issued-{token_kind}-canary-{digest}"
 
@@ -131,6 +132,7 @@ def _apply_actor_assignment(body: dict, decoy_type: str, actor_hint: str) -> dic
     body["mirage_assignment"] = {
         "mode": "per_actor",
         "tracking": "synthetic_canary",
+        "rotation_epoch": getattr(settings, "decoy_canary_epoch", "v1"),
     }
     return body
 

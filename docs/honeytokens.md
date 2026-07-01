@@ -26,6 +26,11 @@ It also matches issued in-process canary tokens shaped like:
 mirage-issued-{kind}-canary-{assignment}
 ```
 
+Issued tokens are deterministic per actor, token kind, and
+`DECOY_CANARY_EPOCH`. Increase the epoch and restart gateway/decoy services to
+rotate newly issued canaries while retaining detection for older canary-shaped
+values.
+
 The stored hit records token kind and label, masked source IP, path, method,
 event id, and evidence text. It does not store the full token value.
 
@@ -42,5 +47,6 @@ interaction. Honeytoken hits also create critical alerts.
 
 This is still a bounded tracking workflow. The in-process decoy response API and
 the redirected external decoy service can issue deterministic per-actor
-synthetic canary tokens, but token rotation, assignment lifecycle controls, and
-persistent cross-session actor records are still future work.
+synthetic canary tokens with epoch-based rotation, but persistent assignment
+records, explicit revoke lists, and multi-operator lifecycle controls are still
+future work.

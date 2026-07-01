@@ -6,8 +6,8 @@ heuristics, forwards normal traffic to a protected demo app, redirects suspiciou
 traffic to an isolated static decoy, persists security events, and exposes them
 through a polling Next.js dashboard.
 
-The broader adaptive-ML, honeytoken rotation, and cloud-deployment capabilities
-remain proposal targets. See
+The broader adaptive-ML hardening, honeytoken lifecycle, and cloud-deployment
+capabilities remain proposal targets. See
 `docs/PROPOSAL_ALIGNMENT.md` for the exact implementation gap.
 
 ## What Works
@@ -23,7 +23,7 @@ remain proposal targets. See
 - JSONL export and readiness checks for analyst-labeled training records;
 - dataset preparation adapters for MIRAGE JSONL, custom API-log JSONL, and CICIDS-style CSV sources;
 - honeytoken detection for configured decoy credentials;
-- adaptive decoy responses with per-actor synthetic canary tokens;
+- adaptive decoy responses with epoch-rotatable per-actor synthetic canary tokens;
 - persistent actor profiles, lightweight actor clusters, and persisted case triage workflows;
 - Docker Compose configuration for the five-service demo stack.
 
@@ -32,7 +32,8 @@ remain proposal targets. See
 - The gateway only proxies its explicit `/api/v1/proxy/*` route.
 - Runtime routing uses heuristics; trained artifacts can be observed in shadow mode.
 - Decoy payloads are synthetic and can issue deterministic per-actor canary
-  tokens; token rotation and long-lived assignments are not implemented.
+  tokens with epoch-based rotation; persistent assignment records and revoke
+  controls are not implemented.
 - Dashboard updates use HTTP polling with an optional authenticated WebSocket
   stream for event and alert updates.
 - Docker image builds and cloud deployment are not yet verified in CI.
@@ -86,6 +87,8 @@ Fill every variable marked `REQUIRED` in `.env`:
   same user, password, and database configured by `POSTGRES_*`.
 - `MIRAGE_API_KEY` protects operator write endpoints and the dashboard simulation bridge.
 - `DECOY_*` values must be synthetic and invalid on every real system.
+- `DECOY_CANARY_EPOCH` can be increased when rotating newly issued canary
+  tokens.
 
 Then start the stack:
 
@@ -318,7 +321,8 @@ infra/
 3. Observe reviewed models in shadow mode before changing routing decisions.
 4. Expand WebSocket streaming beyond events/alerts and harden deployment auth.
 5. Expand case-management workflow queues and analyst collaboration.
-6. Add token rotation and assignment lifecycle controls.
+6. Add persistent canary assignment records, revoke controls, and lifecycle
+   audit trails.
 7. Verify Docker image builds and deploy the stack.
 
 ## License

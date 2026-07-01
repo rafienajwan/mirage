@@ -13,6 +13,7 @@ app = FastAPI(title="Application API", docs_url=None, redoc_url=None, openapi_ur
 _LOGIN_TOKEN = os.getenv("DECOY_LOGIN_TOKEN", "DECOY_LOGIN_TOKEN_NOT_CONFIGURED")
 _OAUTH_TOKEN = os.getenv("DECOY_OAUTH_TOKEN", "DECOY_OAUTH_TOKEN_NOT_CONFIGURED")
 _SERVICE_TOKEN = os.getenv("DECOY_SERVICE_TOKEN", "DECOY_SERVICE_TOKEN_NOT_CONFIGURED")
+_CANARY_EPOCH = os.getenv("DECOY_CANARY_EPOCH", "v1")
 _DATABASE_URL = os.getenv("DECOY_DATABASE_URL", "postgresql://db:5432/decoy")
 
 
@@ -22,7 +23,7 @@ async def health() -> dict[str, str]:
 
 
 def _assigned_token(actor_hint: str, token_kind: str) -> str:
-    seed = f"{actor_hint}:{token_kind}:{_SERVICE_TOKEN}"
+    seed = f"{actor_hint}:{token_kind}:{_CANARY_EPOCH}:{_SERVICE_TOKEN}"
     digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()[:12]
     return f"mirage-issued-{token_kind}-canary-{digest}"
 
@@ -60,6 +61,7 @@ def _attach_metadata(payload: dict, request: Request, path: str) -> dict:
         payload["mirage_assignment"] = {
             "mode": "per_actor",
             "tracking": "synthetic_canary",
+            "rotation_epoch": _CANARY_EPOCH,
         }
     return payload
 

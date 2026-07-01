@@ -13,6 +13,7 @@ def _settings() -> SimpleNamespace:
         decoy_login_token="mirage-login-canary",
         decoy_oauth_token="mirage-oauth-canary",
         decoy_service_token="mirage-service-canary",
+        decoy_canary_epoch="v1",
         decoy_database_url="postgresql://decoy.invalid/mirage",
     )
 
@@ -41,6 +42,28 @@ def test_decoy_response_assigns_stable_actor_token(monkeypatch):
     assert first.body["token"] == repeat.body["token"]
     assert first.body["token"] != other.body["token"]
     assert first.body["mirage_assignment"]["mode"] == "per_actor"
+    assert first.body["mirage_assignment"]["rotation_epoch"] == "v1"
+
+
+def test_decoy_response_rotates_actor_token_by_epoch(monkeypatch):
+    settings_v1 = _settings()
+    settings_v2 = _settings()
+    settings_v2.decoy_canary_epoch = "v2"
+
+    monkeypatch.setattr(decoy_engine, "settings", settings_v1)
+    first = decoy_engine.generate_decoy_response(
+        "/api/auth/login",
+        actor_hint="actor-alpha",
+    )
+
+    monkeypatch.setattr(decoy_engine, "settings", settings_v2)
+    rotated = decoy_engine.generate_decoy_response(
+        "/api/auth/login",
+        actor_hint="actor-alpha",
+    )
+
+    assert first.body["token"] != rotated.body["token"]
+    assert rotated.body["mirage_assignment"]["rotation_epoch"] == "v2"
 
 
 def test_issued_actor_token_is_detected_as_honeytoken(monkeypatch):
