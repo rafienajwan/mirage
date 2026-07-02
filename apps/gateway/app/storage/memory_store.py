@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from collections import defaultdict
 
 from app.schemas.actor import ActorCase, ActorCaseWorkflow, CaseWorkflowStatus, ActorProfile
+from app.schemas.canary import CanaryAssignment, CanaryAssignmentStatus
 from app.schemas.dashboard import AlertRecord, AlertSeverity
 from app.schemas.decision import Decision
 from app.schemas.event import AnalystLabel, EventRecord
@@ -23,6 +24,7 @@ class MemoryStore:
         self.events: list[EventRecord] = []
         self.alerts: list[AlertRecord] = []
         self.honeytoken_hits: list[HoneytokenHit] = []
+        self.canary_assignments: dict[str, CanaryAssignment] = {}
         self.actor_profiles: dict[str, dict] = {}
         self.actor_cases: dict[str, ActorCaseWorkflow] = {}
         self._alert_counter: int = 0
@@ -106,6 +108,53 @@ class MemoryStore:
 
     async def get_honeytoken_hit_count(self) -> int:
         return len(self.honeytoken_hits)
+
+    async def upsert_canary_assignment(
+        self,
+        assignment: CanaryAssignment,
+    ) -> CanaryAssignment:
+        existing = self.canary_assignments.get(assignment.assignment_id)
+        if existing is not None:
+            updated = existing.model_copy(
+                update={
+                    "decoy_type": assignment.decoy_type,
+                    "source_path": assignment.source_path,
+                    "last_seen_at": assignment.last_seen_at,
+                }
+            )
+            self.canary_assignments[assignment.assignment_id] = updated
+            return updated
+        self.canary_assignments[assignment.assignment_id] = assignment
+        return assignment
+
+    async def get_canary_assignments(
+        self,
+        limit: int = 50,
+        status: CanaryAssignmentStatus | None = None,
+    ) -> list[CanaryAssignment]:
+        assignments = list(self.canary_assignments.values())
+        if status is not None:
+            assignments = [item for item in assignments if item.status == status]
+        assignments.sort(key=lambda item: item.last_seen_at, reverse=True)
+        return assignments[:limit]
+
+    async def revoke_canary_assignment(
+        self,
+        assignment_id: str,
+        reason: str = "",
+    ) -> CanaryAssignment | None:
+        existing = self.canary_assignments.get(assignment_id)
+        if existing is None:
+            return None
+        updated = existing.model_copy(
+            update={
+                "status": "revoked",
+                "revoked_at": datetime.now(timezone.utc),
+                "revoke_reason": reason,
+            }
+        )
+        self.canary_assignments[assignment_id] = updated
+        return updated
 
     async def get_actor_profiles(self, limit: int = 20) -> list[ActorProfile]:
         profiles = [self._profile_to_schema(item) for item in self.actor_profiles.values()]

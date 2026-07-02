@@ -8,7 +8,7 @@ from app.schemas.decision import Decision, InspectResponse
 from app.schemas.request import InspectRequest
 from app.services.anomaly_engine import anomaly_detector
 from app.services.decision_engine import make_decision
-from app.services.decoy_engine import _infer_decoy_type
+from app.services.decoy_engine import infer_decoy_type
 from app.services.feature_extraction import extract_features
 from app.services.fingerprint import generate_fingerprint
 from app.services.honeytoken import detect_honeytokens
@@ -53,7 +53,7 @@ async def inspect_and_log(
     )
 
     decoy_type = (
-        _infer_decoy_type(request.path)
+        infer_decoy_type(request.path)
         if decision == Decision.REDIRECT_TO_DECOY
         else None
     )

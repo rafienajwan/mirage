@@ -72,6 +72,29 @@ class HoneytokenHitModel(Base):
     evidence: Mapped[str] = mapped_column(String(256))
 
 
+class CanaryAssignmentModel(Base):
+    """Persisted synthetic canary assignment without raw token storage."""
+
+    __tablename__ = "canary_assignments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    assignment_id: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    actor_id: Mapped[str] = mapped_column(String(32), index=True)
+    token_kind: Mapped[str] = mapped_column(String(32), index=True)
+    token_label: Mapped[str] = mapped_column(String(128))
+    token_hash: Mapped[str] = mapped_column(String(64), index=True)
+    rotation_epoch: Mapped[str] = mapped_column(String(64), index=True)
+    decoy_type: Mapped[str] = mapped_column(String(32))
+    source_path: Mapped[str] = mapped_column(String(512))
+    status: Mapped[str] = mapped_column(String(16), default="active", index=True)
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    revoke_reason: Mapped[str] = mapped_column(String(240), default="")
+
+
 class ActorProfileModel(Base):
     """Persisted actor aggregate derived from threat fingerprints."""
 
