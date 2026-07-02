@@ -133,7 +133,8 @@ rows for stratified splitting.
 - proxy coverage is limited to `/api/v1/proxy/*`;
 - no trained artifact participates in live decisions;
 - actor profiles are persisted as aggregates and grouped into lightweight
-  dashboard clusters with assigned case workflows; multi-analyst queues,
-  persistent canary assignment records, and revoke controls are not implemented;
+  dashboard clusters with assigned case workflows; issued canary assignment
+  records and revoke controls are available for operator review, but
+  multi-analyst queues are not implemented;
 - WebSocket streaming currently covers events and alerts; aggregate metrics are
   still polled.

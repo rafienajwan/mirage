@@ -28,8 +28,10 @@ simulation, dashboard, and decoy-management routes remain separate APIs.
    `redirect_to_decoy`.
 3. Allowed and monitored requests go to the protected demo app. Redirected
    requests go to the isolated static decoy.
-4. The gateway persists the event, optional alert, and numeric feature vector.
-5. The dashboard reads aggregate and recent data every 10 seconds.
+4. For decoy responses, the gateway records issued canary assignments with
+   hashed token values for later operator review and revoke tracking.
+5. The gateway persists the event, optional alert, and numeric feature vector.
+6. The dashboard reads aggregate and recent data every 10 seconds.
 
 ## Trust Boundaries
 

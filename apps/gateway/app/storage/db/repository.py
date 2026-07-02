@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from sqlalchemy import case, extract, func, select
 
 from app.schemas.actor import ActorCase, ActorCaseWorkflow, CaseWorkflowStatus, ActorProfile
+from app.schemas.canary import CanaryAssignment, CanaryAssignmentStatus
 from app.schemas.dashboard import AlertRecord, AlertSeverity
 from app.schemas.decision import Decision
 from app.schemas.event import AnalystLabel, EventRecord
@@ -21,6 +22,7 @@ from app.storage.db.models import (
     ActorProfileModel,
     ActorCaseModel,
     AlertModel,
+    CanaryAssignmentModel,
     EventModel,
     HoneytokenHitModel,
 )
@@ -281,6 +283,82 @@ class DatabaseStore:
             result = await session.execute(stmt)
             return result.scalar() or 0
 
+    async def upsert_canary_assignment(
+        self,
+        assignment: CanaryAssignment,
+    ) -> CanaryAssignment:
+        async with get_session() as session:
+            result = await session.execute(
+                select(CanaryAssignmentModel).where(
+                    CanaryAssignmentModel.assignment_id == assignment.assignment_id
+                )
+            )
+            row = result.scalar_one_or_none()
+            if row is None:
+                row = CanaryAssignmentModel(
+                    assignment_id=assignment.assignment_id,
+                    actor_id=assignment.actor_id,
+                    token_kind=assignment.token_kind,
+                    token_label=assignment.token_label,
+                    token_hash=assignment.token_hash,
+                    rotation_epoch=assignment.rotation_epoch,
+                    decoy_type=assignment.decoy_type,
+                    source_path=assignment.source_path,
+                    status=assignment.status,
+                    issued_at=assignment.issued_at,
+                    last_seen_at=assignment.last_seen_at,
+                    revoked_at=assignment.revoked_at,
+                    revoke_reason=assignment.revoke_reason,
+                )
+                session.add(row)
+            else:
+                row.decoy_type = assignment.decoy_type
+                row.source_path = assignment.source_path
+                row.last_seen_at = assignment.last_seen_at
+            await session.flush()
+            return self._canary_assignment_from_row(row)
+
+    async def get_canary_assignments(
+        self,
+        limit: int = 50,
+        status: CanaryAssignmentStatus | None = None,
+    ) -> list[CanaryAssignment]:
+        async with get_session() as session:
+            filters = []
+            if status is not None:
+                filters.append(CanaryAssignmentModel.status == status)
+            stmt = (
+                select(CanaryAssignmentModel)
+                .where(*filters)
+                .order_by(CanaryAssignmentModel.last_seen_at.desc())
+                .limit(limit)
+            )
+            result = await session.execute(stmt)
+            return [
+                self._canary_assignment_from_row(row)
+                for row in result.scalars().all()
+            ]
+
+    async def revoke_canary_assignment(
+        self,
+        assignment_id: str,
+        reason: str = "",
+    ) -> CanaryAssignment | None:
+        async with get_session() as session:
+            result = await session.execute(
+                select(CanaryAssignmentModel).where(
+                    CanaryAssignmentModel.assignment_id == assignment_id
+                )
+            )
+            row = result.scalar_one_or_none()
+            if row is None:
+                return None
+            row.status = "revoked"
+            row.revoked_at = datetime.now(timezone.utc)
+            row.revoke_reason = reason
+            await session.flush()
+            return self._canary_assignment_from_row(row)
+
     async def get_actor_profiles(self, limit: int = 20) -> list[ActorProfile]:
         async with get_session() as session:
             stmt = (
@@ -539,6 +617,26 @@ class DatabaseStore:
             top_paths=top_paths,
             last_decision=Decision(row.last_decision),
             status=row.status,
+        )
+
+    def _canary_assignment_from_row(
+        self,
+        row: CanaryAssignmentModel,
+    ) -> CanaryAssignment:
+        return CanaryAssignment(
+            assignment_id=row.assignment_id,
+            actor_id=row.actor_id,
+            token_kind=row.token_kind,
+            token_label=row.token_label,
+            token_hash=row.token_hash,
+            rotation_epoch=row.rotation_epoch,
+            decoy_type=row.decoy_type,
+            source_path=row.source_path,
+            status=row.status,
+            issued_at=row.issued_at,
+            last_seen_at=row.last_seen_at,
+            revoked_at=row.revoked_at,
+            revoke_reason=row.revoke_reason or "",
         )
 
     def _actor_case_from_row(self, row: ActorCaseModel) -> ActorCaseWorkflow:

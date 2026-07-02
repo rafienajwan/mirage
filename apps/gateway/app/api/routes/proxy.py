@@ -8,6 +8,7 @@ from fastapi.responses import Response
 from app.core.config import settings
 from app.schemas.decision import Decision
 from app.schemas.request import InspectRequest
+from app.services.canary_assignments import record_canary_assignments
 from app.services.inspection import inspect_and_log
 from app.services.payload_signals import detect_payload_indicators
 from app.services.proxy_client import forward_request
@@ -72,7 +73,7 @@ async def proxy_request(target_path: str, request: Request) -> Response:
         else None
     )
 
-    return await forward_request(
+    response = await forward_request(
         request,
         upstream_url=upstream_url,
         target_path=target_path,
@@ -80,3 +81,10 @@ async def proxy_request(target_path: str, request: Request) -> Response:
         is_decoy=is_decoy,
         decoy_context=decoy_context,
     )
+    if is_decoy:
+        await record_canary_assignments(
+            actor_hint=inspection.fingerprint_hash,
+            decoy_type=inspection.decoy_type or "auto",
+            source_path=path,
+        )
+    return response

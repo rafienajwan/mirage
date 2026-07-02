@@ -14,6 +14,11 @@ from app.schemas.dashboard import (
     MLShadowStatus,
     TrainingDataSummary,
 )
+from app.schemas.canary import (
+    CanaryAssignmentRevokeRequest,
+    CanaryAssignmentStatus,
+    CanaryAssignmentSummary,
+)
 from app.schemas.actor import (
     ActorCaseOpenRequest,
     ActorCaseUpdateRequest,
@@ -132,6 +137,40 @@ async def dashboard_honeytokens(limit: int = Query(default=20, ge=1, le=100)):
         "total_hits": await store.get_honeytoken_hit_count(),
         "hits": [hit.model_dump(mode="json") for hit in hits],
     }
+
+
+@router.get("/canary-assignments", response_model=CanaryAssignmentSummary)
+async def dashboard_canary_assignments(
+    limit: int = Query(default=50, ge=1, le=200),
+    status_filter: CanaryAssignmentStatus | None = Query(default=None, alias="status"),
+):
+    """Issued synthetic canary assignments for operator review."""
+    assignments = await store.get_canary_assignments(
+        limit=limit,
+        status=status_filter,
+    )
+    return {
+        "total_assignments": len(assignments),
+        "assignments": [item.model_dump(mode="json") for item in assignments],
+    }
+
+
+@router.post(
+    "/canary-assignments/{assignment_id}/revoke",
+    dependencies=[Depends(require_api_key)],
+)
+async def revoke_dashboard_canary_assignment(
+    assignment_id: str,
+    payload: CanaryAssignmentRevokeRequest,
+):
+    """Revoke a persisted synthetic canary assignment."""
+    revoked = await store.revoke_canary_assignment(assignment_id, payload.reason)
+    if revoked is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Canary assignment not found",
+        )
+    return revoked.model_dump(mode="json")
 
 
 @router.get("/actors", response_model=ActorProfileSummary)

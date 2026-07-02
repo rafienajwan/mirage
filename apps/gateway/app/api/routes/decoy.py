@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 
 from app.schemas.dashboard import DecoyResponse, DecoyResponseRequest, DecoyStatus
 from app.services.decoy_engine import generate_decoy_response, FAKE_ENDPOINTS
+from app.services.canary_assignments import record_canary_assignments
 from app.storage import store
 from app.core.security import require_api_key
 
@@ -28,9 +29,15 @@ async def decoy_status():
 )
 async def decoy_respond(request: DecoyResponseRequest):
     """Generate a safe fake response for a suspicious request."""
-    return generate_decoy_response(
+    response = generate_decoy_response(
         path=request.path,
         decoy_type=request.decoy_type,
         actor_hint=request.actor_hint,
         risk_score=request.risk_score,
     )
+    await record_canary_assignments(
+        actor_hint=request.actor_hint,
+        decoy_type=response.decoy_type,
+        source_path=request.path,
+    )
+    return response

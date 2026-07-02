@@ -31,6 +31,12 @@ Issued tokens are deterministic per actor, token kind, and
 rotate newly issued canaries while retaining detection for older canary-shaped
 values.
 
+The gateway now persists canary assignment records for generated in-process
+decoy responses and successful proxy redirects to the external decoy service.
+Assignment records store actor id, token kind, epoch, decoy type, source path,
+status, timestamps, and a SHA-256 token hash. They do not store the raw token
+value.
+
 The stored hit records token kind and label, masked source IP, path, method,
 event id, and evidence text. It does not store the full token value.
 
@@ -38,15 +44,20 @@ event id, and evidence text. It does not store the full token value.
 
 ```text
 GET /api/v1/dashboard/honeytokens
+GET /api/v1/dashboard/canary-assignments
+POST /api/v1/dashboard/canary-assignments/{assignment_id}/revoke
 ```
 
-The dashboard uses this endpoint to show total honeytoken hits and the latest
-interaction. Honeytoken hits also create critical alerts.
+The dashboard can use these endpoints to show honeytoken hits, review issued
+canary assignments, and revoke an assignment. Revoke is an operator lifecycle
+control: it marks the persisted assignment as revoked for audit and rotation
+tracking. Honeytoken hits also create critical alerts.
 
 ## Current Boundaries
 
 This is still a bounded tracking workflow. The in-process decoy response API and
 the redirected external decoy service can issue deterministic per-actor
-synthetic canary tokens with epoch-based rotation, but persistent assignment
-records, explicit revoke lists, and multi-operator lifecycle controls are still
-future work.
+synthetic canary tokens with epoch-based rotation, and the gateway records
+assignment/revoke lifecycle state for operator review. It is not yet a
+multi-operator lifecycle system with approval queues or external incident
+response integrations.

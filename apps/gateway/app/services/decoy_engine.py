@@ -7,10 +7,10 @@ tokens, or secrets are ever generated.
 from __future__ import annotations
 
 from copy import deepcopy
-import hashlib
 
 from app.core.config import settings
 from app.schemas.dashboard import DecoyResponse
+from app.services.canary_assignments import assigned_token
 
 
 # ── Safe fake data templates ─────────────────────────────────
@@ -83,7 +83,7 @@ FAKE_ENDPOINTS: list[str] = [
 ]
 
 
-def _infer_decoy_type(path: str) -> str:
+def infer_decoy_type(path: str) -> str:
     """Guess the best decoy type from the request path."""
     path_lower = path.lower()
     if "login" in path_lower or "auth" in path_lower:
@@ -111,10 +111,12 @@ def _variant_for(decoy_type: str, risk_score: float | None) -> str:
 
 
 def _assigned_token(actor_hint: str, token_kind: str) -> str:
-    canary_epoch = getattr(settings, "decoy_canary_epoch", "v1")
-    seed = f"{actor_hint}:{token_kind}:{canary_epoch}:{settings.decoy_service_token}"
-    digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()[:12]
-    return f"mirage-issued-{token_kind}-canary-{digest}"
+    return assigned_token(
+        actor_hint,
+        token_kind,
+        canary_epoch=getattr(settings, "decoy_canary_epoch", "v1"),
+        service_token=settings.decoy_service_token,
+    )
 
 
 def _apply_actor_assignment(body: dict, decoy_type: str, actor_hint: str) -> dict:
@@ -157,7 +159,7 @@ def generate_decoy_response(
 ) -> DecoyResponse:
     """Generate a safe fake response for a suspicious request."""
     if decoy_type == "auto":
-        decoy_type = _infer_decoy_type(path)
+        decoy_type = infer_decoy_type(path)
 
     variant = _variant_for(decoy_type, risk_score)
     body = deepcopy(_DECOY_MAP.get(decoy_type, _FAKE_LOGIN))
