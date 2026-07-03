@@ -27,9 +27,7 @@ export default function VideoBackground() {
         hls.loadSource(streamUrl);
         hls.attachMedia(video);
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          video.play().catch((err) => {
-            console.log("Autoplay blocked by browser. Retrying muted...", err);
-          });
+          video.play().catch(() => undefined);
         });
       } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
         // Native fallback (Safari)

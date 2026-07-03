@@ -139,6 +139,27 @@ interface BackendHoneytokenSummary {
   hits: BackendHoneytokenHit[];
 }
 
+interface BackendCanaryAssignment {
+  assignment_id: string;
+  actor_id: string;
+  token_kind: string;
+  token_label: string;
+  token_hash: string;
+  rotation_epoch: string;
+  decoy_type: string;
+  source_path: string;
+  status: "active" | "revoked";
+  issued_at: string;
+  last_seen_at: string;
+  revoked_at: string | null;
+  revoke_reason: string;
+}
+
+interface BackendCanaryAssignmentSummary {
+  total_assignments: number;
+  assignments: BackendCanaryAssignment[];
+}
+
 interface BackendActorProfile {
   actor_id: string;
   fingerprint_hash: string;
@@ -364,6 +385,27 @@ export interface HoneytokenHit {
 export interface HoneytokenSummary {
   totalHits: number;
   hits: HoneytokenHit[];
+}
+
+export interface CanaryAssignment {
+  id: string;
+  actorId: string;
+  tokenKind: string;
+  tokenLabel: string;
+  tokenHash: string;
+  rotationEpoch: string;
+  decoyType: string;
+  sourcePath: string;
+  status: "active" | "revoked";
+  issuedAt: string;
+  lastSeenAt: string;
+  revokedAt: string | null;
+  revokeReason: string;
+}
+
+export interface CanaryAssignmentSummary {
+  totalAssignments: number;
+  assignments: CanaryAssignment[];
 }
 
 export interface ActorProfile {
@@ -696,6 +738,49 @@ export async function fetchHoneytokens(): Promise<HoneytokenSummary> {
       evidence: hit.evidence,
     })),
   };
+}
+
+function mapCanaryAssignment(item: BackendCanaryAssignment): CanaryAssignment {
+  return {
+    id: item.assignment_id,
+    actorId: item.actor_id,
+    tokenKind: item.token_kind,
+    tokenLabel: item.token_label,
+    tokenHash: item.token_hash,
+    rotationEpoch: item.rotation_epoch,
+    decoyType: item.decoy_type,
+    sourcePath: item.source_path,
+    status: item.status,
+    issuedAt: item.issued_at,
+    lastSeenAt: item.last_seen_at,
+    revokedAt: item.revoked_at,
+    revokeReason: item.revoke_reason,
+  };
+}
+
+/** Fetch issued canary assignment lifecycle records. */
+export async function fetchCanaryAssignments(): Promise<CanaryAssignmentSummary> {
+  const data = await apiFetch<BackendCanaryAssignmentSummary>("/dashboard/canary-assignments");
+  return {
+    totalAssignments: data.total_assignments,
+    assignments: data.assignments.map(mapCanaryAssignment),
+  };
+}
+
+/** Revoke an issued canary assignment through the server-side API bridge. */
+export async function revokeCanaryAssignment(
+  assignmentId: string,
+  reason = "",
+): Promise<CanaryAssignment> {
+  const res = await fetch(`/api/canary-assignments/${encodeURIComponent(assignmentId)}/revoke`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason }),
+  });
+  if (!res.ok) {
+    throw new Error(`Canary revoke error: ${res.status} ${res.statusText}`);
+  }
+  return mapCanaryAssignment(await res.json());
 }
 
 /** Fetch recent actor profiles from threat fingerprints. */

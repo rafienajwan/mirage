@@ -7,11 +7,12 @@ import MetricCard from "@/components/ui/MetricCard";
 import ThreatFeed from "@/components/dashboard/ThreatFeed";
 import ActorProfilesPanel from "@/components/dashboard/ActorProfilesPanel";
 import ActorTriagePanel from "@/components/dashboard/ActorTriagePanel";
+import CanaryAssignmentsPanel from "@/components/dashboard/CanaryAssignmentsPanel";
 import DecoyStatusCard from "@/components/dashboard/DecoyStatusCard";
 import AlertPanel from "@/components/dashboard/AlertPanel";
 import SimulationPanel from "@/components/dashboard/SimulationPanel";
-import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchMLShadowSummary, fetchHoneytokens, fetchActorProfiles, fetchActorClusters, fetchActorCases, fetchActorCaseWorkflows, openActorCase, updateActorCase, labelEvent, downloadTrainingData, runRetraining, mapDashboardAlert, mapDashboardEvent } from "@/lib/api";
-import type { ActorCaseSummary, ActorCaseWorkflow, ActorCaseWorkflowSummary, ActorClusterSummary, ActorProfileSummary, AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, MLShadowSummaryData, HoneytokenSummary, RetrainingRun, DashboardStreamMessage } from "@/lib/api";
+import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchMLShadowSummary, fetchHoneytokens, fetchCanaryAssignments, fetchActorProfiles, fetchActorClusters, fetchActorCases, fetchActorCaseWorkflows, revokeCanaryAssignment, openActorCase, updateActorCase, labelEvent, downloadTrainingData, runRetraining, mapDashboardAlert, mapDashboardEvent } from "@/lib/api";
+import type { ActorCaseSummary, ActorCaseWorkflow, ActorCaseWorkflowSummary, ActorClusterSummary, ActorProfileSummary, AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, MLShadowSummaryData, HoneytokenSummary, CanaryAssignmentSummary, RetrainingRun, DashboardStreamMessage } from "@/lib/api";
 import { Globe, ShieldAlert, ArrowRightLeft, Bell, BrainCircuit, Database, Download, KeyRound, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -92,8 +93,8 @@ function playAlertSound(severity: string) {
       osc.start();
       osc.stop(ctx.currentTime + 0.15);
     }
-  } catch (e) {
-    console.warn("Failed to play audio alert:", e);
+  } catch {
+    return;
   }
 }
 
@@ -108,6 +109,7 @@ export default function DashboardPage() {
   const [mlShadowStatus, setMlShadowStatus] = useState<MLShadowStatusData | null>(null);
   const [mlShadowSummary, setMlShadowSummary] = useState<MLShadowSummaryData | null>(null);
   const [honeytokens, setHoneytokens] = useState<HoneytokenSummary | null>(null);
+  const [canaryAssignments, setCanaryAssignments] = useState<CanaryAssignmentSummary | null>(null);
   const [actorProfiles, setActorProfiles] = useState<ActorProfileSummary | null>(null);
   const [actorClusters, setActorClusters] = useState<ActorClusterSummary | null>(null);
   const [actorCases, setActorCases] = useState<ActorCaseSummary | null>(null);
@@ -119,6 +121,7 @@ export default function DashboardPage() {
   const [retraining, setRetraining] = useState(false);
   const [retrainingRun, setRetrainingRun] = useState<RetrainingRun | null>(null);
   const [workingActorCaseId, setWorkingActorCaseId] = useState<string | null>(null);
+  const [workingCanaryAssignmentId, setWorkingCanaryAssignmentId] = useState<string | null>(null);
 
   // Toast notifications & audio toggle
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
@@ -272,9 +275,31 @@ export default function DashboardPage() {
     [],
   );
 
+  const handleRevokeCanaryAssignment = useCallback(async (assignmentId: string) => {
+    setWorkingCanaryAssignmentId(assignmentId);
+    try {
+      const revoked = await revokeCanaryAssignment(
+        assignmentId,
+        "Revoked from dashboard",
+      );
+      setCanaryAssignments((current) => ({
+        totalAssignments: current?.totalAssignments ?? 1,
+        assignments: [
+          revoked,
+          ...(current?.assignments.filter((item) => item.id !== revoked.id) ?? []),
+        ],
+      }));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to revoke canary assignment");
+    } finally {
+      setWorkingCanaryAssignmentId(null);
+    }
+  }, []);
+
   const load = useCallback(async () => {
     try {
-      const [ov, ev, al, tr, rh, ds, ts, ms, mss, ht, ap, ac, cases, workflows] = await Promise.all([
+      const [ov, ev, al, tr, rh, ds, ts, ms, mss, ht, ca, ap, ac, cases, workflows] = await Promise.all([
         fetchOverview(),
         fetchEvents(),
         fetchAlerts(),
@@ -285,6 +310,7 @@ export default function DashboardPage() {
         fetchMLShadowStatus().catch(() => null),
         fetchMLShadowSummary().catch(() => null),
         fetchHoneytokens().catch(() => null),
+        fetchCanaryAssignments().catch(() => null),
         fetchActorProfiles().catch(() => null),
         fetchActorClusters().catch(() => null),
         fetchActorCases().catch(() => null),
@@ -300,6 +326,7 @@ export default function DashboardPage() {
       setMlShadowStatus(ms);
       setMlShadowSummary(mss);
       setHoneytokens(ht);
+      setCanaryAssignments(ca);
       setActorProfiles(ap);
       setActorClusters(ac);
       setActorCases(cases);
@@ -631,8 +658,13 @@ export default function DashboardPage() {
         </div>
 
         {/* Bottom row: Decoy + Alerts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <DecoyStatusCard data={decoyStatus} />
+          <CanaryAssignmentsPanel
+            data={canaryAssignments}
+            workingAssignmentId={workingCanaryAssignmentId}
+            onRevoke={handleRevokeCanaryAssignment}
+          />
           <AlertPanel alerts={alerts} />
         </div>
       </main>
