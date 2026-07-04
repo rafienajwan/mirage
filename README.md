@@ -6,7 +6,7 @@ heuristics, forwards normal traffic to a protected demo app, redirects suspiciou
 traffic to an isolated static decoy, persists security events, and exposes them
 through a polling Next.js dashboard.
 
-The broader adaptive-ML hardening, honeytoken lifecycle, and cloud-deployment
+The broader adaptive-ML hardening, multi-operator workflow, and cloud-deployment
 capabilities remain proposal targets. See
 `docs/PROPOSAL_ALIGNMENT.md` for the exact implementation gap.
 
@@ -26,6 +26,8 @@ capabilities remain proposal targets. See
 - dataset preparation adapters for MIRAGE JSONL, custom API-log JSONL, and CICIDS-style CSV sources;
 - honeytoken detection for configured decoy credentials;
 - adaptive decoy responses with epoch-rotatable per-actor synthetic canary tokens;
+- persistent canary assignment records with hashed token values, operator revoke
+  controls, and dashboard visibility;
 - persistent actor profiles, lightweight actor clusters, and persisted case triage workflows;
 - Docker Compose configuration for the five-service demo stack.
 
@@ -34,8 +36,8 @@ capabilities remain proposal targets. See
 - The gateway only proxies its explicit `/api/v1/proxy/*` route.
 - Runtime routing uses heuristics; trained artifacts can be observed in shadow mode.
 - Decoy payloads are synthetic and can issue deterministic per-actor canary
-  tokens with epoch-based rotation; persistent assignment records and revoke
-  controls are not implemented.
+  tokens with epoch-based rotation; assignment and revoke records exist for
+  operator review, but multi-operator approval workflows are not implemented.
 - Dashboard updates use HTTP polling with an optional authenticated WebSocket
   stream for event and alert updates.
 - Docker image builds are locally verified; cloud deployment is not yet
@@ -205,6 +207,8 @@ All paths below use the `http://localhost:8000` base URL.
 | `GET /api/v1/dashboard/ml-shadow/status` | Public | Report sanitized ML shadow artifact readiness |
 | `GET /api/v1/dashboard/ml-shadow/summary` | Public | Summarize recent model-only agreement with live routing |
 | `GET /api/v1/dashboard/honeytokens` | Public | Show recent decoy credential interactions |
+| `GET /api/v1/dashboard/canary-assignments` | Public | Show issued canary assignment lifecycle records |
+| `POST /api/v1/dashboard/canary-assignments/{assignment_id}/revoke` | API key | Revoke a canary assignment for operator lifecycle tracking |
 | `GET /api/v1/dashboard/actors` | Public | Show recent actor profiles grouped by threat fingerprint |
 | `GET /api/v1/dashboard/actor-clusters` | Public | Show lightweight actor clusters for triage |
 | `GET /api/v1/dashboard/actor-cases` | Public | Show recommended investigation cases |
@@ -327,8 +331,8 @@ infra/
    API domain more closely.
 4. Expand WebSocket streaming beyond events/alerts and harden deployment auth.
 5. Expand case-management workflow queues and analyst collaboration.
-6. Add persistent canary assignment records, revoke controls, and lifecycle
-   audit trails.
+6. Add multi-operator approval flows and audit policy around canary lifecycle
+   changes.
 7. Deploy the stack to managed infrastructure and verify production env wiring.
 
 ## License
