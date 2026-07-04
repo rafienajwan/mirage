@@ -195,6 +195,33 @@ high-risk `/.env` probe, while the CICIDS-trained model scores it as monitor.
 That difference is useful operator evidence that the current artifact should
 remain in shadow mode until runtime API-domain data is collected and reviewed.
 
+## Observe Shadow Trends
+
+After the gateway is running with `MIRAGE_MODEL_ARTIFACT` configured, collect
+periodic status and summary snapshots while local traffic is being replayed or
+tested:
+
+```bash
+cd apps/gateway
+python scripts/observe_ml_shadow.py \
+  --base-url http://localhost:8000 \
+  --samples 20 \
+  --interval-seconds 30 \
+  --limit 500 \
+  --output .tmp/ml-shadow-observation.jsonl \
+  --summary-output .tmp/ml-shadow-observation-summary.json
+```
+
+The JSONL output is append-only and intended for local review. Keep it ignored
+unless it has been sanitized and intentionally promoted to documentation. The
+summary output reports sample count, artifact modes observed, shadow-ready
+sample count, latest agreement/disagreement rates, disagreement count, and the
+change in shadow-scored events across the observation window.
+
+Use this as operational evidence only. A high agreement rate on local traffic is
+not enough to let the model control routing; it should still be reviewed against
+representative API-domain data and false-positive expectations.
+
 ## Retrain From Analyst Labels
 
 After enough dashboard events have analyst labels and feature vectors, the
