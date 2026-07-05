@@ -19,8 +19,8 @@ capabilities remain proposal targets. See
 - SQLite development storage and PostgreSQL/Alembic support;
 - dashboard metrics, events, alerts, traffic history, and simulation controls;
 - ML-ready feature vectors, optional ML shadow scoring, and an offline Random Forest training pipeline;
-- a locally reviewed CICIDS2017 DDoS split, shadow-ready Random Forest artifact,
-  and repeatable ML shadow smoke test;
+- locally reviewed CICIDS2017 DDoS and full-directory splits, shadow-ready
+  Random Forest artifacts, and repeatable ML shadow smoke tests;
 - analyst event labels for future training data curation;
 - JSONL export and readiness checks for analyst-labeled training records;
 - dataset preparation adapters for MIRAGE JSONL, custom API-log JSONL, and CICIDS-style CSV sources;
@@ -259,7 +259,8 @@ python scripts/prepare_dataset.py \
 ```
 
 Use `--source api-log-jsonl` for labeled custom API request logs, or
-`--source cicids-csv` for compatible CICIDS-style CSV exports.
+`--source cicids-csv` / `--source cicids-csv-dir` for compatible
+CICIDS-style CSV exports.
 
 ```bash
 cd apps/gateway
@@ -324,17 +325,15 @@ infra/
 
 ## Next Priorities
 
-1. Prepare and review the full CICIDS2017 directory split, then broaden custom
-   API-log coverage with reviewed real datasets.
-2. Run longer shadow-mode observation against live local traffic and inspect
-   agreement/disagreement trends.
-3. Add reviewed custom API-log datasets so model training matches the protected
+1. Run longer shadow-mode observation with the full CICIDS2017 artifact against
+   live local traffic and inspect agreement/disagreement trends.
+2. Add reviewed custom API-log datasets so model training matches the protected
    API domain more closely.
-4. Expand WebSocket streaming beyond events/alerts and harden deployment auth.
-5. Expand case-management workflow queues and analyst collaboration.
-6. Add multi-operator approval flows and audit policy around canary lifecycle
+3. Expand WebSocket streaming beyond events/alerts and harden deployment auth.
+4. Expand case-management workflow queues and analyst collaboration.
+5. Add multi-operator approval flows and audit policy around canary lifecycle
    changes.
-7. Deploy the stack to managed infrastructure and verify production env wiring.
+6. Deploy the stack to managed infrastructure and verify production env wiring.
 
 ## License
 

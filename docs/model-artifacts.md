@@ -161,6 +161,97 @@ The artifact review returned `shadow_ready: true` with no blockers or warnings.
 This supports shadow-mode observation only. It does not justify switching live
 routing from heuristics to model control.
 
+## Local CICIDS2017 Full Directory Review
+
+The local ignored full CICIDS2017 CSV directory has also been prepared with the
+`cicids-csv-dir` adapter and used to train a broader shadow-ready artifact. The
+raw CSV files, prepared split, and `.joblib` artifact remain ignored local files
+and should not be committed.
+
+Dataset preparation:
+
+```bash
+cd apps/gateway
+python scripts/prepare_dataset.py \
+  --source cicids-csv-dir \
+  --input data \
+  --output-dir data/prepared/cicids2017-full-v1 \
+  --dataset-name cicids2017-full \
+  --dataset-version v1
+```
+
+Dataset review:
+
+```bash
+python scripts/review_dataset.py \
+  --manifest data/prepared/cicids2017-full-v1/manifest.json \
+  --min-total-rows 1000 \
+  --min-train-rows 1000 \
+  --min-test-rows 1000 \
+  --min-rows-per-class 1000
+```
+
+Review result:
+
+| Metric | Value |
+| --- | ---: |
+| Total rows | 2830743 |
+| Train rows | 2123057 |
+| Test rows | 707686 |
+| Normal rows | 2273097 |
+| Suspicious rows | 557646 |
+| Blockers | 0 |
+| Warnings | 0 |
+
+Training command:
+
+```bash
+python scripts/train_model.py \
+  --input data/prepared/cicids2017-full-v1/train.jsonl \
+  --output artifacts/cicids2017-full-risk-model.joblib
+```
+
+Internal training-script validation:
+
+| Metric | Value |
+| --- | ---: |
+| Precision | 0.9653379712324903 |
+| Recall | 0.9820579768360447 |
+| F1 score | 0.9736261964926587 |
+| False-positive rate | 0.008650746352702684 |
+| Training rows | 1592292 |
+| Test rows | 530765 |
+
+Holdout evaluation command:
+
+```bash
+python scripts/evaluate_model_artifact.py \
+  --artifact artifacts/cicids2017-full-risk-model.joblib \
+  --input data/prepared/cicids2017-full-v1/test.jsonl \
+  --min-precision 0.9 \
+  --min-recall 0.9 \
+  --min-f1-score 0.9 \
+  --max-false-positive-rate 0.05 \
+  --min-rows 1000
+```
+
+Holdout evaluation:
+
+| Metric | Value |
+| --- | ---: |
+| Evaluated rows | 707686 |
+| Precision | 0.9661597923602099 |
+| Recall | 0.9825983416061745 |
+| F1 score | 0.9743097341356207 |
+| False-positive rate | 0.008443110189802806 |
+| Blockers | 0 |
+
+Artifact review returned `shadow_ready: true` with no blockers or warnings at
+the same 0.9 precision, recall, and F1 thresholds. Smoke testing confirmed the
+artifact loads through the runtime shadow-scoring path. Like the DDoS-specific
+artifact, this supports shadow-mode observation only; it still does not justify
+model-controlled routing.
+
 ## Smoke-Test Shadow Scoring
 
 Use the smoke script to verify a local artifact can be loaded by the gateway

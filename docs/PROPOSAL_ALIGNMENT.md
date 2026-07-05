@@ -15,7 +15,7 @@ the beginning of a real ML pipeline.
 | Proposal capability | Status | Repository reality |
 | --- | --- | --- |
 | FastAPI defense gateway | Partial | `/api/v1/proxy/*` inspects and forwards traffic, but arbitrary application ingress is not intercepted. |
-| Hybrid risk scoring | Partial | Heuristic risk scoring is active. A Random Forest training/inference path can run in reviewed shadow mode, and a local CICIDS2017 DDoS artifact has passed review, but it does not control live routing. |
+| Hybrid risk scoring | Partial | Heuristic risk scoring is active. Random Forest training/inference can run in reviewed shadow mode, and local CICIDS2017 DDoS plus full-directory artifacts have passed review, but they do not control live routing. |
 | Scikit-learn anomaly detection | Partial | Scikit-learn is configured and training/shadow inference plus artifact review are implemented; runtime anomaly detection remains heuristic. |
 | Threat fingerprint matching | Partial | Stable request fingerprints, persistent actor profiles, lightweight triage clusters, and assigned case workflows exist; trained clustering does not. |
 | Automated real/decoy routing | Implemented for demo | The proxy routes to separate real-app and decoy services using the live decision engine. |
@@ -23,7 +23,7 @@ the beginning of a real ML pipeline.
 | Honeytoken detection | Implemented for demo | Configured decoy credential use and per-actor canary tokens are detected, stored, alerted, and shown on the dashboard; issued canary assignments are persisted without raw token values and can be revoked for operator review. |
 | PostgreSQL/Supabase storage | Partial | Async PostgreSQL and Alembic are supported for events, alerts, honeytoken hits, and actor profiles; Supabase deployment is pending. |
 | Feature-vector storage | Implemented | Request and optional CICIDS-style flow features are stored with events. |
-| CICIDS2017 dataset | Partial | A CICIDS-style CSV adapter and train/test split workflow exist; a local CICIDS2017 DDoS split has been reviewed and trained, while broader multi-day ingestion, cleaning, and provenance review are still pending. |
+| CICIDS2017 dataset | Partial | CICIDS-style single-CSV and directory adapters exist; local DDoS and full-directory CICIDS2017 splits have been prepared, reviewed, trained, and evaluated. Dataset provenance review is local-only and custom API-domain data is still pending. |
 | Custom API logs | Partial | Runtime events, features, analyst-corrected labels, JSONL export, raw API-log JSONL ingestion with common access-log aliases, validation, split tooling, and local retraining are available; reviewed datasets are still pending. |
 | Precision/recall/F1/FPR evaluation | Implemented | The Random Forest trainer calculates all four metrics. |
 | Real-time WebSocket dashboard | Partial | An authenticated WebSocket stream can push events and alerts; dashboard polling remains as fallback and other metrics still poll. |
@@ -43,8 +43,8 @@ The current demo can accurately claim that MIRAGE:
 - stores events, alerts, and ML-ready feature vectors;
 - can store model-only shadow scores beside events when a reviewed artifact is configured;
 - can review trained artifacts for feature-contract and metric readiness before shadow mode;
-- has locally trained and reviewed a shadow-ready Random Forest artifact from a
-  CICIDS2017 DDoS split;
+- has locally trained and reviewed shadow-ready Random Forest artifacts from
+  CICIDS2017 DDoS and full-directory splits;
 - records and alerts on configured and per-actor issued decoy credential reuse as honeytoken hits;
 - generates adaptive decoy responses with epoch-rotatable synthetic per-actor
   canary tokens;
@@ -56,7 +56,8 @@ The current demo can accurately claim that MIRAGE:
 - supports analyst labels for correcting event classification outcomes;
 - exports analyst-labeled feature vectors as JSON Lines for model training;
 - trains local shadow-mode candidate artifacts from analyst-labeled events;
-- prepares validated train/test splits from MIRAGE JSONL, custom API-log JSONL, and CICIDS-style CSV sources;
+- prepares validated train/test splits from MIRAGE JSONL, custom API-log JSONL,
+  CICIDS-style CSV, and CICIDS-style CSV directory sources;
 - displays live backend data, actor clusters, and recommended triage cases on a dashboard;
 - can train and evaluate a Random Forest model from labeled feature records.
 
