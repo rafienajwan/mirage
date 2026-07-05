@@ -11,6 +11,7 @@ from app.ml.datasets import (
     PreparedTrainingRow,
     load_api_log_jsonl,
     load_cicids_csv,
+    load_dataset,
     load_mirage_jsonl,
     prepare_dataset,
     review_prepared_dataset,
@@ -173,6 +174,38 @@ def test_load_api_log_jsonl_rejects_unknown_label(tmp_path):
 
     with pytest.raises(DatasetValidationError, match="API log label"):
         load_api_log_jsonl(source)
+
+
+def test_load_cicids_csv_directory_combines_sorted_csv_files(tmp_path):
+    cicids_dir = tmp_path / "cicids"
+    cicids_dir.mkdir()
+    (cicids_dir / "b.csv").write_text(
+        "Flow Duration,Flow Packets/s,Destination Port,Label\n"
+        "20,4,80,DDoS\n",
+        encoding="utf-8",
+    )
+    (cicids_dir / "a.csv").write_text(
+        "Flow Duration,Flow Packets/s,Destination Port,Label\n"
+        "10,2,443,BENIGN\n",
+        encoding="utf-8",
+    )
+
+    rows = load_dataset(cicids_dir, source_kind="cicids-csv-dir")
+
+    assert [row.label for row in rows] == [0, 1]
+    assert [row.source for row in rows] == ["cicids-csv-dir", "cicids-csv-dir"]
+    assert rows[0].record_id == "a.csv:2"
+    assert rows[1].record_id == "b.csv:2"
+    assert rows[0].features["flow_duration_ms"] == 10.0
+    assert rows[1].features["destination_port"] == 80.0
+
+
+def test_load_cicids_csv_directory_rejects_empty_directories(tmp_path):
+    cicids_dir = tmp_path / "empty-cicids"
+    cicids_dir.mkdir()
+
+    with pytest.raises(DatasetValidationError, match="no CSV files"):
+        load_dataset(cicids_dir, source_kind="cicids-csv-dir")
 
 
 def test_stratified_split_requires_two_rows_per_class():

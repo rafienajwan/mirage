@@ -17,7 +17,12 @@ from app.schemas.request import InspectRequest
 from app.services.feature_extraction import FEATURE_NAMES, FeatureVector, extract_features
 
 
-DatasetSource = Literal["mirage-jsonl", "api-log-jsonl", "cicids-csv"]
+DatasetSource = Literal[
+    "mirage-jsonl",
+    "api-log-jsonl",
+    "cicids-csv",
+    "cicids-csv-dir",
+]
 
 
 @dataclass(frozen=True)
@@ -463,8 +468,13 @@ def load_api_log_jsonl(path: Path) -> list[PreparedTrainingRow]:
     return rows
 
 
-def load_cicids_csv(path: Path) -> list[PreparedTrainingRow]:
-    """Load a CICIDS-style CSV into the MIRAGE feature schema.
+def _load_cicids_csv_rows(
+    path: Path,
+    *,
+    source_kind: DatasetSource,
+    record_prefix: str | None = None,
+) -> list[PreparedTrainingRow]:
+    """Load CICIDS-style CSV rows into the MIRAGE feature schema.
 
     Columns that do not exist in a given CICIDS export are filled with zero so
     the resulting rows remain compatible with the current model feature order.
@@ -524,10 +534,39 @@ def load_cicids_csv(path: Path) -> list[PreparedTrainingRow]:
                 PreparedTrainingRow(
                     features=normalize_features(features, line_number=line_number),
                     label=label,
-                    source="cicids-csv",
-                    record_id=str(line_number),
+                    source=source_kind,
+                    record_id=(
+                        f"{record_prefix}:{line_number}"
+                        if record_prefix
+                        else str(line_number)
+                    ),
                 )
             )
+    return rows
+
+
+def load_cicids_csv(path: Path) -> list[PreparedTrainingRow]:
+    """Load one CICIDS-style CSV into the MIRAGE feature schema."""
+    return _load_cicids_csv_rows(path, source_kind="cicids-csv")
+
+
+def load_cicids_csv_directory(path: Path) -> list[PreparedTrainingRow]:
+    """Load all CICIDS-style CSV files from a directory in stable name order."""
+    csv_files = sorted(
+        item for item in path.iterdir() if item.suffix.lower() == ".csv"
+    )
+    if not csv_files:
+        raise DatasetValidationError(f"no CSV files found in directory: {path}")
+
+    rows: list[PreparedTrainingRow] = []
+    for csv_file in csv_files:
+        rows.extend(
+            _load_cicids_csv_rows(
+                csv_file,
+                source_kind="cicids-csv-dir",
+                record_prefix=csv_file.name,
+            )
+        )
     return rows
 
 
@@ -539,6 +578,8 @@ def load_dataset(path: Path, source_kind: DatasetSource) -> list[PreparedTrainin
         return load_api_log_jsonl(path)
     if source_kind == "cicids-csv":
         return load_cicids_csv(path)
+    if source_kind == "cicids-csv-dir":
+        return load_cicids_csv_directory(path)
     raise DatasetValidationError(f"Unsupported dataset source kind: {source_kind}")
 
 
