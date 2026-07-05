@@ -324,7 +324,8 @@ infra/
 
 ## Next Priorities
 
-1. Expand CICIDS2017 and custom API-log adapters with reviewed real datasets.
+1. Prepare and review the full CICIDS2017 directory split, then broaden custom
+   API-log coverage with reviewed real datasets.
 2. Run longer shadow-mode observation against live local traffic and inspect
    agreement/disagreement trends.
 3. Add reviewed custom API-log datasets so model training matches the protected

@@ -11,7 +11,8 @@ directly into the trainer.
 | --- | --- | --- |
 | Analyst-labeled MIRAGE export | `mirage-jsonl` | Ready |
 | Custom API JSONL logs | `api-log-jsonl` | Ready for labeled request metadata |
-| CICIDS2017-style CSV | `cicids-csv` | Basic adapter for compatible columns |
+| CICIDS2017-style CSV | `cicids-csv` | Basic adapter for one compatible CSV |
+| CICIDS2017-style CSV directory | `cicids-csv-dir` | Loads all immediate `*.csv` files in stable filename order |
 
 Raw and prepared datasets should stay under local ignored `data/` directories.
 Commit the preparation code, schema, and documentation, but do not commit raw
@@ -137,6 +138,23 @@ The current adapter maps common CICIDS columns such as `Flow Duration`,
 `Flow Packets/s`, `Packet Length Mean`, `SYN Flag Count`,
 `Destination Port`, and `Average Packet Size`. Columns without a MIRAGE
 equivalent are intentionally not used yet.
+
+When the full CICIDS2017 CSV set is available in one ignored local directory,
+prepare it as a single reviewed split with the directory adapter:
+
+```bash
+cd apps/gateway
+python scripts/prepare_dataset.py \
+  --source cicids-csv-dir \
+  --input data \
+  --output-dir data/prepared/cicids2017-full-v1 \
+  --dataset-name cicids2017-full \
+  --dataset-version v1
+```
+
+The directory adapter reads only immediate `*.csv` files, sorted by filename.
+Each prepared row keeps a source record id in the form `filename.csv:line` so
+reviewers can trace rows back to the raw CSV without committing raw data.
 
 ## Readiness Rules
 
