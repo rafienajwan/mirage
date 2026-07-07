@@ -139,6 +139,27 @@ The generated files should stay in ignored local `data/` paths unless they have
 been reviewed and explicitly approved for publication. Use the exported JSONL
 with `--source mirage-jsonl` because it already contains MIRAGE feature vectors.
 
+When a running gateway is not available, use the deterministic API-domain
+fixture generator to exercise the same custom API-log adapter path locally:
+
+```bash
+cd apps/gateway
+python scripts/build_api_domain_fixture_dataset.py \
+  --normal-count 20 \
+  --suspicious-count 20 \
+  --output data/raw/runtime/api-domain-fixture-events.jsonl
+python scripts/prepare_dataset.py \
+  --source api-log-jsonl \
+  --input data/raw/runtime/api-domain-fixture-events.jsonl \
+  --output-dir data/prepared/api-domain-fixture-v1 \
+  --dataset-name api-domain-fixture \
+  --dataset-version v1
+```
+
+The fixture records are synthetic, balanced, and deterministic. They are useful
+for adapter, split, training, and shadow-smoke checks, but they are not a
+substitute for reviewed production-like API logs.
+
 ## Prepare CICIDS-Style CSV
 
 Place the raw CSV in an ignored local dataset path and run:
