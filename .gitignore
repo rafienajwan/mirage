@@ -8,6 +8,7 @@ __pycache__/
 *$py.class
 *.egg-info/
 .pytest_cache/
+pytest-tmp/
 .venv/
 *.db
 
@@ -41,5 +42,8 @@ data/
 
 # Logs
 *.log
+
+# Local scratch output
+.tmp/
 
 .hintrc
