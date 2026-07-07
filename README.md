@@ -24,6 +24,7 @@ capabilities remain proposal targets. See
 - analyst event labels for future training data curation;
 - JSONL export and readiness checks for analyst-labeled training records;
 - repeatable local API-domain training data collection from a running gateway;
+- deterministic API-domain fixture generation for local adapter and shadow-artifact experiments;
 - dataset preparation adapters for MIRAGE JSONL, custom API-log JSONL, and CICIDS-style CSV sources;
 - honeytoken detection for configured decoy credentials;
 - adaptive decoy responses with epoch-rotatable per-actor synthetic canary tokens;
@@ -262,6 +263,26 @@ python scripts/prepare_dataset.py \
 Use `--source api-log-jsonl` for labeled custom API request logs, or
 `--source cicids-csv` / `--source cicids-csv-dir` for compatible
 CICIDS-style CSV exports.
+
+For a deterministic local API-domain fixture that exercises the custom API-log
+adapter without a running gateway:
+
+```bash
+cd apps/gateway
+python scripts/build_api_domain_fixture_dataset.py \
+  --normal-count 20 \
+  --suspicious-count 20 \
+  --output data/raw/runtime/api-domain-fixture-events.jsonl
+python scripts/prepare_dataset.py \
+  --source api-log-jsonl \
+  --input data/raw/runtime/api-domain-fixture-events.jsonl \
+  --output-dir data/prepared/api-domain-fixture-v1 \
+  --dataset-name api-domain-fixture \
+  --dataset-version v1
+```
+
+This fixture is useful for local pipeline checks only. It is deterministic and
+small, so any resulting artifact must remain shadow-only.
 
 ```bash
 cd apps/gateway

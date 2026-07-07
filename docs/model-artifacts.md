@@ -353,6 +353,104 @@ shadow mode, but CICIDS flow features alone do not match MIRAGE's simulated API
 attack semantics closely enough to control routing. Keep the model shadow-only
 until reviewed custom API-domain logs are collected and trained.
 
+## Local API-Domain Fixture Review
+
+A deterministic local API-domain fixture can exercise the custom API-log adapter
+and artifact review path without a running gateway. The generated raw JSONL,
+prepared split, and `.joblib` artifact remain ignored local files and should not
+be committed.
+
+Fixture generation and preparation:
+
+```bash
+cd apps/gateway
+python scripts/build_api_domain_fixture_dataset.py \
+  --normal-count 20 \
+  --suspicious-count 20 \
+  --output data/raw/runtime/api-domain-fixture-events.jsonl
+python scripts/prepare_dataset.py \
+  --source api-log-jsonl \
+  --input data/raw/runtime/api-domain-fixture-events.jsonl \
+  --output-dir data/prepared/api-domain-fixture-v1 \
+  --dataset-name api-domain-fixture \
+  --dataset-version v1
+```
+
+Dataset review:
+
+```bash
+python scripts/review_dataset.py \
+  --manifest data/prepared/api-domain-fixture-v1/manifest.json \
+  --min-total-rows 40 \
+  --min-train-rows 30 \
+  --min-test-rows 10 \
+  --min-rows-per-class 10
+```
+
+Review result:
+
+| Metric | Value |
+| --- | ---: |
+| Total rows | 40 |
+| Train rows | 30 |
+| Test rows | 10 |
+| Normal rows | 20 |
+| Suspicious rows | 20 |
+| Blockers | 0 |
+| Warnings | 1 |
+
+Training command:
+
+```bash
+python scripts/train_model.py \
+  --input data/prepared/api-domain-fixture-v1/train.jsonl \
+  --output artifacts/api-domain-fixture-risk-model.joblib
+```
+
+Internal training-script validation:
+
+| Metric | Value |
+| --- | ---: |
+| Precision | 1.0 |
+| Recall | 1.0 |
+| F1 score | 1.0 |
+| False-positive rate | 0.0 |
+| Training rows | 22 |
+| Test rows | 8 |
+
+Holdout evaluation command:
+
+```bash
+python scripts/evaluate_model_artifact.py \
+  --artifact artifacts/api-domain-fixture-risk-model.joblib \
+  --input data/prepared/api-domain-fixture-v1/test.jsonl \
+  --min-precision 0.8 \
+  --min-recall 0.8 \
+  --min-f1-score 0.8 \
+  --max-false-positive-rate 0.25 \
+  --min-rows 10
+```
+
+Holdout evaluation:
+
+| Metric | Value |
+| --- | ---: |
+| Evaluated rows | 10 |
+| Precision | 1.0 |
+| Recall | 1.0 |
+| F1 score | 1.0 |
+| False-positive rate | 0.0 |
+| Blockers | 0 |
+
+Artifact review returned `shadow_ready: true` with the expected small-dataset
+warning. Smoke testing confirmed the artifact loads through the runtime
+shadow-scoring path and agreed with the heuristic on one normal and one
+suspicious smoke request.
+
+This is a pipeline validation artifact only. Because the fixture is
+deterministic and small, it should not be used to claim production ML quality or
+model-controlled routing.
+
 ## Retrain From Analyst Labels
 
 After enough dashboard events have analyst labels and feature vectors, the
