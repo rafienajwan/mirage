@@ -120,6 +120,25 @@ Review `data/prepared/runtime-v1/manifest.json` before training or enabling an
 artifact in shadow mode. It records row counts, label balance, split ratio,
 seed, feature names, and generated files.
 
+For repeatable local API-domain collection, run the collector against a running
+gateway. It submits deterministic normal and suspicious API requests, labels the
+resulting dashboard events, and exports the same reviewed training JSONL:
+
+```bash
+cd apps/gateway
+python scripts/collect_api_domain_training_data.py \
+  --base-url http://localhost:8000 \
+  --api-key YOUR_LOCAL_MIRAGE_API_KEY \
+  --normal-count 10 \
+  --suspicious-count 10 \
+  --output data/raw/runtime/api-domain-training-events.jsonl \
+  --summary-output data/raw/runtime/api-domain-training-summary.json
+```
+
+The generated files should stay in ignored local `data/` paths unless they have
+been reviewed and explicitly approved for publication. Use the exported JSONL
+with `--source mirage-jsonl` because it already contains MIRAGE feature vectors.
+
 ## Prepare CICIDS-Style CSV
 
 Place the raw CSV in an ignored local dataset path and run:

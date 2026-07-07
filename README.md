@@ -23,6 +23,7 @@ capabilities remain proposal targets. See
   Random Forest artifacts, and repeatable ML shadow smoke tests;
 - analyst event labels for future training data curation;
 - JSONL export and readiness checks for analyst-labeled training records;
+- repeatable local API-domain training data collection from a running gateway;
 - dataset preparation adapters for MIRAGE JSONL, custom API-log JSONL, and CICIDS-style CSV sources;
 - honeytoken detection for configured decoy credentials;
 - adaptive decoy responses with epoch-rotatable per-actor synthetic canary tokens;
