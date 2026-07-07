@@ -325,15 +325,13 @@ infra/
 
 ## Next Priorities
 
-1. Run longer shadow-mode observation with the full CICIDS2017 artifact against
-   live local traffic and inspect agreement/disagreement trends.
-2. Add reviewed custom API-log datasets so model training matches the protected
+1. Add reviewed custom API-log datasets so model training matches the protected
    API domain more closely.
-3. Expand WebSocket streaming beyond events/alerts and harden deployment auth.
-4. Expand case-management workflow queues and analyst collaboration.
-5. Add multi-operator approval flows and audit policy around canary lifecycle
+2. Expand WebSocket streaming beyond events/alerts and harden deployment auth.
+3. Expand case-management workflow queues and analyst collaboration.
+4. Add multi-operator approval flows and audit policy around canary lifecycle
    changes.
-6. Deploy the stack to managed infrastructure and verify production env wiring.
+5. Deploy the stack to managed infrastructure and verify production env wiring.
 
 ## License
 

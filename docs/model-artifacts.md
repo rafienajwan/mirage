@@ -313,6 +313,46 @@ Use this as operational evidence only. A high agreement rate on local traffic is
 not enough to let the model control routing; it should still be reviewed against
 representative API-domain data and false-positive expectations.
 
+### Local Full-Artifact Observation
+
+A local ignored observation run was executed against a temporary gateway on
+`127.0.0.1:8010` with the full CICIDS2017 artifact configured in shadow mode.
+The gateway used a local SQLite observation database and simulated normal plus
+suspicious dashboard traffic. The observation outputs remain under ignored
+`data/observations/` files and should not be committed.
+
+Observation command:
+
+```bash
+python scripts/observe_ml_shadow.py \
+  --base-url http://127.0.0.1:8010 \
+  --samples 10 \
+  --interval-seconds 1 \
+  --limit 200 \
+  --output data/observations/ml-shadow-full-observation.jsonl \
+  --summary-output data/observations/ml-shadow-full-observation-summary.json
+```
+
+Observation summary:
+
+| Signal | Value |
+| --- | ---: |
+| Artifact mode samples | `shadow_ready`: 10 |
+| Shadow-ready samples | 10 |
+| Shadow event delta | 18 |
+| Latest shadow events | 19 |
+| Latest agreement rate | 0.526316 |
+| Latest disagreement rate | 0.473684 |
+| Latest disagreements | 9 |
+| Max disagreement rate | 0.473684 |
+
+The final snapshot showed 10 live `allow` decisions and 9 live
+`redirect_to_decoy` decisions, while the model shadow decisions were 19
+`allow`. This is useful negative evidence: the artifact loads and scores in
+shadow mode, but CICIDS flow features alone do not match MIRAGE's simulated API
+attack semantics closely enough to control routing. Keep the model shadow-only
+until reviewed custom API-domain logs are collected and trained.
+
 ## Retrain From Analyst Labels
 
 After enough dashboard events have analyst labels and feature vectors, the
