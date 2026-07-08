@@ -11,7 +11,7 @@ import CanaryAssignmentsPanel from "@/components/dashboard/CanaryAssignmentsPane
 import DecoyStatusCard from "@/components/dashboard/DecoyStatusCard";
 import AlertPanel from "@/components/dashboard/AlertPanel";
 import SimulationPanel from "@/components/dashboard/SimulationPanel";
-import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchMLShadowSummary, fetchHoneytokens, fetchCanaryAssignments, fetchActorProfiles, fetchActorClusters, fetchActorCases, fetchActorCaseWorkflows, revokeCanaryAssignment, openActorCase, updateActorCase, labelEvent, downloadTrainingData, runRetraining, mapDashboardAlert, mapDashboardEvent } from "@/lib/api";
+import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchMLShadowSummary, fetchHoneytokens, fetchCanaryAssignments, fetchActorProfiles, fetchActorClusters, fetchActorCases, fetchActorCaseWorkflows, revokeCanaryAssignment, openActorCase, updateActorCase, labelEvent, downloadTrainingData, runRetraining, mapDashboardAlert, mapDashboardEvent, mapDecoyStatus, mapMLShadowStatus, mapMLShadowSummary, mapOverview, mapRiskHistoryPoint, mapTrainingSummary } from "@/lib/api";
 import type { ActorCaseSummary, ActorCaseWorkflow, ActorCaseWorkflowSummary, ActorClusterSummary, ActorProfileSummary, AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, MLShadowSummaryData, HoneytokenSummary, CanaryAssignmentSummary, RetrainingRun, DashboardStreamMessage } from "@/lib/api";
 import { Globe, ShieldAlert, ArrowRightLeft, Bell, BrainCircuit, Database, Download, KeyRound, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -363,6 +363,23 @@ export default function DashboardPage() {
       if (data.type === "snapshot") {
         setEvents(data.payload.events.map(mapDashboardEvent));
         handleAlertsUpdate(data.payload.alerts.map(mapDashboardAlert));
+        if (data.payload.metrics) setOverview(mapOverview(data.payload.metrics));
+        if (data.payload.traffic) setTraffic(data.payload.traffic);
+        if (data.payload.risk_history) {
+          setRiskHistory(data.payload.risk_history.map(mapRiskHistoryPoint));
+        }
+        if (data.payload.decoy_status) {
+          setDecoyStatus(mapDecoyStatus(data.payload.decoy_status));
+        }
+        if (data.payload.training_summary) {
+          setTrainingSummary(mapTrainingSummary(data.payload.training_summary));
+        }
+        if (data.payload.ml_shadow_status) {
+          setMlShadowStatus(mapMLShadowStatus(data.payload.ml_shadow_status));
+        }
+        if (data.payload.ml_shadow_summary) {
+          setMlShadowSummary(mapMLShadowSummary(data.payload.ml_shadow_summary));
+        }
         return;
       }
       if (data.type === "event") {

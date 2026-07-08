@@ -18,6 +18,8 @@ capabilities remain proposal targets. See
 - bounded request bodies, upstream timeouts, credential filtering, and rate limits;
 - SQLite development storage and PostgreSQL/Alembic support;
 - dashboard metrics, events, alerts, traffic history, and simulation controls;
+- authenticated WebSocket dashboard snapshots for events, alerts, metrics,
+  traffic, risk history, decoy status, training readiness, and ML shadow status;
 - ML-ready feature vectors, optional ML shadow scoring, and an offline Random Forest training pipeline;
 - locally reviewed CICIDS2017 DDoS and full-directory splits, shadow-ready
   Random Forest artifacts, and repeatable ML shadow smoke tests;
@@ -41,7 +43,7 @@ capabilities remain proposal targets. See
   tokens with epoch-based rotation; assignment and revoke records exist for
   operator review, but multi-operator approval workflows are not implemented.
 - Dashboard updates use HTTP polling with an optional authenticated WebSocket
-  stream for event and alert updates.
+  stream for initial dashboard snapshots plus event and alert updates.
 - Docker image builds are locally verified; cloud deployment is not yet
   verified in CI.
 
