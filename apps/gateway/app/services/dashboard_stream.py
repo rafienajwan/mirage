@@ -54,6 +54,11 @@ async def broadcast_dashboard_update(kind: str, payload: dict[str, Any]) -> None
     await dashboard_stream.broadcast({"type": kind, "payload": payload})
 
 
+async def broadcast_dashboard_snapshot() -> None:
+    """Broadcast a refreshed dashboard snapshot to connected clients."""
+    await broadcast_dashboard_update("snapshot", await build_dashboard_snapshot())
+
+
 async def build_dashboard_snapshot() -> dict[str, Any]:
     """Build the initial dashboard WebSocket snapshot payload."""
     recent_events = await store.get_recent_events(limit=20)

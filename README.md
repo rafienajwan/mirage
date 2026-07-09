@@ -43,7 +43,8 @@ capabilities remain proposal targets. See
   tokens with epoch-based rotation; assignment and revoke records exist for
   operator review, but multi-operator approval workflows are not implemented.
 - Dashboard updates use HTTP polling with an optional authenticated WebSocket
-  stream for initial dashboard snapshots plus event and alert updates.
+  stream for initial and post-inspection dashboard snapshots plus event and
+  alert updates.
 - Docker image builds are locally verified; cloud deployment is not yet
   verified in CI.
 
