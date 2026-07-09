@@ -5,10 +5,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect, status
 
 from app.services.dashboard_stream import (
+    build_dashboard_snapshot,
     dashboard_stream,
     dashboard_stream_authorized,
 )
-from app.storage import store
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -28,16 +28,7 @@ async def dashboard_websocket(
         await websocket.send_json(
             {
                 "type": "snapshot",
-                "payload": {
-                    "events": [
-                        item.model_dump(mode="json")
-                        for item in await store.get_recent_events(limit=20)
-                    ],
-                    "alerts": [
-                        item.model_dump(mode="json")
-                        for item in await store.get_alerts(limit=20)
-                    ],
-                },
+                "payload": await build_dashboard_snapshot(),
             }
         )
         while True:

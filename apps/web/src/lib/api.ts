@@ -240,6 +240,30 @@ interface BackendActorCaseWorkflowSummary {
   cases: BackendActorCaseWorkflow[];
 }
 
+interface BackendDecoyStatus {
+  active_decoys: number;
+  fake_endpoints: string[];
+  captured_interactions: number;
+  last_decoy_trigger: string | null;
+}
+
+interface BackendRiskHistoryPoint {
+  timestamp: string;
+  risk_score: number;
+}
+
+interface BackendDashboardSnapshot {
+  events: BackendEvent[];
+  alerts: BackendAlert[];
+  metrics?: BackendOverview;
+  traffic?: TrafficPoint[];
+  risk_history?: BackendRiskHistoryPoint[];
+  decoy_status?: BackendDecoyStatus;
+  training_summary?: BackendTrainingDataSummary;
+  ml_shadow_status?: BackendMLShadowStatus;
+  ml_shadow_summary?: BackendMLShadowSummary;
+}
+
 // ─── Frontend types (mapped from backend) ───────────────────────
 
 export interface OverviewMetrics {
@@ -575,8 +599,7 @@ async function simulationFetch<T>(kind: "normal" | "suspicious"): Promise<T> {
 }
 
 /** Fetch dashboard overview metrics. */
-export async function fetchOverview(): Promise<OverviewMetrics> {
-  const data = await apiFetch<BackendOverview>("/dashboard/overview");
+export function mapOverview(data: BackendOverview): OverviewMetrics {
   return {
     totalRequests: data.total_requests,
     suspiciousRequests: data.suspicious_requests,
@@ -584,6 +607,11 @@ export async function fetchOverview(): Promise<OverviewMetrics> {
     activeAlerts: data.active_alerts,
     averageRiskScore: data.average_risk_score,
   };
+}
+
+/** Fetch dashboard overview metrics. */
+export async function fetchOverview(): Promise<OverviewMetrics> {
+  return mapOverview(await apiFetch<BackendOverview>("/dashboard/overview"));
 }
 
 /** Fetch recent activity events. */
@@ -639,7 +667,7 @@ export async function fetchTrainingDataSummary(): Promise<TrainingDataSummary> {
   };
 }
 
-function mapTrainingSummary(data: BackendTrainingDataSummary): TrainingDataSummary {
+export function mapTrainingSummary(data: BackendTrainingDataSummary): TrainingDataSummary {
   return {
     labeledRows: data.labeled_rows,
     exportableRows: data.exportable_rows,
@@ -681,8 +709,7 @@ export async function runRetraining(): Promise<RetrainingRun> {
 }
 
 /** Fetch model-only shadow scoring status. */
-export async function fetchMLShadowStatus(): Promise<MLShadowStatusData> {
-  const data = await apiFetch<BackendMLShadowStatus>("/dashboard/ml-shadow/status");
+export function mapMLShadowStatus(data: BackendMLShadowStatus): MLShadowStatusData {
   return {
     mode: data.mode,
     artifact: data.artifact,
@@ -693,6 +720,13 @@ export async function fetchMLShadowStatus(): Promise<MLShadowStatusData> {
     blockers: data.blockers,
     warnings: data.warnings,
   };
+}
+
+/** Fetch model-only shadow scoring status. */
+export async function fetchMLShadowStatus(): Promise<MLShadowStatusData> {
+  return mapMLShadowStatus(
+    await apiFetch<BackendMLShadowStatus>("/dashboard/ml-shadow/status"),
+  );
 }
 
 function mapMLShadowBreakdown(
@@ -706,8 +740,7 @@ function mapMLShadowBreakdown(
 }
 
 /** Fetch recent model-only shadow scoring agreement summary. */
-export async function fetchMLShadowSummary(): Promise<MLShadowSummaryData> {
-  const data = await apiFetch<BackendMLShadowSummary>("/dashboard/ml-shadow/summary");
+export function mapMLShadowSummary(data: BackendMLShadowSummary): MLShadowSummaryData {
   return {
     inspectedEvents: data.inspected_events,
     shadowEvents: data.shadow_events,
@@ -719,6 +752,13 @@ export async function fetchMLShadowSummary(): Promise<MLShadowSummaryData> {
     liveDecisions: mapMLShadowBreakdown(data.live_decisions),
     shadowDecisions: mapMLShadowBreakdown(data.shadow_decisions),
   };
+}
+
+/** Fetch recent model-only shadow scoring agreement summary. */
+export async function fetchMLShadowSummary(): Promise<MLShadowSummaryData> {
+  return mapMLShadowSummary(
+    await apiFetch<BackendMLShadowSummary>("/dashboard/ml-shadow/summary"),
+  );
 }
 
 /** Fetch recent honeytoken interactions. */
@@ -926,7 +966,7 @@ export async function fetchAlerts(): Promise<FeedAlert[]> {
 export type DashboardStreamMessage =
   | {
       type: "snapshot";
-      payload: { events: BackendEvent[]; alerts: BackendAlert[] };
+      payload: BackendDashboardSnapshot;
     }
   | { type: "event"; payload: BackendEvent }
   | { type: "alert"; payload: BackendAlert };
@@ -973,24 +1013,27 @@ export async function fetchTraffic(): Promise<TrafficPoint[]> {
 
 /** Fetch recent risk scores for the sparkline chart. */
 export async function fetchRiskHistory(): Promise<RiskHistoryPoint[]> {
-  const { history } = await apiFetch<{ history: { timestamp: string; risk_score: number }[] }>("/dashboard/risk-history");
-  return history.map((h) => ({ timestamp: h.timestamp, riskScore: h.risk_score }));
+  const { history } = await apiFetch<{ history: BackendRiskHistoryPoint[] }>("/dashboard/risk-history");
+  return history.map(mapRiskHistoryPoint);
+}
+
+export function mapRiskHistoryPoint(point: BackendRiskHistoryPoint): RiskHistoryPoint {
+  return { timestamp: point.timestamp, riskScore: point.risk_score };
 }
 
 /** Fetch decoy environment status. */
-export async function fetchDecoyStatus(): Promise<DecoyStatusData> {
-  const data = await apiFetch<{
-    active_decoys: number;
-    fake_endpoints: string[];
-    captured_interactions: number;
-    last_decoy_trigger: string | null;
-  }>("/decoy/status");
+export function mapDecoyStatus(data: BackendDecoyStatus): DecoyStatusData {
   return {
     activeDecoys: data.active_decoys,
     fakeEndpoints: data.fake_endpoints,
     capturedInteractions: data.captured_interactions,
     lastDecoyTrigger: data.last_decoy_trigger,
   };
+}
+
+/** Fetch decoy environment status. */
+export async function fetchDecoyStatus(): Promise<DecoyStatusData> {
+  return mapDecoyStatus(await apiFetch<BackendDecoyStatus>("/decoy/status"));
 }
 
 export interface DecoyStatusData {

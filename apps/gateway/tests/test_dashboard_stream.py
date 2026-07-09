@@ -4,7 +4,11 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.schemas.decision import Decision
+from app.schemas.event import EventRecord
 from app.services import dashboard_stream
+from app.storage.memory_store import MemoryStore
+from app.utils.time import utcnow
 
 
 class FakeWebSocket:
@@ -61,3 +65,45 @@ async def test_dashboard_stream_broadcasts_and_drops_closed_clients():
         {"type": "event", "payload": {"event_id": "evt-1"}},
         {"type": "alert", "payload": {"alert_id": "alert-1"}},
     ]
+
+
+@pytest.mark.asyncio
+async def test_dashboard_stream_snapshot_includes_dashboard_metrics(monkeypatch):
+    memory_store = MemoryStore()
+    await memory_store.add_event(
+        EventRecord(
+            event_id="evt-1",
+            timestamp=utcnow(),
+            ip_address="10.0.0.1",
+            path="/api/products",
+            method="GET",
+            risk_score=5.0,
+            decision=Decision.ALLOW,
+            event_type="inspection",
+            summary="GET /api/products",
+        )
+    )
+
+    monkeypatch.setattr(dashboard_stream, "store", memory_store)
+
+    snapshot = await dashboard_stream.build_dashboard_snapshot()
+
+    assert snapshot["events"][0]["event_id"] == "evt-1"
+    assert snapshot["metrics"]["total_requests"] == 1
+    assert snapshot["traffic"] == [
+        {
+            "hour": snapshot["traffic"][0]["hour"],
+            "normal": 1,
+            "suspicious": 0,
+        }
+    ]
+    assert snapshot["risk_history"][0]["risk_score"] == 5.0
+    assert snapshot["decoy_status"]["captured_interactions"] == 0
+    assert snapshot["training_summary"]["ready_for_training"] is False
+    assert snapshot["ml_shadow_status"]["mode"] in {
+        "disabled",
+        "missing",
+        "invalid",
+        "shadow_ready",
+    }
+    assert snapshot["ml_shadow_summary"]["inspected_events"] == 1
