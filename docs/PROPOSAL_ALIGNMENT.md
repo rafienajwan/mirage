@@ -26,7 +26,7 @@ the beginning of a real ML pipeline.
 | CICIDS2017 dataset | Partial | CICIDS-style single-CSV and directory adapters exist; local DDoS and full-directory CICIDS2017 splits have been prepared, reviewed, trained, and evaluated. Dataset provenance review is local-only and custom API-domain data is still pending. |
 | Custom API logs | Partial | Runtime events, features, analyst-corrected labels, JSONL export, raw API-log JSONL ingestion with common access-log aliases, validation, split tooling, deterministic local API-domain fixture generation, and local retraining are available; reviewed production-like API-domain datasets are still pending. |
 | Precision/recall/F1/FPR evaluation | Implemented | The Random Forest trainer calculates all four metrics. |
-| Real-time WebSocket dashboard | Partial | An authenticated WebSocket stream sends initial dashboard snapshots and pushes events and alerts; dashboard polling remains as fallback and some secondary panels still refresh through HTTP. |
+| Real-time WebSocket dashboard | Partial | An authenticated WebSocket stream sends initial and post-inspection dashboard snapshots and pushes events and alerts; dashboard polling remains as fallback for resilience and secondary workflows. |
 | Security dashboard and alerts | Implemented for demo | Live metrics, events, risk history, decoy status, actor triage, and internal alerts are available. |
 | Adaptive decoy generation | Partial | The in-process decoy API and redirected external decoy service select variants and issue epoch-rotatable per-actor synthetic canary tokens; assignment/revoke lifecycle records exist, while multi-operator lifecycle workflows are pending. |
 | Docker Compose | Locally verified | Compose, health checks, and Dockerfiles exist; local image build and service startup have been verified, but CI and production deployment are still pending. |
@@ -61,7 +61,7 @@ The current demo can accurately claim that MIRAGE:
 - can generate deterministic API-domain fixture logs for local adapter and
   shadow-artifact validation;
 - displays live backend data, actor clusters, and recommended triage cases on a
-  dashboard with authenticated WebSocket snapshots plus polling fallback;
+  dashboard with authenticated WebSocket snapshots and polling fallback;
 - can train and evaluate a Random Forest model from labeled feature records.
 
 It should not yet claim arbitrary ingress interception, a production ML model,
