@@ -1,5 +1,6 @@
 """Tests for dashboard WebSocket stream helpers."""
 
+import asyncio
 import json
 
 from types import SimpleNamespace
@@ -127,3 +128,70 @@ async def test_dashboard_stream_snapshot_includes_dashboard_metrics(monkeypatch)
     assert "cases" in snapshot["actor_cases"]
     assert snapshot["actor_case_workflows"] == {"total_cases": 0, "cases": []}
     json.dumps(snapshot)
+
+
+@pytest.mark.asyncio
+async def test_snapshot_refresh_coalesces_while_build_is_running():
+    started = asyncio.Event()
+    release = asyncio.Event()
+    builds = 0
+    active = 0
+    max_active = 0
+    messages: list[dict] = []
+
+    async def build_snapshot() -> dict:
+        nonlocal builds, active, max_active
+        builds += 1
+        active += 1
+        max_active = max(max_active, active)
+        started.set()
+        await release.wait()
+        active -= 1
+        return {"build": builds}
+
+    async def broadcast_update(kind: str, payload: dict) -> None:
+        messages.append({"type": kind, "payload": payload})
+
+    coordinator = dashboard_stream.DashboardSnapshotRefreshCoordinator(
+        build_snapshot=build_snapshot,
+        broadcast_update=broadcast_update,
+        debounce_seconds=0,
+    )
+    task = coordinator.schedule()
+    await started.wait()
+    assert coordinator.schedule() is task
+    assert coordinator.schedule() is task
+    release.set()
+    await task
+
+    assert builds == 2
+    assert max_active == 1
+    assert len(messages) == 2
+
+
+@pytest.mark.asyncio
+async def test_snapshot_refresh_recovers_after_build_failure():
+    attempts = 0
+    messages: list[dict] = []
+
+    async def build_snapshot() -> dict:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise RuntimeError("snapshot failed")
+        return {"attempt": attempts}
+
+    async def broadcast_update(kind: str, payload: dict) -> None:
+        messages.append({"type": kind, "payload": payload})
+
+    coordinator = dashboard_stream.DashboardSnapshotRefreshCoordinator(
+        build_snapshot=build_snapshot,
+        broadcast_update=broadcast_update,
+        debounce_seconds=0,
+    )
+
+    await coordinator.schedule()
+    await coordinator.schedule()
+
+    assert attempts == 2
+    assert messages == [{"type": "snapshot", "payload": {"attempt": 2}}]

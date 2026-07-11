@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import secrets
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from fastapi import WebSocket
@@ -19,6 +22,11 @@ from app.services.ml_shadow_summary import summarize_ml_shadow_events
 from app.services.ml_status import get_ml_shadow_status
 from app.services.training_export import training_data_summary
 from app.storage import store
+
+logger = logging.getLogger(__name__)
+
+SnapshotBuilder = Callable[[], Awaitable[dict[str, Any]]]
+DashboardBroadcaster = Callable[[str, dict[str, Any]], Awaitable[None]]
 
 
 class DashboardStreamManager:
@@ -119,3 +127,50 @@ async def build_dashboard_snapshot() -> dict[str, Any]:
         "actor_cases": actor_cases.model_dump(mode="json"),
         "actor_case_workflows": actor_case_workflows.model_dump(mode="json"),
     }
+
+
+class DashboardSnapshotRefreshCoordinator:
+    """Coalesce non-blocking dashboard snapshot refresh requests."""
+
+    def __init__(
+        self,
+        *,
+        build_snapshot: SnapshotBuilder = build_dashboard_snapshot,
+        broadcast_update: DashboardBroadcaster = broadcast_dashboard_update,
+        debounce_seconds: float = 0.1,
+    ) -> None:
+        self._build_snapshot = build_snapshot
+        self._broadcast_update = broadcast_update
+        self._debounce_seconds = debounce_seconds
+        self._pending = False
+        self._task: asyncio.Task[None] | None = None
+
+    def schedule(self) -> asyncio.Task[None]:
+        """Schedule one refresh and return the retained background task."""
+        self._pending = True
+        if self._task is None or self._task.done():
+            self._task = asyncio.create_task(self._run())
+        return self._task
+
+    async def _run(self) -> None:
+        try:
+            await asyncio.sleep(self._debounce_seconds)
+            while self._pending:
+                self._pending = False
+                try:
+                    snapshot = await self._build_snapshot()
+                    await self._broadcast_update("snapshot", snapshot)
+                except Exception:
+                    logger.exception("Dashboard snapshot refresh failed")
+                if self._pending:
+                    await asyncio.sleep(self._debounce_seconds)
+        finally:
+            self._task = None
+
+
+dashboard_snapshot_refresh = DashboardSnapshotRefreshCoordinator()
+
+
+def schedule_dashboard_snapshot_refresh() -> asyncio.Task[None]:
+    """Schedule a coalesced dashboard snapshot refresh."""
+    return dashboard_snapshot_refresh.schedule()
