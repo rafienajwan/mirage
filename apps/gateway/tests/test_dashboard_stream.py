@@ -26,26 +26,31 @@ class FakeWebSocket:
         self.messages.append(message)
 
 
-def test_dashboard_stream_auth_requires_token_when_api_key_is_configured(monkeypatch):
+def test_dashboard_stream_auth_requires_dedicated_token(monkeypatch):
     monkeypatch.setattr(
         dashboard_stream,
         "settings",
-        SimpleNamespace(api_key="operator-key"),
+        SimpleNamespace(
+            api_key="operator-key",
+            dashboard_stream_token="stream-key",
+        ),
     )
 
     assert dashboard_stream.dashboard_stream_authorized(None) is False
+    assert dashboard_stream.dashboard_stream_authorized("operator-key") is False
     assert dashboard_stream.dashboard_stream_authorized("wrong") is False
-    assert dashboard_stream.dashboard_stream_authorized("operator-key") is True
+    assert dashboard_stream.dashboard_stream_authorized("stream-key") is True
 
 
-def test_dashboard_stream_auth_allows_dev_without_api_key(monkeypatch):
+def test_dashboard_stream_auth_is_disabled_without_stream_token(monkeypatch):
     monkeypatch.setattr(
         dashboard_stream,
         "settings",
-        SimpleNamespace(api_key=None),
+        SimpleNamespace(api_key="operator-key", dashboard_stream_token=None),
     )
 
-    assert dashboard_stream.dashboard_stream_authorized(None) is True
+    assert dashboard_stream.dashboard_stream_authorized(None) is False
+    assert dashboard_stream.dashboard_stream_authorized("operator-key") is False
 
 
 @pytest.mark.asyncio

@@ -4,11 +4,14 @@ services:
       context: ../apps/web
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        NEXT_PUBLIC_DASHBOARD_WS_URL: ${NEXT_PUBLIC_DASHBOARD_WS_URL:-}
+        NEXT_PUBLIC_DASHBOARD_WS_TOKEN: ${NEXT_PUBLIC_DASHBOARD_WS_TOKEN:-}
     ports:
       - "${WEB_PORT:-3000}:3000"
     environment:
       MIRAGE_INTERNAL_API_URL: ${MIRAGE_INTERNAL_API_URL:-http://gateway:8000}
       MIRAGE_API_KEY: ${MIRAGE_API_KEY:?MIRAGE_API_KEY is required}
+      MIRAGE_DASHBOARD_STREAM_TOKEN: ${MIRAGE_DASHBOARD_STREAM_TOKEN:-}
     depends_on:
       gateway:
         condition: service_healthy

@@ -43,10 +43,11 @@ dashboard_stream = DashboardStreamManager()
 
 
 def dashboard_stream_authorized(token: str | None) -> bool:
-    """Validate a browser WebSocket token against the operator API key."""
-    if settings.api_key is None:
-        return True
-    return token is not None and secrets.compare_digest(token, settings.api_key)
+    """Validate the dedicated browser-visible dashboard stream token."""
+    expected = settings.dashboard_stream_token
+    if expected is None or token is None:
+        return False
+    return secrets.compare_digest(token, expected)
 
 
 async def broadcast_dashboard_update(kind: str, payload: dict[str, Any]) -> None:
