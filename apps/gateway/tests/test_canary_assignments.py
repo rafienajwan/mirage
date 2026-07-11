@@ -2,9 +2,23 @@
 
 import pytest
 
+from app.api.routes import dashboard as dashboard_routes
+
 
 @pytest.mark.asyncio
-async def test_decoy_response_records_and_revokes_canary_assignment(client):
+async def test_decoy_response_records_and_revokes_canary_assignment(client, monkeypatch):
+    refreshes = 0
+
+    def schedule_refresh() -> None:
+        nonlocal refreshes
+        refreshes += 1
+
+    monkeypatch.setattr(
+        dashboard_routes,
+        "schedule_dashboard_snapshot_refresh",
+        schedule_refresh,
+        raising=False,
+    )
     response = await client.post(
         "/api/v1/decoy/respond",
         json={
@@ -45,6 +59,7 @@ async def test_decoy_response_records_and_revokes_canary_assignment(client):
     assert revoked_assignment["status"] == "revoked"
     assert revoked_assignment["revoke_reason"] == "operator rotation"
     assert revoked_assignment["revoked_at"] is not None
+    assert refreshes == 1
 
     filtered = await client.get(
         "/api/v1/dashboard/canary-assignments?status=revoked"
@@ -54,7 +69,19 @@ async def test_decoy_response_records_and_revokes_canary_assignment(client):
 
 
 @pytest.mark.asyncio
-async def test_missing_canary_assignment_revoke_returns_404(client):
+async def test_missing_canary_assignment_revoke_returns_404(client, monkeypatch):
+    refreshes = 0
+
+    def schedule_refresh() -> None:
+        nonlocal refreshes
+        refreshes += 1
+
+    monkeypatch.setattr(
+        dashboard_routes,
+        "schedule_dashboard_snapshot_refresh",
+        schedule_refresh,
+        raising=False,
+    )
     response = await client.post(
         "/api/v1/dashboard/canary-assignments/canary-missing/revoke",
         json={"reason": "not found"},
@@ -62,3 +89,4 @@ async def test_missing_canary_assignment_revoke_returns_404(client):
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Canary assignment not found"
+    assert refreshes == 0
