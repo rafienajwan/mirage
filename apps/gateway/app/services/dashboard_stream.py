@@ -9,6 +9,12 @@ from fastapi import WebSocket
 
 from app.core.config import settings
 from app.services.decoy_engine import FAKE_ENDPOINTS
+from app.services.actor_clusters import (
+    get_actor_case_workflows,
+    get_actor_cases,
+    get_actor_clusters,
+)
+from app.services.actor_profiles import get_actor_profiles
 from app.services.ml_shadow_summary import summarize_ml_shadow_events
 from app.services.ml_status import get_ml_shadow_status
 from app.services.training_export import training_data_summary
@@ -66,6 +72,12 @@ async def build_dashboard_snapshot() -> dict[str, Any]:
     recent_alerts = await store.get_alerts(limit=20)
     labeled_events = await store.get_labeled_events(limit=10000)
     last_decoy_trigger = await store.get_last_decoy_trigger()
+    honeytoken_hits = await store.get_honeytoken_hits(limit=20)
+    canary_assignments = await store.get_canary_assignments(limit=50)
+    actor_profiles = await get_actor_profiles(limit=20)
+    actor_clusters = await get_actor_clusters(limit=20)
+    actor_cases = await get_actor_cases(limit=20)
+    actor_case_workflows = await get_actor_case_workflows(limit=20)
 
     return {
         "events": [item.model_dump(mode="json") for item in recent_events],
@@ -92,4 +104,18 @@ async def build_dashboard_snapshot() -> dict[str, Any]:
         "ml_shadow_summary": summarize_ml_shadow_events(
             await store.get_recent_events(limit=200)
         ).model_dump(mode="json"),
+        "honeytokens": {
+            "total_hits": await store.get_honeytoken_hit_count(),
+            "hits": [item.model_dump(mode="json") for item in honeytoken_hits],
+        },
+        "canary_assignments": {
+            "total_assignments": len(canary_assignments),
+            "assignments": [
+                item.model_dump(mode="json") for item in canary_assignments
+            ],
+        },
+        "actor_profiles": actor_profiles.model_dump(mode="json"),
+        "actor_clusters": actor_clusters.model_dump(mode="json"),
+        "actor_cases": actor_cases.model_dump(mode="json"),
+        "actor_case_workflows": actor_case_workflows.model_dump(mode="json"),
     }

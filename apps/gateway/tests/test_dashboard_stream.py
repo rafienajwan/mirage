@@ -1,12 +1,14 @@
 """Tests for dashboard WebSocket stream helpers."""
 
+import json
+
 from types import SimpleNamespace
 
 import pytest
 
 from app.schemas.decision import Decision
 from app.schemas.event import EventRecord
-from app.services import dashboard_stream
+from app.services import actor_clusters, actor_profiles, dashboard_stream
 from app.storage.memory_store import MemoryStore
 from app.utils.time import utcnow
 
@@ -90,6 +92,8 @@ async def test_dashboard_stream_snapshot_includes_dashboard_metrics(monkeypatch)
     )
 
     monkeypatch.setattr(dashboard_stream, "store", memory_store)
+    monkeypatch.setattr(actor_profiles, "store", memory_store)
+    monkeypatch.setattr(actor_clusters, "store", memory_store)
 
     snapshot = await dashboard_stream.build_dashboard_snapshot()
 
@@ -112,3 +116,14 @@ async def test_dashboard_stream_snapshot_includes_dashboard_metrics(monkeypatch)
         "shadow_ready",
     }
     assert snapshot["ml_shadow_summary"]["inspected_events"] == 1
+    assert snapshot["honeytokens"] == {"total_hits": 0, "hits": []}
+    assert snapshot["canary_assignments"] == {
+        "total_assignments": 0,
+        "assignments": [],
+    }
+    assert snapshot["actor_profiles"]["total_actors"] == 1
+    assert len(snapshot["actor_profiles"]["profiles"]) == 1
+    assert "clusters" in snapshot["actor_clusters"]
+    assert "cases" in snapshot["actor_cases"]
+    assert snapshot["actor_case_workflows"] == {"total_cases": 0, "cases": []}
+    json.dumps(snapshot)
