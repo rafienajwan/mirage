@@ -31,6 +31,7 @@ Open `http://localhost:8000/docs` for the generated API reference.
 | --- | --- |
 | `DATABASE_URL` | Async SQLite or PostgreSQL connection |
 | `MIRAGE_API_KEY` | Protects inspection, simulation, and decoy-write endpoints |
+| `MIRAGE_DASHBOARD_STREAM_TOKEN` | Local/demo read-only WebSocket access |
 | `REAL_APP_URL` | Upstream for allowed or monitored requests |
 | `DECOY_SERVICE_URL` | Upstream for redirected requests |
 | `RISK_THRESHOLD` | Heuristic risk escalation threshold |
@@ -136,5 +137,5 @@ rows for stratified splitting.
   dashboard clusters with assigned case workflows; issued canary assignment
   records and revoke controls are available for operator review, but
   multi-analyst queues are not implemented;
-- WebSocket streaming currently covers events and alerts; aggregate metrics are
-  still polled.
+- WebSocket streaming sends immediate events/alerts and complete coalesced
+  dashboard snapshots; production session or edge authentication is pending.

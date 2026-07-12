@@ -255,13 +255,19 @@ interface BackendRiskHistoryPoint {
 interface BackendDashboardSnapshot {
   events: BackendEvent[];
   alerts: BackendAlert[];
-  metrics?: BackendOverview;
-  traffic?: TrafficPoint[];
-  risk_history?: BackendRiskHistoryPoint[];
-  decoy_status?: BackendDecoyStatus;
-  training_summary?: BackendTrainingDataSummary;
-  ml_shadow_status?: BackendMLShadowStatus;
-  ml_shadow_summary?: BackendMLShadowSummary;
+  metrics: BackendOverview;
+  traffic: TrafficPoint[];
+  risk_history: BackendRiskHistoryPoint[];
+  decoy_status: BackendDecoyStatus;
+  training_summary: BackendTrainingDataSummary;
+  ml_shadow_status: BackendMLShadowStatus;
+  ml_shadow_summary: BackendMLShadowSummary;
+  honeytokens: BackendHoneytokenSummary;
+  canary_assignments: BackendCanaryAssignmentSummary;
+  actor_profiles: BackendActorProfileSummary;
+  actor_clusters: BackendActorClusterSummary;
+  actor_cases: BackendActorCaseSummary;
+  actor_case_workflows: BackendActorCaseWorkflowSummary;
 }
 
 // ─── Frontend types (mapped from backend) ───────────────────────
@@ -510,6 +516,24 @@ export interface ActorCaseWorkflow {
 export interface ActorCaseWorkflowSummary {
   totalCases: number;
   cases: ActorCaseWorkflow[];
+}
+
+export interface DashboardSnapshot {
+  events: FeedEvent[];
+  alerts: FeedAlert[];
+  overview: OverviewMetrics;
+  traffic: TrafficPoint[];
+  riskHistory: RiskHistoryPoint[];
+  decoyStatus: DecoyStatusData;
+  trainingSummary: TrainingDataSummary;
+  mlShadowStatus: MLShadowStatusData;
+  mlShadowSummary: MLShadowSummaryData;
+  honeytokens: HoneytokenSummary;
+  canaryAssignments: CanaryAssignmentSummary;
+  actorProfiles: ActorProfileSummary;
+  actorClusters: ActorClusterSummary;
+  actorCases: ActorCaseSummary;
+  actorCaseWorkflows: ActorCaseWorkflowSummary;
 }
 
 // ─── Mapping helpers ────────────────────────────────────────────
@@ -764,6 +788,12 @@ export async function fetchMLShadowSummary(): Promise<MLShadowSummaryData> {
 /** Fetch recent honeytoken interactions. */
 export async function fetchHoneytokens(): Promise<HoneytokenSummary> {
   const data = await apiFetch<BackendHoneytokenSummary>("/dashboard/honeytokens");
+  return mapHoneytokenSummary(data);
+}
+
+export function mapHoneytokenSummary(
+  data: BackendHoneytokenSummary,
+): HoneytokenSummary {
   return {
     totalHits: data.total_hits,
     hits: data.hits.map((hit) => ({
@@ -801,6 +831,12 @@ function mapCanaryAssignment(item: BackendCanaryAssignment): CanaryAssignment {
 /** Fetch issued canary assignment lifecycle records. */
 export async function fetchCanaryAssignments(): Promise<CanaryAssignmentSummary> {
   const data = await apiFetch<BackendCanaryAssignmentSummary>("/dashboard/canary-assignments");
+  return mapCanaryAssignmentSummary(data);
+}
+
+export function mapCanaryAssignmentSummary(
+  data: BackendCanaryAssignmentSummary,
+): CanaryAssignmentSummary {
   return {
     totalAssignments: data.total_assignments,
     assignments: data.assignments.map(mapCanaryAssignment),
@@ -826,6 +862,12 @@ export async function revokeCanaryAssignment(
 /** Fetch recent actor profiles from threat fingerprints. */
 export async function fetchActorProfiles(): Promise<ActorProfileSummary> {
   const data = await apiFetch<BackendActorProfileSummary>("/dashboard/actors");
+  return mapActorProfileSummary(data);
+}
+
+export function mapActorProfileSummary(
+  data: BackendActorProfileSummary,
+): ActorProfileSummary {
   return {
     totalActors: data.total_actors,
     profiles: data.profiles.map((profile) => ({
@@ -850,6 +892,12 @@ export async function fetchActorProfiles(): Promise<ActorProfileSummary> {
 /** Fetch lightweight actor clusters for dashboard triage. */
 export async function fetchActorClusters(): Promise<ActorClusterSummary> {
   const data = await apiFetch<BackendActorClusterSummary>("/dashboard/actor-clusters");
+  return mapActorClusterSummary(data);
+}
+
+export function mapActorClusterSummary(
+  data: BackendActorClusterSummary,
+): ActorClusterSummary {
   return {
     totalClusters: data.total_clusters,
     clusters: data.clusters.map((cluster) => ({
@@ -870,6 +918,12 @@ export async function fetchActorClusters(): Promise<ActorClusterSummary> {
 /** Fetch read-only recommended actor cases for analyst triage. */
 export async function fetchActorCases(): Promise<ActorCaseSummary> {
   const data = await apiFetch<BackendActorCaseSummary>("/dashboard/actor-cases");
+  return mapActorCaseSummary(data);
+}
+
+export function mapActorCaseSummary(
+  data: BackendActorCaseSummary,
+): ActorCaseSummary {
   return {
     totalCases: data.total_cases,
     cases: data.cases.map((item) => ({
@@ -916,6 +970,12 @@ export async function fetchActorCaseWorkflows(filters?: {
   if (filters?.assignedTo) params.set("assigned_to", filters.assignedTo);
   const query = params.size ? `?${params.toString()}` : "";
   const data = await apiFetch<BackendActorCaseWorkflowSummary>(`/dashboard/actor-case-workflows${query}`);
+  return mapActorCaseWorkflowSummary(data);
+}
+
+export function mapActorCaseWorkflowSummary(
+  data: BackendActorCaseWorkflowSummary,
+): ActorCaseWorkflowSummary {
   return {
     totalCases: data.total_cases,
     cases: data.cases.map(mapActorCaseWorkflow),
@@ -961,6 +1021,28 @@ export async function updateActorCase(
 export async function fetchAlerts(): Promise<FeedAlert[]> {
   const { alerts } = await apiFetch<{ alerts: BackendAlert[] }>("/dashboard/alerts");
   return alerts.map(mapDashboardAlert);
+}
+
+export function mapDashboardSnapshot(
+  data: BackendDashboardSnapshot,
+): DashboardSnapshot {
+  return {
+    events: data.events.map(mapDashboardEvent),
+    alerts: data.alerts.map(mapDashboardAlert),
+    overview: mapOverview(data.metrics),
+    traffic: data.traffic,
+    riskHistory: data.risk_history.map(mapRiskHistoryPoint),
+    decoyStatus: mapDecoyStatus(data.decoy_status),
+    trainingSummary: mapTrainingSummary(data.training_summary),
+    mlShadowStatus: mapMLShadowStatus(data.ml_shadow_status),
+    mlShadowSummary: mapMLShadowSummary(data.ml_shadow_summary),
+    honeytokens: mapHoneytokenSummary(data.honeytokens),
+    canaryAssignments: mapCanaryAssignmentSummary(data.canary_assignments),
+    actorProfiles: mapActorProfileSummary(data.actor_profiles),
+    actorClusters: mapActorClusterSummary(data.actor_clusters),
+    actorCases: mapActorCaseSummary(data.actor_cases),
+    actorCaseWorkflows: mapActorCaseWorkflowSummary(data.actor_case_workflows),
+  };
 }
 
 export type DashboardStreamMessage =

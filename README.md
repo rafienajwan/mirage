@@ -4,7 +4,7 @@ Project MIRAGE is an experimental cyber-deception platform for API traffic. The
 current repository is a local MVP: a guarded FastAPI proxy scores requests with
 heuristics, forwards normal traffic to a protected demo app, redirects suspicious
 traffic to an isolated static decoy, persists security events, and exposes them
-through a polling Next.js dashboard.
+through a real-time Next.js dashboard with resilient polling fallback.
 
 The broader adaptive-ML hardening, multi-operator workflow, and cloud-deployment
 capabilities remain proposal targets. See
@@ -19,7 +19,8 @@ capabilities remain proposal targets. See
 - SQLite development storage and PostgreSQL/Alembic support;
 - dashboard metrics, events, alerts, traffic history, and simulation controls;
 - authenticated WebSocket dashboard snapshots for events, alerts, metrics,
-  traffic, risk history, decoy status, training readiness, and ML shadow status;
+  traffic, risk history, decoy status, training readiness, ML shadow status,
+  honeytokens, canary assignments, and actor/case workflows;
 - ML-ready feature vectors, optional ML shadow scoring, and an offline Random Forest training pipeline;
 - locally reviewed CICIDS2017 DDoS and full-directory splits, shadow-ready
   Random Forest artifacts, and repeatable ML shadow smoke tests;
@@ -42,9 +43,10 @@ capabilities remain proposal targets. See
 - Decoy payloads are synthetic and can issue deterministic per-actor canary
   tokens with epoch-based rotation; assignment and revoke records exist for
   operator review, but multi-operator approval workflows are not implemented.
-- Dashboard updates use HTTP polling with an optional authenticated WebSocket
-  stream for initial and post-inspection dashboard snapshots plus event and
-  alert updates.
+- Dashboard updates use a dedicated read-only WebSocket token for complete
+  initial and post-change snapshots plus immediate event/alert updates. HTTP
+  polling reconciles every 60 seconds while connected and falls back to every
+  10 seconds while disconnected.
 - Docker image builds are locally verified; cloud deployment is not yet
   verified in CI.
 
@@ -96,6 +98,7 @@ Fill every variable marked `REQUIRED` in `.env`:
 - `DATABASE_URL` must use the `postgresql+asyncpg` driver, host `db`, and the
   same user, password, and database configured by `POSTGRES_*`.
 - `MIRAGE_API_KEY` protects operator write endpoints and the dashboard simulation bridge.
+- `MIRAGE_DASHBOARD_STREAM_TOKEN` grants local/demo read-only dashboard stream access.
 - `DECOY_*` values must be synthetic and invalid on every real system.
 - `DECOY_CANARY_EPOCH` can be increased when rotating newly issued canary
   tokens.
@@ -352,7 +355,8 @@ infra/
 
 1. Add reviewed custom API-log datasets so model training matches the protected
    API domain more closely.
-2. Expand WebSocket streaming beyond events/alerts and harden deployment auth.
+2. Replace the local dashboard stream token with session or edge authentication
+   for managed deployment.
 3. Expand case-management workflow queues and analyst collaboration.
 4. Add multi-operator approval flows and audit policy around canary lifecycle
    changes.

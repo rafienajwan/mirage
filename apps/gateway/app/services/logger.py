@@ -11,8 +11,8 @@ from app.schemas.honeytoken import HoneytokenHit
 from app.schemas.ml import MLShadowScore
 from app.schemas.request import InspectRequest
 from app.services.dashboard_stream import (
-    broadcast_dashboard_snapshot,
     broadcast_dashboard_update,
+    schedule_dashboard_snapshot_refresh,
 )
 from app.services.honeytoken import HoneytokenMatch
 from app.storage import store
@@ -104,7 +104,7 @@ async def log_inspection(
         )
         await _broadcast_latest_alert()
 
-    await broadcast_dashboard_snapshot()
+    schedule_dashboard_snapshot_refresh()
     return event
 
 

@@ -4,6 +4,7 @@ import json
 
 import pytest
 
+from app.api.routes import dashboard as dashboard_routes
 from app.schemas.decision import Decision, RiskLevel
 from app.services.decision_engine import make_decision
 from app.services.risk_engine import RiskResult
@@ -109,7 +110,19 @@ async def test_inspect_rejects_unbounded_input(client):
 
 
 @pytest.mark.asyncio
-async def test_dashboard_event_labeling(client):
+async def test_dashboard_event_labeling(client, monkeypatch):
+    refreshes = 0
+
+    def schedule_refresh() -> None:
+        nonlocal refreshes
+        refreshes += 1
+
+    monkeypatch.setattr(
+        dashboard_routes,
+        "schedule_dashboard_snapshot_refresh",
+        schedule_refresh,
+        raising=False,
+    )
     inspect_response = await client.post(
         "/api/v1/inspect",
         json={
@@ -136,16 +149,30 @@ async def test_dashboard_event_labeling(client):
     assert data["analyst_label"] == "normal"
     assert data["analyst_note"] == "Reviewed as benign demo traffic"
     assert data["labeled_at"] is not None
+    assert refreshes == 1
 
 
 @pytest.mark.asyncio
-async def test_dashboard_event_labeling_returns_404(client):
+async def test_dashboard_event_labeling_returns_404(client, monkeypatch):
+    refreshes = 0
+
+    def schedule_refresh() -> None:
+        nonlocal refreshes
+        refreshes += 1
+
+    monkeypatch.setattr(
+        dashboard_routes,
+        "schedule_dashboard_snapshot_refresh",
+        schedule_refresh,
+        raising=False,
+    )
     response = await client.patch(
         "/api/v1/dashboard/events/missing/label",
         json={"label": "false_positive"},
     )
 
     assert response.status_code == 404
+    assert refreshes == 0
 
 
 @pytest.mark.asyncio

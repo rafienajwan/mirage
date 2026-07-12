@@ -19,10 +19,11 @@ appropriate example and this reference in the same change.
 | Variable | Required | Scope | Purpose |
 | --- | --- | --- | --- |
 | `NEXT_PUBLIC_API_URL` | No | Browser | Public gateway URL used for dashboard reads |
-| `NEXT_PUBLIC_DASHBOARD_WS_URL` | No | Browser | Optional gateway WebSocket URL for dashboard event/alert streaming |
-| `NEXT_PUBLIC_DASHBOARD_WS_TOKEN` | No | Browser | Optional local stream token; omit to keep polling fallback only |
+| `NEXT_PUBLIC_DASHBOARD_WS_URL` | No | Browser | Optional gateway URL for complete dashboard streaming |
+| `NEXT_PUBLIC_DASHBOARD_WS_TOKEN` | No | Browser | Optional local/demo read-only stream token |
 | `MIRAGE_INTERNAL_API_URL` | No | Web server | Internal gateway URL used by the simulation bridge |
 | `MIRAGE_API_KEY` | Yes | Gateway and web server | Protects operator writes and authenticates simulations |
+| `MIRAGE_DASHBOARD_STREAM_TOKEN` | No | Gateway | Matches the browser stream token without granting write access |
 | `DATABASE_URL` | Yes | Gateway | Async PostgreSQL connection used by SQLAlchemy |
 | `POSTGRES_USER` | No | PostgreSQL | Database user; defaults to `mirage` |
 | `POSTGRES_PASSWORD` | Yes | PostgreSQL | Strong URL-safe database password |
@@ -90,7 +91,7 @@ Only variables beginning with `NEXT_PUBLIC_` are safe to expose to browser code.
 server-side. Dashboard simulations use the Next.js server route
 `/api/simulate/{kind}` to avoid exposing the operator key.
 
-`NEXT_PUBLIC_DASHBOARD_WS_TOKEN` is browser-visible by design. Use it only for a
-local/demo read stream, and keep HTTP polling enabled as the fallback. For a
-production deployment, place the WebSocket behind a server-side session or edge
-auth layer instead of exposing the operator API key.
+`NEXT_PUBLIC_DASHBOARD_WS_TOKEN` is browser-visible by design and must match
+`MIRAGE_DASHBOARD_STREAM_TOKEN`. Use this pair only for the local/demo read
+stream. It does not authorize operator writes. For production, place the
+WebSocket behind a server-side session or edge authentication layer.

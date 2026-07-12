@@ -8,13 +8,13 @@ from app.services import logger
 
 
 @pytest.mark.asyncio
-async def test_log_inspection_broadcasts_event_then_snapshot(monkeypatch):
+async def test_log_inspection_broadcasts_event_then_schedules_snapshot(monkeypatch):
     calls: list[str] = []
 
     async def fake_broadcast_dashboard_update(kind: str, payload: dict) -> None:
         calls.append(kind)
 
-    async def fake_broadcast_dashboard_snapshot() -> None:
+    def fake_schedule_dashboard_snapshot_refresh() -> None:
         calls.append("snapshot")
 
     monkeypatch.setattr(
@@ -24,8 +24,8 @@ async def test_log_inspection_broadcasts_event_then_snapshot(monkeypatch):
     )
     monkeypatch.setattr(
         logger,
-        "broadcast_dashboard_snapshot",
-        fake_broadcast_dashboard_snapshot,
+        "schedule_dashboard_snapshot_refresh",
+        fake_schedule_dashboard_snapshot_refresh,
     )
 
     await logger.log_inspection(

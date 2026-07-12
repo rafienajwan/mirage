@@ -11,8 +11,10 @@ import CanaryAssignmentsPanel from "@/components/dashboard/CanaryAssignmentsPane
 import DecoyStatusCard from "@/components/dashboard/DecoyStatusCard";
 import AlertPanel from "@/components/dashboard/AlertPanel";
 import SimulationPanel from "@/components/dashboard/SimulationPanel";
-import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchMLShadowSummary, fetchHoneytokens, fetchCanaryAssignments, fetchActorProfiles, fetchActorClusters, fetchActorCases, fetchActorCaseWorkflows, revokeCanaryAssignment, openActorCase, updateActorCase, labelEvent, downloadTrainingData, runRetraining, mapDashboardAlert, mapDashboardEvent, mapDecoyStatus, mapMLShadowStatus, mapMLShadowSummary, mapOverview, mapRiskHistoryPoint, mapTrainingSummary } from "@/lib/api";
+import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchMLShadowSummary, fetchHoneytokens, fetchCanaryAssignments, fetchActorProfiles, fetchActorClusters, fetchActorCases, fetchActorCaseWorkflows, revokeCanaryAssignment, openActorCase, updateActorCase, labelEvent, downloadTrainingData, runRetraining, mapDashboardAlert, mapDashboardEvent, mapDashboardSnapshot } from "@/lib/api";
 import type { ActorCaseSummary, ActorCaseWorkflow, ActorCaseWorkflowSummary, ActorClusterSummary, ActorProfileSummary, AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, MLShadowSummaryData, HoneytokenSummary, CanaryAssignmentSummary, RetrainingRun, DashboardStreamMessage } from "@/lib/api";
+import { useDashboardStream } from "@/hooks/useDashboardStream";
+import { pollIntervalFor } from "@/lib/dashboard-stream";
 import { Globe, ShieldAlert, ArrowRightLeft, Bell, BrainCircuit, Database, Download, KeyRound, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -20,7 +22,6 @@ import { motion, AnimatePresence } from "framer-motion";
 const TrafficChart = dynamic(() => import("@/components/dashboard/TrafficChart"), { ssr: false });
 const RiskScoreWidget = dynamic(() => import("@/components/dashboard/RiskScoreWidget"), { ssr: false });
 
-const POLL_INTERVAL = 10_000; // 10 seconds
 const DASHBOARD_WS_URL = process.env.NEXT_PUBLIC_DASHBOARD_WS_URL;
 const DASHBOARD_WS_TOKEN = process.env.NEXT_PUBLIC_DASHBOARD_WS_TOKEN;
 
@@ -339,66 +340,60 @@ export default function DashboardPage() {
     }
   }, [handleAlertsUpdate]);
 
-  // Fetch on mount + poll every POLL_INTERVAL ms.
-  useEffect(() => {
-    const initialLoad = setTimeout(load, 0);
-    const interval = setInterval(load, POLL_INTERVAL);
-    return () => {
-      clearTimeout(initialLoad);
-      clearInterval(interval);
-    };
-  }, [load]);
-
-  useEffect(() => {
-    if (!DASHBOARD_WS_URL) return;
-
-    const url = new URL(DASHBOARD_WS_URL);
-    if (DASHBOARD_WS_TOKEN) {
-      url.searchParams.set("token", DASHBOARD_WS_TOKEN);
-    }
-    const socket = new WebSocket(url.toString());
-
-    socket.onmessage = (message) => {
-      const data = JSON.parse(message.data) as DashboardStreamMessage;
+  const handleStreamMessage = useCallback(
+    (data: DashboardStreamMessage) => {
       if (data.type === "snapshot") {
-        setEvents(data.payload.events.map(mapDashboardEvent));
-        handleAlertsUpdate(data.payload.alerts.map(mapDashboardAlert));
-        if (data.payload.metrics) setOverview(mapOverview(data.payload.metrics));
-        if (data.payload.traffic) setTraffic(data.payload.traffic);
-        if (data.payload.risk_history) {
-          setRiskHistory(data.payload.risk_history.map(mapRiskHistoryPoint));
-        }
-        if (data.payload.decoy_status) {
-          setDecoyStatus(mapDecoyStatus(data.payload.decoy_status));
-        }
-        if (data.payload.training_summary) {
-          setTrainingSummary(mapTrainingSummary(data.payload.training_summary));
-        }
-        if (data.payload.ml_shadow_status) {
-          setMlShadowStatus(mapMLShadowStatus(data.payload.ml_shadow_status));
-        }
-        if (data.payload.ml_shadow_summary) {
-          setMlShadowSummary(mapMLShadowSummary(data.payload.ml_shadow_summary));
-        }
+        const snapshot = mapDashboardSnapshot(data.payload);
+        setEvents(snapshot.events);
+        handleAlertsUpdate(snapshot.alerts);
+        setOverview(snapshot.overview);
+        setTraffic(snapshot.traffic);
+        setRiskHistory(snapshot.riskHistory);
+        setDecoyStatus(snapshot.decoyStatus);
+        setTrainingSummary(snapshot.trainingSummary);
+        setMlShadowStatus(snapshot.mlShadowStatus);
+        setMlShadowSummary(snapshot.mlShadowSummary);
+        setHoneytokens(snapshot.honeytokens);
+        setCanaryAssignments(snapshot.canaryAssignments);
+        setActorProfiles(snapshot.actorProfiles);
+        setActorClusters(snapshot.actorClusters);
+        setActorCases(snapshot.actorCases);
+        setActorCaseWorkflows(snapshot.actorCaseWorkflows);
         return;
       }
       if (data.type === "event") {
         const event = mapDashboardEvent(data.payload);
-        setEvents((current) => [event, ...current.filter((item) => item.id !== event.id)].slice(0, 50));
+        setEvents((current) =>
+          [event, ...current.filter((item) => item.id !== event.id)].slice(0, 50),
+        );
         return;
       }
       const alert = mapDashboardAlert(data.payload);
-      handleAlertsUpdate([alert, ...alertsRef.current.filter((item) => item.id !== alert.id)].slice(0, 100));
-    };
+      handleAlertsUpdate(
+        [
+          alert,
+          ...alertsRef.current.filter((item) => item.id !== alert.id),
+        ].slice(0, 100),
+      );
+    },
+    [handleAlertsUpdate],
+  );
 
-    socket.onerror = () => {
-      socket.close();
-    };
+  const connectionStatus = useDashboardStream({
+    url: DASHBOARD_WS_URL,
+    token: DASHBOARD_WS_TOKEN,
+    onMessage: handleStreamMessage,
+    onReconcile: load,
+  });
 
+  useEffect(() => {
+    const initialLoad = setTimeout(load, 0);
+    const interval = setInterval(load, pollIntervalFor(connectionStatus));
     return () => {
-      socket.close();
+      clearTimeout(initialLoad);
+      clearInterval(interval);
     };
-  }, [handleAlertsUpdate]);
+  }, [connectionStatus, load]);
 
   const trainingRowsText = trainingSummary
     ? `${trainingSummary.exportableRows}/${trainingSummary.minimumRows} rows`

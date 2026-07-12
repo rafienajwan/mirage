@@ -45,5 +45,6 @@ data/
 
 # Local scratch output
 .tmp/
+apps/web/.test-dist/
 
 .hintrc

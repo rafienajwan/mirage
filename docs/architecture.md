@@ -11,8 +11,8 @@ graph LR
     E -->|Allow or monitor| F[Protected Demo App]
     E -->|Redirect| G[Static Decoy Service]
     D --> H[(Events and Alerts)]
-    H --> I[Dashboard API]
-    I --> J[Next.js Polling Dashboard]
+    H --> I[Dashboard API and WebSocket]
+    I --> J[Next.js Real-Time Dashboard]
     C --> K[ML-ready Feature Vectors]
     K --> L[Offline Random Forest Trainer]
 ```
@@ -31,7 +31,9 @@ simulation, dashboard, and decoy-management routes remain separate APIs.
 4. For decoy responses, the gateway records issued canary assignments with
    hashed token values for later operator review and revoke tracking.
 5. The gateway persists the event, optional alert, and numeric feature vector.
-6. The dashboard reads aggregate and recent data every 10 seconds.
+6. The gateway sends immediate events/alerts and coalesced complete snapshots.
+   The dashboard reconciles over HTTP every 60 seconds while connected and
+   every 10 seconds while disconnected.
 
 ## Trust Boundaries
 
@@ -40,6 +42,8 @@ simulation, dashboard, and decoy-management routes remain separate APIs.
 - Decoy forwarding uses an allowlist and removes cookies, authorization values,
   and `X-Mirage-API-Key`.
 - Operator write endpoints require `X-Mirage-API-Key` in Docker deployments.
+- The WebSocket uses a separate local/demo read-only token and never accepts
+  `MIRAGE_API_KEY`.
 - Browser simulations pass through a server-side Next.js route. The operator key
   is not exposed through a `NEXT_PUBLIC_*` variable.
 - Request body size, upstream timeout, rate limit, and tracked-source count are bounded.

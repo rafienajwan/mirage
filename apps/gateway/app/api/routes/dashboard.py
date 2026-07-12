@@ -36,6 +36,7 @@ from app.services.actor_clusters import (
     update_actor_case_workflow,
 )
 from app.services.actor_profiles import get_actor_profiles
+from app.services.dashboard_stream import schedule_dashboard_snapshot_refresh
 from app.services.retraining import train_from_labeled_events
 from app.services.threat_analysis import get_threat_summary
 from app.services.training_export import events_to_jsonl, training_data_summary
@@ -75,6 +76,7 @@ async def label_dashboard_event(event_id: str, payload: EventLabelRequest):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Event not found",
         )
+    schedule_dashboard_snapshot_refresh()
     return updated.model_dump(mode="json")
 
 
@@ -170,6 +172,7 @@ async def revoke_dashboard_canary_assignment(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Canary assignment not found",
         )
+    schedule_dashboard_snapshot_refresh()
     return revoked.model_dump(mode="json")
 
 
@@ -217,6 +220,7 @@ async def open_dashboard_actor_case(case_id: str, payload: ActorCaseOpenRequest)
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Recommended actor case not found",
         )
+    schedule_dashboard_snapshot_refresh()
     return opened.model_dump(mode="json")
 
 
@@ -232,6 +236,7 @@ async def update_dashboard_actor_case(case_id: str, payload: ActorCaseUpdateRequ
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Actor case workflow not found",
         )
+    schedule_dashboard_snapshot_refresh()
     return updated.model_dump(mode="json")
 
 

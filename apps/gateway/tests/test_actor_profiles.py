@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.api.routes import dashboard as dashboard_routes
 from app.services import honeytoken
 
 
@@ -126,6 +127,18 @@ async def test_actor_cases_recommend_investigations_from_clusters(client, monkey
 
 @pytest.mark.asyncio
 async def test_actor_case_workflows_open_and_update_recommended_case(client, monkeypatch):
+    refreshes = 0
+
+    def schedule_refresh() -> None:
+        nonlocal refreshes
+        refreshes += 1
+
+    monkeypatch.setattr(
+        dashboard_routes,
+        "schedule_dashboard_snapshot_refresh",
+        schedule_refresh,
+        raising=False,
+    )
     monkeypatch.setattr(honeytoken, "settings", _settings())
     request = {
         "ip_address": "10.10.40.10",
@@ -211,3 +224,33 @@ async def test_actor_case_workflows_open_and_update_recommended_case(client, mon
     reopened = reopen_response.json()
     assert reopened["status"] == "open"
     assert reopened["analyst_note"] == "Reopened after new signal"
+    assert refreshes == 4
+
+
+@pytest.mark.asyncio
+async def test_missing_actor_case_mutations_do_not_schedule_refresh(client, monkeypatch):
+    refreshes = 0
+
+    def schedule_refresh() -> None:
+        nonlocal refreshes
+        refreshes += 1
+
+    monkeypatch.setattr(
+        dashboard_routes,
+        "schedule_dashboard_snapshot_refresh",
+        schedule_refresh,
+        raising=False,
+    )
+
+    opened = await client.post(
+        "/api/v1/dashboard/actor-cases/case-missing/open",
+        json={"note": "missing"},
+    )
+    updated = await client.patch(
+        "/api/v1/dashboard/actor-case-workflows/case-missing",
+        json={"status": "closed", "note": "missing"},
+    )
+
+    assert opened.status_code == 404
+    assert updated.status_code == 404
+    assert refreshes == 0

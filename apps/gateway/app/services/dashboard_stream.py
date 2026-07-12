@@ -2,17 +2,31 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import secrets
+from collections.abc import Awaitable, Callable
 from typing import Any
 
 from fastapi import WebSocket
 
 from app.core.config import settings
 from app.services.decoy_engine import FAKE_ENDPOINTS
+from app.services.actor_clusters import (
+    get_actor_case_workflows,
+    get_actor_cases,
+    get_actor_clusters,
+)
+from app.services.actor_profiles import get_actor_profiles
 from app.services.ml_shadow_summary import summarize_ml_shadow_events
 from app.services.ml_status import get_ml_shadow_status
 from app.services.training_export import training_data_summary
 from app.storage import store
+
+logger = logging.getLogger(__name__)
+
+SnapshotBuilder = Callable[[], Awaitable[dict[str, Any]]]
+DashboardBroadcaster = Callable[[str, dict[str, Any]], Awaitable[None]]
 
 
 class DashboardStreamManager:
@@ -43,10 +57,11 @@ dashboard_stream = DashboardStreamManager()
 
 
 def dashboard_stream_authorized(token: str | None) -> bool:
-    """Validate a browser WebSocket token against the operator API key."""
-    if settings.api_key is None:
-        return True
-    return token is not None and secrets.compare_digest(token, settings.api_key)
+    """Validate the dedicated browser-visible dashboard stream token."""
+    expected = settings.dashboard_stream_token
+    if expected is None or token is None:
+        return False
+    return secrets.compare_digest(token, expected)
 
 
 async def broadcast_dashboard_update(kind: str, payload: dict[str, Any]) -> None:
@@ -65,6 +80,12 @@ async def build_dashboard_snapshot() -> dict[str, Any]:
     recent_alerts = await store.get_alerts(limit=20)
     labeled_events = await store.get_labeled_events(limit=10000)
     last_decoy_trigger = await store.get_last_decoy_trigger()
+    honeytoken_hits = await store.get_honeytoken_hits(limit=20)
+    canary_assignments = await store.get_canary_assignments(limit=50)
+    actor_profiles = await get_actor_profiles(limit=20)
+    actor_clusters = await get_actor_clusters(limit=20)
+    actor_cases = await get_actor_cases(limit=20)
+    actor_case_workflows = await get_actor_case_workflows(limit=20)
 
     return {
         "events": [item.model_dump(mode="json") for item in recent_events],
@@ -91,4 +112,65 @@ async def build_dashboard_snapshot() -> dict[str, Any]:
         "ml_shadow_summary": summarize_ml_shadow_events(
             await store.get_recent_events(limit=200)
         ).model_dump(mode="json"),
+        "honeytokens": {
+            "total_hits": await store.get_honeytoken_hit_count(),
+            "hits": [item.model_dump(mode="json") for item in honeytoken_hits],
+        },
+        "canary_assignments": {
+            "total_assignments": len(canary_assignments),
+            "assignments": [
+                item.model_dump(mode="json") for item in canary_assignments
+            ],
+        },
+        "actor_profiles": actor_profiles.model_dump(mode="json"),
+        "actor_clusters": actor_clusters.model_dump(mode="json"),
+        "actor_cases": actor_cases.model_dump(mode="json"),
+        "actor_case_workflows": actor_case_workflows.model_dump(mode="json"),
     }
+
+
+class DashboardSnapshotRefreshCoordinator:
+    """Coalesce non-blocking dashboard snapshot refresh requests."""
+
+    def __init__(
+        self,
+        *,
+        build_snapshot: SnapshotBuilder = build_dashboard_snapshot,
+        broadcast_update: DashboardBroadcaster = broadcast_dashboard_update,
+        debounce_seconds: float = 0.1,
+    ) -> None:
+        self._build_snapshot = build_snapshot
+        self._broadcast_update = broadcast_update
+        self._debounce_seconds = debounce_seconds
+        self._pending = False
+        self._task: asyncio.Task[None] | None = None
+
+    def schedule(self) -> asyncio.Task[None]:
+        """Schedule one refresh and return the retained background task."""
+        self._pending = True
+        if self._task is None or self._task.done():
+            self._task = asyncio.create_task(self._run())
+        return self._task
+
+    async def _run(self) -> None:
+        try:
+            await asyncio.sleep(self._debounce_seconds)
+            while self._pending:
+                self._pending = False
+                try:
+                    snapshot = await self._build_snapshot()
+                    await self._broadcast_update("snapshot", snapshot)
+                except Exception:
+                    logger.exception("Dashboard snapshot refresh failed")
+                if self._pending:
+                    await asyncio.sleep(self._debounce_seconds)
+        finally:
+            self._task = None
+
+
+dashboard_snapshot_refresh = DashboardSnapshotRefreshCoordinator()
+
+
+def schedule_dashboard_snapshot_refresh() -> asyncio.Task[None]:
+    """Schedule a coalesced dashboard snapshot refresh."""
+    return dashboard_snapshot_refresh.schedule()
