@@ -28,6 +28,10 @@ Open `http://localhost:3000` or `http://localhost:3000/dashboard`.
 Never rename `MIRAGE_API_KEY` with a `NEXT_PUBLIC_` prefix. That would expose it
 in the browser bundle.
 
+The server also uses `MIRAGE_API_KEY` for the promotion-readiness bridge. The
+dashboard receives sanitized readiness through that bridge and authenticated
+WebSocket snapshots; artifact and dataset filesystem paths remain server-only.
+
 ## Scripts
 
 | Command | Purpose |
