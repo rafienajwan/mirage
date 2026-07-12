@@ -11,8 +11,8 @@ import CanaryAssignmentsPanel from "@/components/dashboard/CanaryAssignmentsPane
 import DecoyStatusCard from "@/components/dashboard/DecoyStatusCard";
 import AlertPanel from "@/components/dashboard/AlertPanel";
 import SimulationPanel from "@/components/dashboard/SimulationPanel";
-import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchMLShadowSummary, fetchHoneytokens, fetchCanaryAssignments, fetchActorProfiles, fetchActorClusters, fetchActorCases, fetchActorCaseWorkflows, revokeCanaryAssignment, openActorCase, updateActorCase, labelEvent, downloadTrainingData, runRetraining, mapDashboardAlert, mapDashboardEvent, mapDashboardSnapshot } from "@/lib/api";
-import type { ActorCaseSummary, ActorCaseWorkflow, ActorCaseWorkflowSummary, ActorClusterSummary, ActorProfileSummary, AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, MLShadowSummaryData, HoneytokenSummary, CanaryAssignmentSummary, RetrainingRun, DashboardStreamMessage } from "@/lib/api";
+import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchMLShadowSummary, fetchMLPromotionReadiness, fetchHoneytokens, fetchCanaryAssignments, fetchActorProfiles, fetchActorClusters, fetchActorCases, fetchActorCaseWorkflows, revokeCanaryAssignment, openActorCase, updateActorCase, labelEvent, downloadTrainingData, runRetraining, mapDashboardAlert, mapDashboardEvent, mapDashboardSnapshot } from "@/lib/api";
+import type { ActorCaseSummary, ActorCaseWorkflow, ActorCaseWorkflowSummary, ActorClusterSummary, ActorProfileSummary, AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, MLShadowSummaryData, MLPromotionReadinessData, HoneytokenSummary, CanaryAssignmentSummary, RetrainingRun, DashboardStreamMessage } from "@/lib/api";
 import { useDashboardStream } from "@/hooks/useDashboardStream";
 import { pollIntervalFor } from "@/lib/dashboard-stream";
 import { Globe, ShieldAlert, ArrowRightLeft, Bell, BrainCircuit, Database, Download, KeyRound, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
@@ -109,6 +109,7 @@ export default function DashboardPage() {
   const [trainingSummary, setTrainingSummary] = useState<TrainingDataSummary | null>(null);
   const [mlShadowStatus, setMlShadowStatus] = useState<MLShadowStatusData | null>(null);
   const [mlShadowSummary, setMlShadowSummary] = useState<MLShadowSummaryData | null>(null);
+  const [mlPromotionReadiness, setMlPromotionReadiness] = useState<MLPromotionReadinessData | null>(null);
   const [honeytokens, setHoneytokens] = useState<HoneytokenSummary | null>(null);
   const [canaryAssignments, setCanaryAssignments] = useState<CanaryAssignmentSummary | null>(null);
   const [actorProfiles, setActorProfiles] = useState<ActorProfileSummary | null>(null);
@@ -300,7 +301,7 @@ export default function DashboardPage() {
 
   const load = useCallback(async () => {
     try {
-      const [ov, ev, al, tr, rh, ds, ts, ms, mss, ht, ca, ap, ac, cases, workflows] = await Promise.all([
+      const [ov, ev, al, tr, rh, ds, ts, ms, mss, mpr, ht, ca, ap, ac, cases, workflows] = await Promise.all([
         fetchOverview(),
         fetchEvents(),
         fetchAlerts(),
@@ -310,6 +311,7 @@ export default function DashboardPage() {
         fetchTrainingDataSummary().catch(() => null),
         fetchMLShadowStatus().catch(() => null),
         fetchMLShadowSummary().catch(() => null),
+        fetchMLPromotionReadiness().catch(() => null),
         fetchHoneytokens().catch(() => null),
         fetchCanaryAssignments().catch(() => null),
         fetchActorProfiles().catch(() => null),
@@ -326,6 +328,7 @@ export default function DashboardPage() {
       setTrainingSummary(ts);
       setMlShadowStatus(ms);
       setMlShadowSummary(mss);
+      setMlPromotionReadiness(mpr);
       setHoneytokens(ht);
       setCanaryAssignments(ca);
       setActorProfiles(ap);
@@ -353,6 +356,7 @@ export default function DashboardPage() {
         setTrainingSummary(snapshot.trainingSummary);
         setMlShadowStatus(snapshot.mlShadowStatus);
         setMlShadowSummary(snapshot.mlShadowSummary);
+        setMlPromotionReadiness(snapshot.mlPromotionReadiness);
         setHoneytokens(snapshot.honeytokens);
         setCanaryAssignments(snapshot.canaryAssignments);
         setActorProfiles(snapshot.actorProfiles);
@@ -415,6 +419,16 @@ export default function DashboardPage() {
   const mlShadowObservation = mlShadowSummary?.shadowEvents
     ? `${Math.round(mlShadowSummary.agreementRate * 100)}% agree over ${mlShadowSummary.shadowEvents} events | avg score ${mlShadowSummary.averageScore.toFixed(1)}`
     : "no shadow observations yet";
+  const promotionLabel =
+    mlPromotionReadiness?.status === "eligible"
+      ? "PROMOTION ELIGIBLE"
+      : mlPromotionReadiness?.status === "needs_observation"
+        ? "OBSERVATION NEEDED"
+        : mlPromotionReadiness?.status === "blocked"
+          ? "PROMOTION BLOCKED"
+          : "PROMOTION UNAVAILABLE";
+  const promotionBlocker = mlPromotionReadiness?.gates.find((gate) => !gate.passed);
+  const promotionDetail = promotionBlocker?.message ?? "all configured gates passed";
   const latestHoneytoken = honeytokens?.hits[0];
   const honeytokenLabel = honeytokens?.totalHits
     ? `HONEYTOKEN HITS: ${honeytokens.totalHits}`
@@ -456,19 +470,21 @@ export default function DashboardPage() {
             </div>
 
             <div
-              title={`Model status: ${mlShadowLabel}; ${mlShadowDetail}; ${mlShadowObservation}`}
+              title={`Model status: ${mlShadowLabel}; ${mlShadowDetail}; ${mlShadowObservation}; ${promotionLabel}: ${promotionDetail}. Live routing remains heuristic.`}
               className={`flex items-center gap-2 px-3 py-2 rounded border text-[10px] font-mono tracking-widest ${
-                mlShadowStatus?.mode === "shadow_ready"
+                mlPromotionReadiness?.status === "eligible"
+                  ? "border-brand-emerald/30 bg-brand-emerald/10 text-brand-emerald"
+                  : mlPromotionReadiness?.status === "needs_observation"
                   ? "border-brand-cyan/30 bg-brand-cyan/10 text-brand-cyan"
-                  : mlShadowStatus?.mode === "invalid" || mlShadowStatus?.mode === "missing"
+                  : mlPromotionReadiness?.status === "blocked" || mlShadowStatus?.mode === "invalid" || mlShadowStatus?.mode === "missing"
                     ? "border-red-500/25 bg-red-500/5 text-red-300"
                     : "border-white/5 bg-white/2 text-white/40"
               }`}
             >
               <BrainCircuit className="w-3.5 h-3.5 shrink-0" />
-              <span>{mlShadowLabel}</span>
+              <span>{promotionLabel}</span>
               <span className="hidden xl:inline text-white/35">
-                {mlShadowObservation}
+                {promotionDetail}
               </span>
             </div>
 
