@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": false,
+    "incremental": false,
+    "isolatedModules": false,
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "noEmit": false,
+    "outDir": ".test-dist",
+    "rootDir": "src"
+  },
+  "include": [
+    "src/lib/dashboard-stream.ts",
+    "src/lib/dashboard-stream.test.ts"
+  ]
+}
