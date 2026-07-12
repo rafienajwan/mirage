@@ -35,9 +35,10 @@ Expected result: synthetic configuration data from the static decoy service.
 
 ## 5. Observe
 
-Open `http://localhost:3000/dashboard`. The event feed, risk metrics, alerts, and
-decoy count refresh through HTTP polling. Event and alert updates can also use
-the optional authenticated WebSocket stream when configured.
+Open `http://localhost:3000/dashboard`. When configured, the read-only WebSocket
+sends immediate events/alerts and complete snapshots for metrics, decoys,
+honeytokens, actor triage, and case workflows. HTTP polling reconciles every 60
+seconds while connected and falls back to every 10 seconds while disconnected.
 
 The dashboard simulation buttons call a server-side Next.js route that adds the
 operator API key before contacting the gateway. The key remains outside the
@@ -60,7 +61,6 @@ docker compose --env-file .env -f infra/docker-compose.yml down
 - Proxy coverage is limited to `/api/v1/proxy/*`.
 - Routing is heuristic rather than model-driven.
 - Decoy payloads are synthetic and can issue deterministic per-actor canary
-  tokens with epoch-based rotation; persistent assignment and revoke controls
-  are still pending.
-- Aggregate dashboard metrics are polled; event and alert updates can stream
-  over WebSocket when configured.
+  tokens with epoch-based rotation; multi-operator approval remains pending.
+- WebSocket authentication is suitable for the local demo; production session
+  or edge authentication remains pending.
