@@ -74,6 +74,29 @@ class MLShadowSummary(BaseModel):
     shadow_decisions: MLShadowDecisionBreakdown
 
 
+class MLPromotionGate(BaseModel):
+    """One auditable requirement for model promotion eligibility."""
+
+    code: str
+    passed: bool
+    message: str
+    actual: float | int | str | None = None
+    required: float | int | str | None = None
+
+
+class MLPromotionReadiness(BaseModel):
+    """Read-only recommendation for a future operator-controlled promotion."""
+
+    status: Literal["unavailable", "blocked", "needs_observation", "eligible"]
+    artifact: str | None = None
+    dataset_manifest: str | None = None
+    dataset_name: str | None = None
+    dataset_version: str | None = None
+    routing_unchanged: bool = True
+    gates: list[MLPromotionGate]
+    warnings: list[str]
+
+
 class HoneytokenSummary(BaseModel):
     """Recent honeytoken activity for the dashboard."""
 

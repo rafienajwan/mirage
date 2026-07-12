@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import math
 from pathlib import Path
 from typing import Any
 
@@ -39,7 +40,7 @@ def _number(value: object) -> float | int | None:
     if isinstance(value, bool):
         return None
     if isinstance(value, int | float):
-        return value
+        return value if math.isfinite(value) else None
     return None
 
 

@@ -61,3 +61,29 @@ def test_review_model_artifact_reports_missing_file(tmp_path):
 
     assert review.shadow_ready is False
     assert review.blockers == ["Artifact file does not exist"]
+
+
+def test_review_model_artifact_rejects_non_finite_metrics(tmp_path):
+    artifact = tmp_path / "non-finite.joblib"
+    joblib.dump(
+        {
+            "artifact_version": 1,
+            "feature_names": FEATURE_NAMES,
+            "metrics": {
+                "precision": float("nan"),
+                "recall": float("inf"),
+                "f1_score": 1.0,
+                "false_positive_rate": 0.0,
+                "training_rows": 30,
+                "test_rows": 10,
+            },
+            "model": object(),
+        },
+        artifact,
+    )
+
+    review = review_model_artifact(artifact)
+
+    assert review.shadow_ready is False
+    assert "Metric 'precision' is missing or non-numeric" in review.blockers
+    assert "Metric 'recall' is missing or non-numeric" in review.blockers
