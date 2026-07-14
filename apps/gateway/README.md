@@ -40,7 +40,9 @@ Open `http://localhost:8000/docs` for the generated API reference.
 | `PROXY_TIMEOUT_SECONDS` | Upstream timeout |
 | `PROXY_MAX_BODY_BYTES` | Maximum forwarded request body |
 | `MIRAGE_MODEL_ARTIFACT` | Optional trained artifact path for shadow scoring |
+| `MIRAGE_MODEL_DATASET_MANIFEST` | Prepared dataset manifest reviewed for promotion readiness |
 | `ML_SHADOW_*` | Model-only thresholds; live routing remains heuristic |
+| `ML_PROMOTION_*` | Conservative dataset and shadow-observation promotion gates |
 | `DECOY_*` | Synthetic values only; never real credentials |
 | `DECOY_CANARY_EPOCH` | Rotation epoch for newly issued per-actor canary tokens |
 
@@ -108,6 +110,11 @@ curl -X POST -H "X-Mirage-API-Key: YOUR_LOCAL_MIRAGE_API_KEY" \
 
 The response includes metrics and artifact review output. The endpoint does not
 change live routing or set `MIRAGE_MODEL_ARTIFACT`.
+
+Set `MIRAGE_MODEL_DATASET_MANIFEST` beside the reviewed artifact to expose the
+read-only promotion report at `GET /api/v1/dashboard/ml-promotion/readiness`.
+The endpoint requires the operator API key. An `eligible` report is evidence
+for a future manual promotion decision; it never changes live routing.
 
 Analyst-labeled events can be exported from the running gateway as JSON Lines:
 

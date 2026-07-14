@@ -65,6 +65,27 @@ class Settings:
     ml_model_artifact: str | None = field(
         default_factory=lambda: os.getenv("MIRAGE_MODEL_ARTIFACT") or None
     )
+    ml_dataset_manifest: str | None = field(
+        default_factory=lambda: os.getenv("MIRAGE_MODEL_DATASET_MANIFEST") or None
+    )
+    ml_promotion_min_total_rows: int = field(
+        default_factory=lambda: int(os.getenv("ML_PROMOTION_MIN_TOTAL_ROWS", "1000"))
+    )
+    ml_promotion_min_rows_per_class: int = field(
+        default_factory=lambda: int(
+            os.getenv("ML_PROMOTION_MIN_ROWS_PER_CLASS", "100")
+        )
+    )
+    ml_promotion_min_shadow_events: int = field(
+        default_factory=lambda: int(
+            os.getenv("ML_PROMOTION_MIN_SHADOW_EVENTS", "500")
+        )
+    )
+    ml_promotion_min_agreement_rate: float = field(
+        default_factory=lambda: float(
+            os.getenv("ML_PROMOTION_MIN_AGREEMENT_RATE", "0.8")
+        )
+    )
     retraining_artifact_dir: str = field(
         default_factory=lambda: os.getenv(
             "MIRAGE_RETRAINING_ARTIFACT_DIR", "artifacts/retraining"

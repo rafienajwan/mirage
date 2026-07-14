@@ -214,6 +214,7 @@ All paths below use the `http://localhost:8000` base URL.
 | `POST /api/v1/dashboard/training-data/retrain` | API key | Train a local shadow-mode candidate artifact from analyst labels |
 | `GET /api/v1/dashboard/ml-shadow/status` | Public | Report sanitized ML shadow artifact readiness |
 | `GET /api/v1/dashboard/ml-shadow/summary` | Public | Summarize recent model-only agreement with live routing |
+| `GET /api/v1/dashboard/ml-promotion/readiness` | API key | Evaluate guarded promotion prerequisites without changing routing |
 | `GET /api/v1/dashboard/honeytokens` | Public | Show recent decoy credential interactions |
 | `GET /api/v1/dashboard/canary-assignments` | Public | Show issued canary assignment lifecycle records |
 | `POST /api/v1/dashboard/canary-assignments/{assignment_id}/revoke` | API key | Revoke a canary assignment for operator lifecycle tracking |
@@ -353,14 +354,16 @@ infra/
 
 ## Next Priorities
 
-1. Add reviewed custom API-log datasets so model training matches the protected
-   API domain more closely.
-2. Replace the local dashboard stream token with session or edge authentication
+1. Collect and review a substantially larger production-like custom API-log
+   dataset until the promotion-readiness dataset gates pass.
+2. Observe a reviewed API-domain model in shadow mode until the promotion gate
+   has sufficient runtime evidence; keep live routing heuristic meanwhile.
+3. Replace the local dashboard stream token with session or edge authentication
    for managed deployment.
-3. Expand case-management workflow queues and analyst collaboration.
-4. Add multi-operator approval flows and audit policy around canary lifecycle
+4. Expand case-management workflow queues and analyst collaboration.
+5. Add multi-operator approval flows and audit policy around canary lifecycle
    changes.
-5. Deploy the stack to managed infrastructure and verify production env wiring.
+6. Deploy the stack to managed infrastructure and verify production env wiring.
 
 ## License
 

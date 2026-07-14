@@ -94,6 +94,24 @@ describe("dashboard stream helpers", () => {
         live_decisions: { allow: 0, monitor: 0, redirect_to_decoy: 0 },
         shadow_decisions: { allow: 0, monitor: 0, redirect_to_decoy: 0 },
       },
+      ml_promotion_readiness: {
+        status: "needs_observation",
+        artifact: "risk-model.joblib",
+        dataset_manifest: "manifest.json",
+        dataset_name: "api-domain",
+        dataset_version: "v2",
+        routing_unchanged: true,
+        gates: [
+          {
+            code: "shadow_event_count",
+            passed: false,
+            message: "More shadow observations are required",
+            actual: 120,
+            required: 500,
+          },
+        ],
+        warnings: [],
+      },
       honeytokens: { total_hits: 11, hits: [] },
       canary_assignments: { total_assignments: 12, assignments: [] },
       actor_profiles: { total_actors: 13, profiles: [] },
@@ -110,6 +128,11 @@ describe("dashboard stream helpers", () => {
     assert.equal(snapshot.actorClusters.totalClusters, 14);
     assert.equal(snapshot.actorCases.totalCases, 15);
     assert.equal(snapshot.actorCaseWorkflows.totalCases, 16);
+    assert.equal(snapshot.mlPromotionReadiness.status, "needs_observation");
+    assert.equal(
+      snapshot.mlPromotionReadiness.gates[0].code,
+      "shadow_event_count",
+    );
   });
 
   it("reconnects with reset backoff and reconciles malformed messages", () => {

@@ -485,12 +485,25 @@ The dashboard also reads:
 ```text
 GET /api/v1/dashboard/ml-shadow/status
 GET /api/v1/dashboard/ml-shadow/summary
+GET /api/v1/dashboard/ml-promotion/readiness
 ```
 
 The status endpoint returns sanitized artifact readiness and does not expose the
 full filesystem path. The summary endpoint reports recent model-only agreement,
 disagreements, average probability, average score, and live-versus-shadow
 decision counts for operator review.
+
+The promotion endpoint requires `X-Mirage-API-Key` and also needs a prepared
+manifest configured through `MIRAGE_MODEL_DATASET_MANIFEST`. It reports:
+
+- `unavailable` when required paths are not configured;
+- `blocked` when configuration, artifact, or dataset review fails;
+- `needs_observation` when runtime shadow evidence is insufficient;
+- `eligible` when every configured gate passes.
+
+Only sanitized file names are returned. The report never changes the active
+artifact or heuristic routing policy. Agreement is a compatibility signal
+against current heuristics, not proof of real-world model accuracy.
 
 ## Safe Claims
 

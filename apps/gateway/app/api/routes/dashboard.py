@@ -10,6 +10,7 @@ from app.schemas.dashboard import (
     ActorClusterSummary,
     ActorProfileSummary,
     HoneytokenSummary,
+    MLPromotionReadiness,
     MLShadowSummary,
     MLShadowStatus,
     TrainingDataSummary,
@@ -27,6 +28,7 @@ from app.schemas.actor import (
 from app.schemas.event import EventLabelRequest
 from app.schemas.retraining import RetrainingRun
 from app.services.ml_status import get_ml_shadow_status
+from app.services.ml_promotion import evaluate_ml_promotion
 from app.services.ml_shadow_summary import get_ml_shadow_summary
 from app.services.actor_clusters import (
     get_actor_cases,
@@ -129,6 +131,19 @@ async def ml_shadow_status():
 async def ml_shadow_summary(limit: int = Query(default=200, ge=1, le=1000)):
     """Recent agreement between live decisions and model-only shadow decisions."""
     return await get_ml_shadow_summary(limit=limit)
+
+
+@router.get(
+    "/ml-promotion/readiness",
+    response_model=MLPromotionReadiness,
+    dependencies=[Depends(require_api_key)],
+)
+async def ml_promotion_readiness(
+    limit: int = Query(default=1000, ge=1, le=10000),
+):
+    """Evaluate whether the current shadow model is eligible for promotion."""
+    summary = await get_ml_shadow_summary(limit=limit)
+    return evaluate_ml_promotion(shadow_summary=summary)
 
 
 @router.get("/honeytokens", response_model=HoneytokenSummary)

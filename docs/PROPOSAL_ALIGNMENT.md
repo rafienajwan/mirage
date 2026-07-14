@@ -15,7 +15,7 @@ the beginning of a real ML pipeline.
 | Proposal capability | Status | Repository reality |
 | --- | --- | --- |
 | FastAPI defense gateway | Partial | `/api/v1/proxy/*` inspects and forwards traffic, but arbitrary application ingress is not intercepted. |
-| Hybrid risk scoring | Partial | Heuristic risk scoring is active. Random Forest training/inference can run in reviewed shadow mode, and local CICIDS2017 DDoS plus full-directory artifacts have passed review, but they do not control live routing. |
+| Hybrid risk scoring | Partial | Heuristic risk scoring is active. Random Forest training/inference can run in reviewed shadow mode, and a guarded readiness evaluator checks artifact, dataset, and shadow-observation evidence before any future promotion; models do not control live routing. |
 | Scikit-learn anomaly detection | Partial | Scikit-learn is configured and training/shadow inference plus artifact review are implemented; runtime anomaly detection remains heuristic. |
 | Threat fingerprint matching | Partial | Stable request fingerprints, persistent actor profiles, lightweight triage clusters, and assigned case workflows exist; trained clustering does not. |
 | Automated real/decoy routing | Implemented for demo | The proxy routes to separate real-app and decoy services using the live decision engine. |
@@ -43,6 +43,8 @@ The current demo can accurately claim that MIRAGE:
 - stores events, alerts, and ML-ready feature vectors;
 - can store model-only shadow scores beside events when a reviewed artifact is configured;
 - can review trained artifacts for feature-contract and metric readiness before shadow mode;
+- reports auditable `unavailable`, `blocked`, `needs_observation`, or `eligible`
+  model-promotion readiness without changing heuristic routing;
 - has locally trained and reviewed shadow-ready Random Forest artifacts from
   CICIDS2017 DDoS and full-directory splits;
 - records and alerts on configured and per-actor issued decoy credential reuse as honeytoken hits;

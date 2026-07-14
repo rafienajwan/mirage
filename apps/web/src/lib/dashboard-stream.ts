@@ -62,6 +62,7 @@ export function parseDashboardStreamMessage(
       isRecord(value.payload.training_summary) &&
       isRecord(value.payload.ml_shadow_status) &&
       isRecord(value.payload.ml_shadow_summary) &&
+      isRecord(value.payload.ml_promotion_readiness) &&
       isRecord(value.payload.honeytokens) &&
       isRecord(value.payload.canary_assignments) &&
       isRecord(value.payload.actor_profiles) &&

@@ -35,9 +35,14 @@ appropriate example and this reference in the same change.
 | `PROXY_TIMEOUT_SECONDS` | No | Gateway | Upstream HTTP timeout |
 | `PROXY_MAX_BODY_BYTES` | No | Gateway | Maximum forwarded request body |
 | `MIRAGE_MODEL_ARTIFACT` | No | Gateway | Optional path to a trained model artifact for shadow scoring |
+| `MIRAGE_MODEL_DATASET_MANIFEST` | No | Gateway | Prepared dataset manifest used by the promotion-readiness evaluator |
 | `MIRAGE_RETRAINING_ARTIFACT_DIR` | No | Gateway | Local directory for analyst-label retraining artifacts |
 | `ML_SHADOW_MONITOR_THRESHOLD` | No | Gateway | Probability threshold for model-only monitor decisions |
 | `ML_SHADOW_REDIRECT_THRESHOLD` | No | Gateway | Probability threshold for model-only decoy decisions |
+| `ML_PROMOTION_MIN_TOTAL_ROWS` | No | Gateway | Minimum reviewed dataset rows; defaults to `1000` |
+| `ML_PROMOTION_MIN_ROWS_PER_CLASS` | No | Gateway | Minimum rows for each binary class; defaults to `100` |
+| `ML_PROMOTION_MIN_SHADOW_EVENTS` | No | Gateway | Minimum runtime shadow observations; defaults to `500` |
+| `ML_PROMOTION_MIN_AGREEMENT_RATE` | No | Gateway | Minimum heuristic compatibility rate; defaults to `0.8` |
 | `DECOY_LOGIN_TOKEN` | Yes | Gateway and decoy | Synthetic login token shown in decoy data |
 | `DECOY_OAUTH_TOKEN` | Yes | Gateway and decoy | Synthetic OAuth token shown in decoy data |
 | `DECOY_SERVICE_TOKEN` | Yes | Gateway and decoy | Synthetic service token shown in decoy data |
@@ -69,6 +74,12 @@ Run `python scripts/review_model_artifact.py --artifact <path>` from
 `MIRAGE_RETRAINING_ARTIFACT_DIR` controls where the authenticated retraining
 endpoint stores local candidate artifacts. Keep this path ignored by Git and
 review the generated artifact before pointing `MIRAGE_MODEL_ARTIFACT` at it.
+
+`MIRAGE_MODEL_DATASET_MANIFEST` and `ML_PROMOTION_*` configure a read-only
+promotion recommendation. The evaluator verifies the prepared split and
+artifact, then checks shadow observation volume and compatibility. Invalid
+thresholds block the report. Even an `eligible` result never activates model
+routing; it only records that the configured evidence passed the current gates.
 
 ## Standalone-Only Gateway Variables
 

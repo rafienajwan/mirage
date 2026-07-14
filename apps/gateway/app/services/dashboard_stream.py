@@ -19,6 +19,7 @@ from app.services.actor_clusters import (
 )
 from app.services.actor_profiles import get_actor_profiles
 from app.services.ml_shadow_summary import summarize_ml_shadow_events
+from app.services.ml_promotion import evaluate_ml_promotion
 from app.services.ml_status import get_ml_shadow_status
 from app.services.training_export import training_data_summary
 from app.storage import store
@@ -86,6 +87,9 @@ async def build_dashboard_snapshot() -> dict[str, Any]:
     actor_clusters = await get_actor_clusters(limit=20)
     actor_cases = await get_actor_cases(limit=20)
     actor_case_workflows = await get_actor_case_workflows(limit=20)
+    shadow_summary = summarize_ml_shadow_events(
+        await store.get_recent_events(limit=1000)
+    )
 
     return {
         "events": [item.model_dump(mode="json") for item in recent_events],
@@ -109,8 +113,9 @@ async def build_dashboard_snapshot() -> dict[str, Any]:
         },
         "training_summary": training_data_summary(labeled_events),
         "ml_shadow_status": get_ml_shadow_status(),
-        "ml_shadow_summary": summarize_ml_shadow_events(
-            await store.get_recent_events(limit=200)
+        "ml_shadow_summary": shadow_summary.model_dump(mode="json"),
+        "ml_promotion_readiness": evaluate_ml_promotion(
+            shadow_summary=shadow_summary
         ).model_dump(mode="json"),
         "honeytokens": {
             "total_hits": await store.get_honeytoken_hit_count(),

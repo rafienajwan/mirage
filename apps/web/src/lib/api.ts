@@ -107,6 +107,25 @@ interface BackendMLShadowSummary {
   shadow_decisions: BackendMLShadowDecisionBreakdown;
 }
 
+interface BackendMLPromotionGate {
+  code: string;
+  passed: boolean;
+  message: string;
+  actual: number | string | null;
+  required: number | string | null;
+}
+
+interface BackendMLPromotionReadiness {
+  status: "unavailable" | "blocked" | "needs_observation" | "eligible";
+  artifact: string | null;
+  dataset_manifest: string | null;
+  dataset_name: string | null;
+  dataset_version: string | null;
+  routing_unchanged: boolean;
+  gates: BackendMLPromotionGate[];
+  warnings: string[];
+}
+
 interface BackendRetrainingRun {
   artifact_path: string;
   training_summary: BackendTrainingDataSummary;
@@ -262,6 +281,7 @@ interface BackendDashboardSnapshot {
   training_summary: BackendTrainingDataSummary;
   ml_shadow_status: BackendMLShadowStatus;
   ml_shadow_summary: BackendMLShadowSummary;
+  ml_promotion_readiness: BackendMLPromotionReadiness;
   honeytokens: BackendHoneytokenSummary;
   canary_assignments: BackendCanaryAssignmentSummary;
   actor_profiles: BackendActorProfileSummary;
@@ -383,6 +403,25 @@ export interface MLShadowSummaryData {
   averageScore: number;
   liveDecisions: MLShadowDecisionBreakdown;
   shadowDecisions: MLShadowDecisionBreakdown;
+}
+
+export interface MLPromotionGate {
+  code: string;
+  passed: boolean;
+  message: string;
+  actual: number | string | null;
+  required: number | string | null;
+}
+
+export interface MLPromotionReadinessData {
+  status: "unavailable" | "blocked" | "needs_observation" | "eligible";
+  artifact: string | null;
+  datasetManifest: string | null;
+  datasetName: string | null;
+  datasetVersion: string | null;
+  routingUnchanged: boolean;
+  gates: MLPromotionGate[];
+  warnings: string[];
 }
 
 export interface RetrainingRun {
@@ -528,6 +567,7 @@ export interface DashboardSnapshot {
   trainingSummary: TrainingDataSummary;
   mlShadowStatus: MLShadowStatusData;
   mlShadowSummary: MLShadowSummaryData;
+  mlPromotionReadiness: MLPromotionReadinessData;
   honeytokens: HoneytokenSummary;
   canaryAssignments: CanaryAssignmentSummary;
   actorProfiles: ActorProfileSummary;
@@ -785,6 +825,29 @@ export async function fetchMLShadowSummary(): Promise<MLShadowSummaryData> {
   );
 }
 
+export function mapMLPromotionReadiness(
+  data: BackendMLPromotionReadiness,
+): MLPromotionReadinessData {
+  return {
+    status: data.status,
+    artifact: data.artifact,
+    datasetManifest: data.dataset_manifest,
+    datasetName: data.dataset_name,
+    datasetVersion: data.dataset_version,
+    routingUnchanged: data.routing_unchanged,
+    gates: data.gates,
+    warnings: data.warnings,
+  };
+}
+
+export async function fetchMLPromotionReadiness(): Promise<MLPromotionReadinessData> {
+  const res = await fetch("/api/ml-promotion/readiness", { cache: "no-store" });
+  if (!res.ok) {
+    throw new Error(`ML promotion readiness error: ${res.status} ${res.statusText}`);
+  }
+  return mapMLPromotionReadiness(await res.json());
+}
+
 /** Fetch recent honeytoken interactions. */
 export async function fetchHoneytokens(): Promise<HoneytokenSummary> {
   const data = await apiFetch<BackendHoneytokenSummary>("/dashboard/honeytokens");
@@ -1036,6 +1099,7 @@ export function mapDashboardSnapshot(
     trainingSummary: mapTrainingSummary(data.training_summary),
     mlShadowStatus: mapMLShadowStatus(data.ml_shadow_status),
     mlShadowSummary: mapMLShadowSummary(data.ml_shadow_summary),
+    mlPromotionReadiness: mapMLPromotionReadiness(data.ml_promotion_readiness),
     honeytokens: mapHoneytokenSummary(data.honeytokens),
     canaryAssignments: mapCanaryAssignmentSummary(data.canary_assignments),
     actorProfiles: mapActorProfileSummary(data.actor_profiles),
