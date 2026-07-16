@@ -45,6 +45,7 @@ def train_risk_classifier(
     output_path: Path,
     *,
     random_state: int = 42,
+    dataset_lineage: dict[str, str] | None = None,
 ) -> TrainingMetrics:
     """Train a deterministic binary classifier and save a versioned artifact."""
     records = list(rows)
@@ -85,7 +86,8 @@ def train_risk_classifier(
             "model": model,
             "feature_names": FEATURE_NAMES,
             "metrics": asdict(metrics),
-            "artifact_version": 1,
+            "artifact_version": 2 if dataset_lineage else 1,
+            "dataset_lineage": dataset_lineage,
         },
         output_path,
     )

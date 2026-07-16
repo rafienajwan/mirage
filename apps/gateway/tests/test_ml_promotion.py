@@ -24,12 +24,13 @@ def _settings(**overrides):
     return SimpleNamespace(**values)
 
 
-def _artifact_review(*, ready: bool = True):
+def _artifact_review(*, ready: bool = True, dataset_lineage=None):
     return SimpleNamespace(
         shadow_ready=ready,
         metrics={"precision": 0.91, "recall": 0.89, "f1_score": 0.9},
         blockers=[] if ready else ["Artifact feature contract is invalid"],
         warnings=[],
+        dataset_lineage=dataset_lineage,
     )
 
 
@@ -83,6 +84,7 @@ def test_promotion_needs_more_shadow_observation():
         shadow_summary=_summary(events=120, agreement=0.92),
         artifact_reviewer=lambda *_args, **_kwargs: _artifact_review(),
         dataset_reviewer=lambda *_args, **_kwargs: _dataset_review(),
+        lineage_reviewer=lambda *_args: True,
     )
 
     assert report.status == "needs_observation"
@@ -97,11 +99,36 @@ def test_promotion_is_eligible_only_when_every_gate_passes():
         shadow_summary=_summary(),
         artifact_reviewer=lambda *_args, **_kwargs: _artifact_review(),
         dataset_reviewer=lambda *_args, **_kwargs: _dataset_review(),
+        lineage_reviewer=lambda *_args: True,
     )
 
     assert report.status == "eligible"
     assert all(gate.passed for gate in report.gates)
     assert report.routing_unchanged is True
+
+
+def test_promotion_blocks_artifact_dataset_lineage_mismatch(tmp_path):
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text('{"dataset_name":"api-domain"}', encoding="utf-8")
+    report = evaluate_ml_promotion(
+        settings=_settings(ml_dataset_manifest=str(manifest)),
+        shadow_summary=_summary(),
+        artifact_reviewer=lambda *_args, **_kwargs: _artifact_review(
+            dataset_lineage={
+                "dataset_name": "different-dataset",
+                "dataset_version": "v2",
+                "source_kind": "mirage-jsonl",
+                "manifest_sha256": "a" * 64,
+                "train_sha256": "b" * 64,
+                "test_sha256": "c" * 64,
+            }
+        ),
+        dataset_reviewer=lambda *_args, **_kwargs: _dataset_review(),
+    )
+
+    gate = next(gate for gate in report.gates if gate.code == "dataset_lineage")
+    assert report.status == "blocked"
+    assert gate.passed is False
 
 
 def test_promotion_blocks_invalid_threshold_configuration():

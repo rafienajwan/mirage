@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 
 import pytest
@@ -9,6 +10,7 @@ import pytest
 from app.ml.datasets import (
     DatasetValidationError,
     PreparedTrainingRow,
+    build_dataset_lineage,
     load_api_log_jsonl,
     load_cicids_csv,
     load_dataset,
@@ -246,6 +248,10 @@ def test_prepare_dataset_writes_split_and_manifest(tmp_path):
     assert manifest.train_rows == 16
     assert manifest.test_rows == 4
     assert manifest_data["label_counts"] == {"0": 10, "1": 10}
+    assert manifest_data["file_sha256"] == {
+        "train": hashlib.sha256((output_dir / "train.jsonl").read_bytes()).hexdigest(),
+        "test": hashlib.sha256((output_dir / "test.jsonl").read_bytes()).hexdigest(),
+    }
     assert len(train_rows) == 16
     assert len(test_rows) == 4
 
@@ -303,6 +309,58 @@ def test_review_prepared_dataset_blocks_manifest_row_mismatch(tmp_path):
 
     assert review.ready_for_training is False
     assert any("Train file row count" in blocker for blocker in review.blockers)
+
+
+def test_review_prepared_dataset_blocks_split_hash_mismatch(tmp_path):
+    source = tmp_path / "training_events.jsonl"
+    rows = [
+        {"label": label, "features": _features(float(index))}
+        for label in (0, 1)
+        for index in range(10)
+    ]
+    _write_jsonl(source, rows)
+    output_dir = tmp_path / "prepared" / "runtime-v1"
+    prepare_dataset(
+        source,
+        output_dir,
+        source_kind="mirage-jsonl",
+        dataset_name="runtime-export",
+        dataset_version="v1",
+    )
+    train_path = output_dir / "train.jsonl"
+    content = train_path.read_text(encoding="utf-8")
+    train_path.write_text(
+        content.replace('"label": 0', '"label": 1', 1),
+        encoding="utf-8",
+    )
+
+    review = review_prepared_dataset(output_dir / "manifest.json")
+
+    assert review.ready_for_training is False
+    assert "Train file SHA-256 does not match manifest" in review.blockers
+
+
+def test_build_dataset_lineage_rejects_unrelated_training_file(tmp_path):
+    source = tmp_path / "training_events.jsonl"
+    rows = [
+        {"label": label, "features": _features(float(index))}
+        for label in (0, 1)
+        for index in range(12)
+    ]
+    _write_jsonl(source, rows)
+    output_dir = tmp_path / "prepared" / "runtime-v1"
+    prepare_dataset(
+        source,
+        output_dir,
+        source_kind="mirage-jsonl",
+        dataset_name="runtime-export",
+        dataset_version="v1",
+    )
+    unrelated = tmp_path / "unrelated.jsonl"
+    unrelated.write_text((output_dir / "train.jsonl").read_text(), encoding="utf-8")
+
+    with pytest.raises(DatasetValidationError, match="manifest train file"):
+        build_dataset_lineage(output_dir / "manifest.json", unrelated)
 
 
 def test_review_prepared_dataset_blocks_malformed_counts(tmp_path):
