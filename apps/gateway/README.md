@@ -87,7 +87,8 @@ python scripts/prepare_dataset.py \
 
 python scripts/train_model.py \
   --input data/prepared/runtime-v1/train.jsonl \
-  --output artifacts/risk_model.joblib
+  --output artifacts/risk_model.joblib \
+  --manifest data/prepared/runtime-v1/manifest.json
 
 python scripts/review_model_artifact.py \
   --artifact artifacts/risk_model.joblib

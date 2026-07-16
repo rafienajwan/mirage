@@ -239,6 +239,11 @@ normal and 15,964 suspicious. A request identity covers method, target, user
 agent, and body, so the same canonical request identity cannot appear in both
 train and test sets. The manifest records the official catalog,
 distribution DOI, SHA-256 values, rejected rows, and removed duplicates.
+Prepared manifests also record SHA-256 values for `train.jsonl` and
+`test.jsonl`. Dataset review fails if either split changes without regenerating
+the manifest, even when its row count remains unchanged.
+Prepared directories created before these hashes were introduced must be
+regenerated before training a promotion-eligible artifact.
 
 CSIC traffic was generated for a 2010 e-commerce application. It is useful for
 reproducible parser, payload-signal, and model benchmarking, but it is not
@@ -269,7 +274,7 @@ python scripts/review_dataset.py \
   --min-test-rows 5
 ```
 
-The command checks manifest integrity, train/test file row counts, label
-presence in both splits, and the feature contract. It exits with code `1` when
-blockers are found. Passing this review means the split is ready for local
+The command checks manifest integrity, train/test file hashes and row counts,
+label presence in both splits, and the feature contract. It exits with code `1`
+when blockers are found. Passing this review means the split is ready for local
 training review, not that the resulting model should control live routing.

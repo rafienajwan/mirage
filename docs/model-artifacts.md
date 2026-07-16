@@ -21,7 +21,8 @@ If the dataset review passes, train from the reviewed split:
 ```bash
 python scripts/train_model.py \
   --input data/prepared/runtime-v1/train.jsonl \
-  --output artifacts/risk_model.joblib
+  --output artifacts/risk_model.joblib \
+  --manifest data/prepared/runtime-v1/manifest.json
 ```
 
 The training script stores:
@@ -29,7 +30,16 @@ The training script stores:
 - the trained model;
 - the stable feature contract;
 - precision, recall, F1, false-positive rate, training rows, and test rows;
-- an artifact version.
+- an artifact version;
+- sanitized dataset lineage containing dataset identity and SHA-256 values for
+  the manifest and prepared train/test splits.
+
+Omitting `--manifest` still creates a legacy local artifact for compatibility,
+but the promotion-readiness gate rejects it because it cannot prove which
+prepared dataset produced the model.
+
+Likewise, regenerate older prepared manifests that do not contain train/test
+file hashes before retraining a promotion-eligible artifact.
 
 ## Evaluate The Holdout Split
 
@@ -66,7 +76,8 @@ python scripts/review_model_artifact.py \
 
 The command exits with code `1` when blockers are found. It checks that the
 artifact can be loaded, the feature contract matches the gateway, required
-metrics exist, and the selected metric thresholds are satisfied.
+metrics exist, dataset lineage is structurally valid when present, and the
+selected metric thresholds are satisfied.
 
 The default thresholds are intentionally modest for local prototypes. For a
 real demonstration or deployment, raise them and review dataset provenance,
@@ -106,7 +117,8 @@ Training command:
 ```bash
 python scripts/train_model.py \
   --input data/prepared/cicids2017-ddos-v1/train.jsonl \
-  --output artifacts/cicids2017-ddos-risk-model.joblib
+  --output artifacts/cicids2017-ddos-risk-model.joblib \
+  --manifest data/prepared/cicids2017-ddos-v1/manifest.json
 ```
 
 Internal training-script validation:
@@ -208,7 +220,8 @@ Training command:
 ```bash
 python scripts/train_model.py \
   --input data/prepared/cicids2017-full-v1/train.jsonl \
-  --output artifacts/cicids2017-full-risk-model.joblib
+  --output artifacts/cicids2017-full-risk-model.joblib \
+  --manifest data/prepared/cicids2017-full-v1/manifest.json
 ```
 
 Internal training-script validation:
@@ -251,6 +264,40 @@ the same 0.9 precision, recall, and F1 thresholds. Smoke testing confirmed the
 artifact loads through the runtime shadow-scoring path. Like the DDoS-specific
 artifact, this supports shadow-mode observation only; it still does not justify
 model-controlled routing.
+
+## Local HTTP CSIC 2010 Review
+
+The ignored HTTP CSIC 2010 split was regenerated with train/test SHA-256
+values, trained with manifest-bound lineage, and evaluated against its external
+holdout. The dataset review passed, but the candidate artifact did not pass the
+conservative model gates and must not be enabled in shadow mode.
+
+Training command:
+
+```bash
+python scripts/train_model.py \
+  --input data/prepared/csic-http-2010-v1/train.jsonl \
+  --output artifacts/csic-http-2010-risk-model.joblib \
+  --manifest data/prepared/csic-http-2010-v1/manifest.json
+```
+
+| Check | Precision | Recall | F1 | False-positive rate |
+| --- | ---: | ---: | ---: | ---: |
+| Internal training validation | 0.635046 | 0.321977 | 0.427305 | 0.158512 |
+| Prepared holdout, 8,651 rows | 0.639824 | 0.328489 | 0.434106 | 0.158369 |
+
+The artifact failed the required `0.9` precision, recall, and F1 gates and the
+maximum `0.05` false-positive-rate gate. The default shadow review also blocks
+it because recall and F1 are below `0.5`. A smoke run produced one false
+positive on the normal request and correctly retained `mode: invalid`.
+
+Diagnostic review found only 163 unique feature vectors among 25,953 training
+rows. Seventeen vectors contained both labels and covered 24,737 rows. Payload,
+user-agent, flow, and destination-port features were constant for nearly all
+rows, leaving the classifier mostly dependent on path length and depth. This is
+evidence that the current runtime feature contract is too lossy for this HTTP
+benchmark. Thresholds were not lowered; generic runtime-compatible payload
+shape features should be evaluated in a separate milestone.
 
 ## Smoke-Test Shadow Scoring
 
@@ -404,7 +451,8 @@ Training command:
 ```bash
 python scripts/train_model.py \
   --input data/prepared/api-domain-fixture-v1/train.jsonl \
-  --output artifacts/api-domain-fixture-risk-model.joblib
+  --output artifacts/api-domain-fixture-risk-model.joblib \
+  --manifest data/prepared/api-domain-fixture-v1/manifest.json
 ```
 
 Internal training-script validation:
