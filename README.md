@@ -269,7 +269,9 @@ python scripts/prepare_dataset.py \
 
 Use `--source api-log-jsonl` for labeled custom API request logs, or
 `--source cicids-csv` / `--source cicids-csv-dir` for compatible
-CICIDS-style CSV exports.
+CICIDS-style CSV exports. The `--source csic-http-dir` adapter accepts the
+three raw HTTP CSIC 2010 files and a complete SHA-256 checksum map; see
+`docs/dataset-preparation.md` for the provenance and review workflow.
 
 For a deterministic local API-domain fixture that exercises the custom API-log
 adapter without a running gateway:

@@ -13,6 +13,7 @@ directly into the trainer.
 | Custom API JSONL logs | `api-log-jsonl` | Ready for labeled request metadata |
 | CICIDS2017-style CSV | `cicids-csv` | Basic adapter for one compatible CSV |
 | CICIDS2017-style CSV directory | `cicids-csv-dir` | Loads all immediate `*.csv` files in stable filename order |
+| HTTP CSIC 2010 directory | `csic-http-dir` | Parses the three official raw HTTP request files with provenance and deduplication |
 
 Raw and prepared datasets should stay under local ignored `data/` directories.
 Commit the preparation code, schema, and documentation, but do not commit raw
@@ -195,6 +196,54 @@ python scripts/prepare_dataset.py \
 The directory adapter reads only immediate `*.csv` files, sorted by filename.
 Each prepared row keeps a source record id in the form `filename.csv:line` so
 reviewers can trace rows back to the raw CSV without committing raw data.
+
+## Prepare HTTP CSIC 2010
+
+HTTP CSIC 2010 supplements the network-flow CICIDS2017 data with labeled,
+application-layer HTTP requests. Use the [official IMPACT catalog](https://www.impactcybertrust.org/dataset_view?idDataset=940)
+for dataset context and the [ReData distribution DOI](https://doi.org/10.60895/redata/RWUUSV)
+for the three files distributed under CC BY 4.0:
+
+| File | Label | Bytes | Published MD5 |
+| --- | --- | ---: | --- |
+| `normalTrafficTraining.txt` | Normal | 20,640,988 | `80dc393c73afd08df28351e1470e3bbf` |
+| `normalTrafficTest.txt` | Normal | 20,643,204 | `475d761acdb349a5d2e5404e9f3a4ebb` |
+| `anomalousTrafficTest.txt` | Suspicious | 16,090,299 | `d03503ed45d198b4cebdefec1f540131` |
+
+Place them in `apps/gateway/data/csic-2010/`. Verify the published MD5 values,
+then create `data/csic-2010/sha256.json` with a JSON object that maps all three
+filenames to their local SHA-256 values. The preparation command rejects a
+partial checksum map or any mismatch.
+
+```bash
+cd apps/gateway
+python scripts/prepare_dataset.py \
+  --source csic-http-dir \
+  --input data/csic-2010 \
+  --output-dir data/prepared/csic-http-2010-v1 \
+  --dataset-name csic-http-2010 \
+  --dataset-version redata-rwuusv-v1 \
+  --checksums data/csic-2010/sha256.json
+
+python scripts/review_dataset.py \
+  --manifest data/prepared/csic-http-2010-v1/manifest.json \
+  --min-total-rows 10000 \
+  --min-train-rows 7000 \
+  --min-test-rows 2000 \
+  --min-rows-per-class 1000
+```
+
+The verified local release contains 97,065 raw requests. MIRAGE removes 62,461
+repeated request identities before splitting, leaving 34,604 rows: 18,640
+normal and 15,964 suspicious. A request identity covers method, target, user
+agent, and body, so the same canonical request identity cannot appear in both
+train and test sets. The manifest records the official catalog,
+distribution DOI, SHA-256 values, rejected rows, and removed duplicates.
+
+CSIC traffic was generated for a 2010 e-commerce application. It is useful for
+reproducible parser, payload-signal, and model benchmarking, but it is not
+modern production traffic and does not satisfy the proposal's pending need for
+reviewed production-like custom API logs.
 
 ## Readiness Rules
 

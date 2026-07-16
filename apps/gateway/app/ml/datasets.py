@@ -6,15 +6,25 @@ import csv
 import json
 import math
 import random
+import re
 from collections import Counter
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Literal
 from urllib.parse import urlsplit
 
+from app.ml.csic_http import (
+    CSIC_DISTRIBUTION_URL,
+    CSIC_FILE_LABELS,
+    CSIC_SOURCE_URL,
+    LoadedCSICHTTP,
+    load_csic_http_directory,
+)
+from app.ml.errors import DatasetValidationError
 from app.schemas.request import InspectRequest
 from app.services.feature_extraction import FEATURE_NAMES, FeatureVector, extract_features
+from app.services.payload_signals import detect_payload_indicators
 
 
 DatasetSource = Literal[
@@ -22,6 +32,7 @@ DatasetSource = Literal[
     "api-log-jsonl",
     "cicids-csv",
     "cicids-csv-dir",
+    "csic-http-dir",
 ]
 
 
@@ -53,6 +64,11 @@ class DatasetManifest:
     random_seed: int
     feature_names: list[str]
     files: dict[str, str]
+    source_url: str | None = None
+    distribution_url: str | None = None
+    input_sha256: dict[str, str] = field(default_factory=dict)
+    duplicate_rows_removed: int = 0
+    rejected_rows: int = 0
 
 
 @dataclass(frozen=True)
@@ -75,10 +91,6 @@ class DatasetReview:
 
     def to_dict(self) -> dict:
         return asdict(self)
-
-
-class DatasetValidationError(ValueError):
-    """Raised when source data cannot be converted into trainable rows."""
 
 
 def normalize_features(features: object, *, line_number: int | None = None) -> FeatureVector:
@@ -570,6 +582,39 @@ def load_cicids_csv_directory(path: Path) -> list[PreparedTrainingRow]:
     return rows
 
 
+def _csic_http_rows(loaded: LoadedCSICHTTP) -> list[PreparedTrainingRow]:
+    rows: list[PreparedTrainingRow] = []
+    for record in loaded.records:
+        indicators = detect_payload_indicators(
+            record.path,
+            record.query,
+            record.body,
+        )
+        request = InspectRequest(
+            ip_address="127.0.0.1",
+            method=record.method,
+            path=record.path[:2048],
+            user_agent=record.user_agent[:512],
+            payload_indicators=indicators,
+            payload_excerpt=record.body.decode("latin-1")[:4096],
+            destination_port=record.destination_port,
+        )
+        rows.append(
+            PreparedTrainingRow(
+                features=extract_features(request),
+                label=record.label,
+                source="csic-http-dir",
+                record_id=record.record_id,
+            )
+        )
+    return rows
+
+
+def load_csic_http_rows(path: Path) -> list[PreparedTrainingRow]:
+    """Load HTTP CSIC 2010 requests into MIRAGE's runtime feature contract."""
+    return _csic_http_rows(load_csic_http_directory(path))
+
+
 def load_dataset(path: Path, source_kind: DatasetSource) -> list[PreparedTrainingRow]:
     """Load source data using the selected adapter."""
     if source_kind == "mirage-jsonl":
@@ -580,6 +625,8 @@ def load_dataset(path: Path, source_kind: DatasetSource) -> list[PreparedTrainin
         return load_cicids_csv(path)
     if source_kind == "cicids-csv-dir":
         return load_cicids_csv_directory(path)
+    if source_kind == "csic-http-dir":
+        return load_csic_http_rows(path)
     raise DatasetValidationError(f"Unsupported dataset source kind: {source_kind}")
 
 
@@ -662,9 +709,22 @@ def prepare_dataset(
     dataset_version: str,
     train_ratio: float = 0.75,
     random_seed: int = 42,
+    expected_checksums: dict[str, str] | None = None,
 ) -> DatasetManifest:
     """Validate, split, and write a versioned training dataset."""
-    rows = load_dataset(input_path, source_kind)
+    csic_source: LoadedCSICHTTP | None = None
+    if source_kind == "csic-http-dir":
+        csic_source = load_csic_http_directory(
+            input_path,
+            expected_checksums=expected_checksums,
+        )
+        rows = _csic_http_rows(csic_source)
+    else:
+        if expected_checksums:
+            raise DatasetValidationError(
+                "expected_checksums is only supported for csic-http-dir"
+            )
+        rows = load_dataset(input_path, source_kind)
     train_rows, test_rows = stratified_split(
         rows,
         train_ratio=train_ratio,
@@ -701,6 +761,13 @@ def prepare_dataset(
             "test": test_path.name,
             "manifest": manifest_path.name,
         },
+        source_url=CSIC_SOURCE_URL if csic_source else None,
+        distribution_url=CSIC_DISTRIBUTION_URL if csic_source else None,
+        input_sha256=csic_source.input_sha256 if csic_source else {},
+        duplicate_rows_removed=(
+            csic_source.duplicate_rows_removed if csic_source else 0
+        ),
+        rejected_rows=csic_source.rejected_rows if csic_source else 0,
     )
 
     manifest_path.write_text(
@@ -754,6 +821,34 @@ def _manifest_counts(manifest: dict, key: str, blockers: list[str]) -> dict[str,
     return counts
 
 
+def _review_csic_provenance(manifest: dict, blockers: list[str]) -> None:
+    if manifest.get("source_url") != CSIC_SOURCE_URL:
+        blockers.append("CSIC source_url does not match the official catalog")
+    if manifest.get("distribution_url") != CSIC_DISTRIBUTION_URL:
+        blockers.append("CSIC distribution_url does not match the approved DOI")
+
+    input_sha256 = manifest.get("input_sha256")
+    if not isinstance(input_sha256, dict) or set(input_sha256) != set(
+        CSIC_FILE_LABELS
+    ):
+        blockers.append("CSIC input_sha256 must cover the three required files")
+    if isinstance(input_sha256, dict):
+        for name, checksum in input_sha256.items():
+            if not isinstance(checksum, str) or re.fullmatch(
+                r"[0-9a-fA-F]{64}", checksum
+            ) is None:
+                blockers.append(f"CSIC checksum for {name} is invalid")
+
+    for key in ("duplicate_rows_removed", "rejected_rows"):
+        try:
+            value = int(manifest.get(key, 0))
+        except (TypeError, ValueError):
+            blockers.append(f"manifest {key} must be a non-negative integer")
+            continue
+        if value < 0:
+            blockers.append(f"manifest {key} must be non-negative")
+
+
 def review_prepared_dataset(
     manifest_path: Path,
     *,
@@ -792,6 +887,9 @@ def review_prepared_dataset(
     label_counts = _manifest_counts(manifest, "label_counts", blockers)
     train_label_counts = _manifest_counts(manifest, "train_label_counts", blockers)
     test_label_counts = _manifest_counts(manifest, "test_label_counts", blockers)
+
+    if manifest.get("source_kind") == "csic-http-dir":
+        _review_csic_provenance(manifest, blockers)
 
     if total_rows < min_total_rows:
         blockers.append(f"Total rows {total_rows} is below {min_total_rows}")

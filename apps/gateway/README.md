@@ -94,7 +94,10 @@ python scripts/review_model_artifact.py \
 ```
 
 Use `--source api-log-jsonl` for labeled custom API request logs and
-`--source cicids-csv` for compatible CICIDS-style CSV exports.
+`--source cicids-csv` for compatible CICIDS-style CSV exports. Use
+`--source csic-http-dir` for the three raw HTTP CSIC 2010 files together with a
+complete `--checksums` SHA-256 JSON map. See `docs/dataset-preparation.md` for
+the provenance, filenames, and review thresholds.
 
 Training computes precision, recall, F1, and false-positive rate. Runtime
 routing remains heuristic until a reviewed artifact is enabled in shadow mode.
