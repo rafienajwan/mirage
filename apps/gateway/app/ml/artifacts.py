@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 import math
 from pathlib import Path
+import re
 from typing import Any
 
 import joblib
@@ -19,6 +20,14 @@ REQUIRED_METRICS = (
     "training_rows",
     "test_rows",
 )
+DATASET_LINEAGE_FIELDS = (
+    "dataset_name",
+    "dataset_version",
+    "source_kind",
+    "manifest_sha256",
+    "train_sha256",
+    "test_sha256",
+)
 
 
 @dataclass(frozen=True)
@@ -31,6 +40,7 @@ class ArtifactReview:
     metrics: dict[str, float | int]
     blockers: list[str]
     warnings: list[str]
+    dataset_lineage: dict[str, str] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -42,6 +52,32 @@ def _number(value: object) -> float | int | None:
     if isinstance(value, int | float):
         return value if math.isfinite(value) else None
     return None
+
+
+def _review_dataset_lineage(
+    raw_lineage: object,
+    artifact_version: int | None,
+    blockers: list[str],
+) -> dict[str, str] | None:
+    if raw_lineage is None and artifact_version == 1:
+        return None
+    if not isinstance(raw_lineage, dict):
+        blockers.append("Artifact dataset lineage is missing or invalid")
+        return None
+
+    lineage: dict[str, str] = {}
+    for field_name in DATASET_LINEAGE_FIELDS:
+        value = raw_lineage.get(field_name)
+        if not isinstance(value, str) or not value:
+            blockers.append(f"Artifact dataset lineage {field_name} is invalid")
+            continue
+        if field_name.endswith("_sha256") and re.fullmatch(
+            r"[0-9a-fA-F]{64}", value
+        ) is None:
+            blockers.append(f"Artifact dataset lineage {field_name} is invalid")
+            continue
+        lineage[field_name] = value
+    return lineage
 
 
 def review_model_artifact(
@@ -97,6 +133,12 @@ def review_model_artifact(
     if tuple(artifact.get("feature_names", ())) != FEATURE_NAMES:
         blockers.append("Artifact feature contract does not match the gateway")
 
+    dataset_lineage = _review_dataset_lineage(
+        artifact.get("dataset_lineage"),
+        artifact_version,
+        blockers,
+    )
+
     raw_metrics = artifact.get("metrics", {})
     if not isinstance(raw_metrics, dict):
         blockers.append("Artifact metrics must be a dictionary")
@@ -147,4 +189,5 @@ def review_model_artifact(
         metrics=metrics,
         blockers=blockers,
         warnings=warnings,
+        dataset_lineage=dataset_lineage,
     )

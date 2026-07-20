@@ -9,11 +9,17 @@ from typing import Any
 
 from app.core.config import settings as app_settings
 from app.ml.artifacts import ArtifactReview, review_model_artifact
-from app.ml.datasets import DatasetReview, DatasetValidationError, review_prepared_dataset
+from app.ml.datasets import (
+    DatasetReview,
+    DatasetValidationError,
+    review_prepared_dataset,
+    sha256_file,
+)
 from app.schemas.dashboard import MLPromotionGate, MLPromotionReadiness, MLShadowSummary
 
 ArtifactReviewer = Callable[..., ArtifactReview]
 DatasetReviewer = Callable[..., DatasetReview]
+LineageReviewer = Callable[[ArtifactReview, DatasetReview, Path], bool]
 
 
 def _mtime(path: Path) -> int:
@@ -64,12 +70,33 @@ def _gate(
     )
 
 
+def _artifact_matches_dataset(
+    artifact_review: ArtifactReview,
+    dataset_review: DatasetReview,
+    manifest_path: Path,
+) -> bool:
+    lineage = artifact_review.dataset_lineage
+    if not lineage:
+        return False
+    try:
+        manifest_sha256 = sha256_file(manifest_path)
+    except OSError:
+        return False
+    return (
+        lineage.get("dataset_name") == dataset_review.dataset_name
+        and lineage.get("dataset_version") == dataset_review.dataset_version
+        and lineage.get("source_kind") == dataset_review.source_kind
+        and lineage.get("manifest_sha256") == manifest_sha256
+    )
+
+
 def evaluate_ml_promotion(
     *,
     shadow_summary: MLShadowSummary | Any,
     settings: Any = app_settings,
     artifact_reviewer: ArtifactReviewer = review_model_artifact,
     dataset_reviewer: DatasetReviewer = review_prepared_dataset,
+    lineage_reviewer: LineageReviewer = _artifact_matches_dataset,
 ) -> MLPromotionReadiness:
     """Evaluate prerequisites without changing the active routing policy."""
     artifact_path = (
@@ -202,6 +229,20 @@ def evaluate_ml_promotion(
             )
         )
 
+    lineage_ready = bool(
+        dataset_review
+        and lineage_reviewer(artifact_review, dataset_review, manifest_path)
+    )
+    gates.append(
+        _gate(
+            "dataset_lineage",
+            lineage_ready,
+            "Artifact dataset lineage matches the configured manifest"
+            if lineage_ready
+            else "Artifact dataset lineage does not match the configured manifest",
+        )
+    )
+
     shadow_events = shadow_summary.shadow_events
     agreement_rate = shadow_summary.agreement_rate
     gates.extend(
@@ -230,7 +271,7 @@ def evaluate_ml_promotion(
     review_failed = any(
         not gate.passed
         for gate in gates
-        if gate.code in {"artifact_review", "dataset_review"}
+        if gate.code in {"artifact_review", "dataset_review", "dataset_lineage"}
     )
     observation_failed = any(
         not gate.passed

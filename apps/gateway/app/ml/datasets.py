@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import math
 import random
@@ -64,6 +65,7 @@ class DatasetManifest:
     random_seed: int
     feature_names: list[str]
     files: dict[str, str]
+    file_sha256: dict[str, str] = field(default_factory=dict)
     source_url: str | None = None
     distribution_url: str | None = None
     input_sha256: dict[str, str] = field(default_factory=dict)
@@ -700,6 +702,15 @@ def write_jsonl(path: Path, rows: Iterable[PreparedTrainingRow]) -> None:
             target.write("\n")
 
 
+def sha256_file(path: Path) -> str:
+    """Return the SHA-256 digest for a local dataset or manifest file."""
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def prepare_dataset(
     input_path: Path,
     output_dir: Path,
@@ -760,6 +771,10 @@ def prepare_dataset(
             "train": train_path.name,
             "test": test_path.name,
             "manifest": manifest_path.name,
+        },
+        file_sha256={
+            "train": sha256_file(train_path),
+            "test": sha256_file(test_path),
         },
         source_url=CSIC_SOURCE_URL if csic_source else None,
         distribution_url=CSIC_DISTRIBUTION_URL if csic_source else None,
@@ -880,6 +895,23 @@ def review_prepared_dataset(
     test_rows_actual = (
         _count_jsonl(base_dir / test_file) if isinstance(test_file, str) else 0
     )
+    file_sha256 = manifest.get("file_sha256")
+    if not isinstance(file_sha256, dict) or set(file_sha256) != {"train", "test"}:
+        blockers.append("manifest file_sha256 must cover train and test files")
+        file_sha256 = {}
+
+    for split, filename in (("train", train_file), ("test", test_file)):
+        expected_hash = file_sha256.get(split)
+        if not isinstance(expected_hash, str) or re.fullmatch(
+            r"[0-9a-fA-F]{64}", expected_hash
+        ) is None:
+            blockers.append(f"manifest {split} file SHA-256 is invalid")
+            continue
+        if (
+            isinstance(filename, str)
+            and sha256_file(base_dir / filename) != expected_hash
+        ):
+            blockers.append(f"{split.title()} file SHA-256 does not match manifest")
 
     total_rows = _manifest_int(manifest, "total_rows", blockers)
     train_rows = _manifest_int(manifest, "train_rows", blockers)
@@ -934,3 +966,32 @@ def review_prepared_dataset(
         blockers=blockers,
         warnings=warnings,
     )
+
+
+def build_dataset_lineage(
+    manifest_path: Path,
+    training_path: Path,
+) -> dict[str, str]:
+    """Build sanitized artifact lineage for a reviewed training split."""
+    review = review_prepared_dataset(manifest_path)
+    if not review.ready_for_training:
+        raise DatasetValidationError(
+            "dataset manifest is not ready for training: "
+            + "; ".join(review.blockers)
+        )
+
+    manifest = _load_manifest(manifest_path)
+    files = manifest["files"]
+    expected_training_path = (manifest_path.parent / files["train"]).resolve()
+    if training_path.resolve() != expected_training_path:
+        raise DatasetValidationError("training input is not the manifest train file")
+
+    file_sha256 = manifest["file_sha256"]
+    return {
+        "dataset_name": review.dataset_name,
+        "dataset_version": review.dataset_version,
+        "source_kind": review.source_kind,
+        "manifest_sha256": sha256_file(manifest_path),
+        "train_sha256": str(file_sha256["train"]),
+        "test_sha256": str(file_sha256["test"]),
+    }

@@ -295,7 +295,10 @@ small, so any resulting artifact must remain shadow-only.
 
 ```bash
 cd apps/gateway
-python scripts/train_model.py --input data/prepared/runtime-v1/train.jsonl --output artifacts/risk_model.joblib
+python scripts/train_model.py \
+  --input data/prepared/runtime-v1/train.jsonl \
+  --output artifacts/risk_model.joblib \
+  --manifest data/prepared/runtime-v1/manifest.json
 ```
 
 Review the artifact before enabling shadow mode:

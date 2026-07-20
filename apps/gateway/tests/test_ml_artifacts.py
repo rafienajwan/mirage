@@ -87,3 +87,45 @@ def test_review_model_artifact_rejects_non_finite_metrics(tmp_path):
     assert review.shadow_ready is False
     assert "Metric 'precision' is missing or non-numeric" in review.blockers
     assert "Metric 'recall' is missing or non-numeric" in review.blockers
+
+
+def test_review_model_artifact_exposes_valid_dataset_lineage(tmp_path):
+    artifact = tmp_path / "risk_model.joblib"
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(20)]
+    lineage = {
+        "dataset_name": "csic-http-2010",
+        "dataset_version": "redata-rwuusv-v1",
+        "source_kind": "csic-http-dir",
+        "manifest_sha256": "a" * 64,
+        "train_sha256": "b" * 64,
+        "test_sha256": "c" * 64,
+    }
+    train_risk_classifier(rows, artifact, dataset_lineage=lineage)
+
+    review = review_model_artifact(artifact)
+
+    assert review.shadow_ready is True
+    assert review.artifact_version == 2
+    assert review.dataset_lineage == lineage
+
+
+def test_review_model_artifact_rejects_invalid_dataset_lineage(tmp_path):
+    artifact = tmp_path / "risk_model.joblib"
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(20)]
+    train_risk_classifier(
+        rows,
+        artifact,
+        dataset_lineage={
+            "dataset_name": "csic-http-2010",
+            "dataset_version": "redata-rwuusv-v1",
+            "source_kind": "csic-http-dir",
+            "manifest_sha256": "bad",
+            "train_sha256": "b" * 64,
+            "test_sha256": "c" * 64,
+        },
+    )
+
+    review = review_model_artifact(artifact)
+
+    assert review.shadow_ready is False
+    assert "Artifact dataset lineage manifest_sha256 is invalid" in review.blockers
