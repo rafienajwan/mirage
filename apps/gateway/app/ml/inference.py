@@ -6,12 +6,20 @@ from pathlib import Path
 
 import joblib
 
-from app.services.feature_extraction import FEATURE_NAMES, FeatureVector
+from app.services.feature_extraction import (
+    FEATURE_CONTRACT_VERSION,
+    FEATURE_NAMES,
+    FeatureVector,
+)
 
 
 class RiskClassifier:
     def __init__(self, artifact_path: Path) -> None:
         artifact = joblib.load(artifact_path)
+        if artifact.get("feature_contract_version") != FEATURE_CONTRACT_VERSION:
+            raise ValueError(
+                "Model feature contract version does not match the gateway"
+            )
         if tuple(artifact.get("feature_names", ())) != FEATURE_NAMES:
             raise ValueError("Model feature contract does not match the gateway")
         self.model = artifact["model"]

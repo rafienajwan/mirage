@@ -10,7 +10,7 @@ from typing import Any
 
 import joblib
 
-from app.services.feature_extraction import FEATURE_NAMES
+from app.services.feature_extraction import FEATURE_CONTRACT_VERSION, FEATURE_NAMES
 
 REQUIRED_METRICS = (
     "precision",
@@ -40,6 +40,7 @@ class ArtifactReview:
     metrics: dict[str, float | int]
     blockers: list[str]
     warnings: list[str]
+    feature_contract_version: int | None = None
     dataset_lineage: dict[str, str] | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -95,6 +96,7 @@ def review_model_artifact(
     warnings: list[str] = []
     metrics: dict[str, float | int] = {}
     artifact_version: int | None = None
+    feature_contract_version: int | None = None
 
     try:
         artifact = joblib.load(artifact_path)
@@ -129,6 +131,12 @@ def review_model_artifact(
 
     if "model" not in artifact:
         blockers.append("Artifact is missing model")
+
+    feature_contract_version_value = artifact.get("feature_contract_version")
+    if isinstance(feature_contract_version_value, int):
+        feature_contract_version = feature_contract_version_value
+    if feature_contract_version != FEATURE_CONTRACT_VERSION:
+        blockers.append("Artifact feature contract version does not match the gateway")
 
     if tuple(artifact.get("feature_names", ())) != FEATURE_NAMES:
         blockers.append("Artifact feature contract does not match the gateway")
@@ -189,5 +197,6 @@ def review_model_artifact(
         metrics=metrics,
         blockers=blockers,
         warnings=warnings,
+        feature_contract_version=feature_contract_version,
         dataset_lineage=dataset_lineage,
     )

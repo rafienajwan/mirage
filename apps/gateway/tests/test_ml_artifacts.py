@@ -26,6 +26,7 @@ def test_review_model_artifact_marks_valid_shadow_ready(tmp_path):
 
     assert review.shadow_ready is True
     assert review.artifact_version == 1
+    assert review.feature_contract_version == 2
     assert review.blockers == []
     assert review.metrics["training_rows"] == 30
     assert review.metrics["test_rows"] == 10
@@ -54,6 +55,23 @@ def test_review_model_artifact_rejects_feature_contract_mismatch(tmp_path):
 
     assert review.shadow_ready is False
     assert "Artifact feature contract does not match the gateway" in review.blockers
+
+
+def test_review_model_artifact_rejects_feature_contract_version_mismatch(tmp_path):
+    artifact = tmp_path / "bad_contract_version.joblib"
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(20)]
+    train_risk_classifier(rows, artifact)
+    payload = joblib.load(artifact)
+    payload["feature_contract_version"] = 1
+    joblib.dump(payload, artifact)
+
+    review = review_model_artifact(artifact)
+
+    assert review.shadow_ready is False
+    assert (
+        "Artifact feature contract version does not match the gateway"
+        in review.blockers
+    )
 
 
 def test_review_model_artifact_reports_missing_file(tmp_path):

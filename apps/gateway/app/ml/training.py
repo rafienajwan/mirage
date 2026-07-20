@@ -12,7 +12,11 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
 from sklearn.model_selection import train_test_split
 
-from app.services.feature_extraction import FEATURE_NAMES, FeatureVector
+from app.services.feature_extraction import (
+    FEATURE_CONTRACT_VERSION,
+    FEATURE_NAMES,
+    FeatureVector,
+)
 
 
 @dataclass(frozen=True)
@@ -84,6 +88,7 @@ def train_risk_classifier(
     joblib.dump(
         {
             "model": model,
+            "feature_contract_version": FEATURE_CONTRACT_VERSION,
             "feature_names": FEATURE_NAMES,
             "metrics": asdict(metrics),
             "artifact_version": 2 if dataset_lineage else 1,

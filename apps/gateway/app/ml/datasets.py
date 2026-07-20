@@ -24,8 +24,16 @@ from app.ml.csic_http import (
 )
 from app.ml.errors import DatasetValidationError
 from app.schemas.request import InspectRequest
-from app.services.feature_extraction import FEATURE_NAMES, FeatureVector, extract_features
-from app.services.payload_signals import detect_payload_indicators
+from app.services.feature_extraction import (
+    FEATURE_CONTRACT_VERSION,
+    FEATURE_NAMES,
+    FeatureVector,
+    extract_features,
+)
+from app.services.payload_signals import (
+    build_payload_excerpt,
+    detect_payload_indicators,
+)
 
 
 DatasetSource = Literal[
@@ -63,6 +71,7 @@ class DatasetManifest:
     test_label_counts: dict[str, int]
     train_ratio: float
     random_seed: int
+    feature_contract_version: int
     feature_names: list[str]
     files: dict[str, str]
     file_sha256: dict[str, str] = field(default_factory=dict)
@@ -280,18 +289,39 @@ def _path_from_value(value: object) -> str:
     return raw_path
 
 
+def _query_from_value(value: object) -> str:
+    if value in (None, ""):
+        return ""
+    return urlsplit(str(value)).query
+
+
 def _payload_excerpt(request_data: dict) -> str:
-    value = _first_object_value(
+    explicit_excerpt = _first_object_value(request_data, "payload_excerpt")
+    if explicit_excerpt not in (None, ""):
+        return str(explicit_excerpt)[:4096]
+
+    target = _first_object_value(
         request_data,
-        "payload_excerpt",
+        "path",
+        "endpoint",
+        "url_path",
+        "route",
+        "uri",
+        "url",
+        "request_uri",
+    )
+    query = _first_object_value(request_data, "query", "query_string")
+    body = _first_object_value(
+        request_data,
         "body_excerpt",
         "request_body",
         "body",
         "payload",
-        "query",
-        "query_string",
     )
-    return str(value or "")[:4096]
+    return build_payload_excerpt(
+        str(query or _query_from_value(target)),
+        str(body or ""),
+    )
 
 
 def _api_payload_indicators(value: object, *, line_number: int) -> list[str]:
@@ -598,7 +628,10 @@ def _csic_http_rows(loaded: LoadedCSICHTTP) -> list[PreparedTrainingRow]:
             path=record.path[:2048],
             user_agent=record.user_agent[:512],
             payload_indicators=indicators,
-            payload_excerpt=record.body.decode("latin-1")[:4096],
+            payload_excerpt=build_payload_excerpt(
+                record.query,
+                record.body.decode("latin-1"),
+            ),
             destination_port=record.destination_port,
         )
         rows.append(
@@ -766,6 +799,7 @@ def prepare_dataset(
         test_label_counts={str(label): test_label_counts[label] for label in (0, 1)},
         train_ratio=train_ratio,
         random_seed=random_seed,
+        feature_contract_version=FEATURE_CONTRACT_VERSION,
         feature_names=list(FEATURE_NAMES),
         files={
             "train": train_path.name,
@@ -946,6 +980,8 @@ def review_prepared_dataset(
         if test_label_counts.get(label, 0) < 1:
             blockers.append(f"Test split is missing label {label}")
 
+    if manifest.get("feature_contract_version") != FEATURE_CONTRACT_VERSION:
+        blockers.append("Feature contract version does not match the gateway")
     if tuple(manifest.get("feature_names", ())) != FEATURE_NAMES:
         blockers.append("Feature contract does not match the gateway")
     if total_rows and total_rows < 100:

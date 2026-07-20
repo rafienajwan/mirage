@@ -1,5 +1,7 @@
 """Integration tests for real-app and decoy proxy routing decisions."""
 
+from types import SimpleNamespace
+
 import httpx
 import pytest
 from fastapi.responses import JSONResponse
@@ -7,6 +9,7 @@ from starlette.requests import Request
 
 from app.api.routes import proxy as proxy_route
 from app.core.config import settings
+from app.schemas.decision import Decision
 from app.services.traffic_tracker import TrafficTracker, traffic_tracker
 from app.services import honeytoken, proxy_client
 from app.services.proxy_client import _request_headers, forward_request
@@ -79,6 +82,34 @@ async def test_payload_signals_can_trigger_decoy_routing(client, monkeypatch):
     assert response.status_code == 200
     assert captured["is_decoy"] is True
     assert captured["body"] == b"../../records UNION SELECT password FROM users"
+
+
+@pytest.mark.asyncio
+async def test_proxy_combines_query_and_body_for_feature_extraction(client, monkeypatch):
+    captured = {}
+
+    async def fake_inspect(metadata, **_kwargs):
+        captured["payload_excerpt"] = metadata.payload_excerpt
+        return SimpleNamespace(
+            decision=Decision.ALLOW,
+            fingerprint_hash="fingerprint",
+            risk_score=0.0,
+            decoy_type=None,
+        )
+
+    async def fake_forward(_request, **_kwargs):
+        return JSONResponse({"status": "ok"})
+
+    monkeypatch.setattr(proxy_route, "inspect_and_log", fake_inspect)
+    monkeypatch.setattr(proxy_route, "forward_request", fake_forward)
+
+    response = await client.post(
+        "/api/v1/proxy/api/search?page=1",
+        content="role=admin",
+    )
+
+    assert response.status_code == 200
+    assert captured["payload_excerpt"] == "page=1\nrole=admin"
 
 
 @pytest.mark.asyncio

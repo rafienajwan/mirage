@@ -3,6 +3,11 @@
 from __future__ import annotations
 
 
+def build_payload_excerpt(query: str, body: str, *, limit: int = 4096) -> str:
+    """Combine bounded request query and body text for defensive inspection."""
+    return "\n".join(value for value in (query, body) if value)[:limit]
+
+
 def detect_payload_indicators(path: str, query: str, body: bytes) -> list[str]:
     """Return stable labels for common malicious request signatures."""
     body_text = body.decode("utf-8", errors="ignore")[:65_536]
