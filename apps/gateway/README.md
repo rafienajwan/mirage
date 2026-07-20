@@ -105,6 +105,10 @@ routing remains heuristic until a reviewed artifact is enabled in shadow mode.
 Set `MIRAGE_MODEL_ARTIFACT` to a trained artifact path to store model-only
 scores beside events without changing live routing.
 
+Prepared manifests and trained artifacts must match the gateway's current
+feature-contract version. Regenerate prepared splits and retrain artifacts made
+with an older contract; review, evaluation, and runtime loading reject them.
+
 To train a local candidate directly from reviewed dashboard labels:
 
 ```bash

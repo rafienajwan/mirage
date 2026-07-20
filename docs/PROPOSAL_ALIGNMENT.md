@@ -22,9 +22,9 @@ the beginning of a real ML pipeline.
 | Fake endpoints and fake data | Implemented for demo | The isolated decoy service exposes static, synthetic responses without real secrets. |
 | Honeytoken detection | Implemented for demo | Configured decoy credential use and per-actor canary tokens are detected, stored, alerted, and shown on the dashboard; issued canary assignments are persisted without raw token values and can be revoked for operator review. |
 | PostgreSQL/Supabase storage | Partial | Async PostgreSQL and Alembic are supported for events, alerts, honeytoken hits, and actor profiles; Supabase deployment is pending. |
-| Feature-vector storage | Implemented | Request and optional CICIDS-style flow features are stored with events. |
+| Feature-vector storage | Implemented | Versioned request, bounded payload-shape, and optional CICIDS-style flow features are stored with events. Dataset, artifact, evaluation, and runtime paths reject stale feature contracts. |
 | CICIDS2017 dataset | Partial | CICIDS-style single-CSV and directory adapters exist; local DDoS and full-directory CICIDS2017 splits have been prepared, reviewed, trained, and evaluated. Dataset provenance review is local-only and custom API-domain data is still pending. |
-| Application-layer HTTP benchmark | Partial | HTTP CSIC 2010 has been parsed, deduplicated, trained, and evaluated with checksum and artifact-lineage controls. The candidate is correctly blocked from shadow activation because holdout recall, F1, and false-positive rate miss conservative gates; CSIC is also generated legacy web traffic, not production-like custom API logs. |
+| Application-layer HTTP benchmark | Partial | HTTP CSIC 2010 has been parsed, deduplicated, retrained with generic payload-shape features, and evaluated with checksum, feature-contract, and artifact-lineage controls. The enriched candidate materially improves precision, recall, and F1 but still misses conservative promotion-quality gates; CSIC is also generated legacy web traffic, not production-like custom API logs. |
 | Custom API logs | Partial | Runtime events, features, analyst-corrected labels, JSONL export, raw API-log JSONL ingestion with common access-log aliases, validation, split tooling, deterministic local API-domain fixture generation, and local retraining are available; reviewed production-like API-domain datasets are still pending. |
 | Precision/recall/F1/FPR evaluation | Implemented | The Random Forest trainer calculates all four metrics. |
 | Real-time WebSocket dashboard | Implemented for demo | A dedicated read-only WebSocket sends immediate events/alerts and complete coalesced snapshots after traffic or operator changes; adaptive HTTP polling remains as reconciliation and disconnect fallback. Production session/edge authentication is pending. |
@@ -42,6 +42,8 @@ The current demo can accurately claim that MIRAGE:
 - automatically decides allow, monitor, or redirect-to-decoy;
 - forwards demo traffic to isolated real-app or static decoy services;
 - stores events, alerts, and ML-ready feature vectors;
+- uses the same bounded query-and-body payload feature contract across live
+  proxy requests, custom API logs, and HTTP CSIC preparation;
 - can store model-only shadow scores beside events when a reviewed artifact is configured;
 - can review trained artifacts for feature-contract and metric readiness before shadow mode;
 - reports auditable `unavailable`, `blocked`, `needs_observation`, or `eligible`
@@ -65,8 +67,8 @@ The current demo can accurately claim that MIRAGE:
   repeated request identities before train/test splitting;
 - binds trained artifacts to reviewed dataset manifests and blocks mismatched
   artifact/dataset combinations at the promotion gate;
-- has evaluated and rejected the current CSIC candidate rather than lowering
-  metric gates or enabling an unsuitable shadow artifact;
+- has evaluated the enriched CSIC candidate without lowering metric gates or
+  allowing it to control live routing;
 - can generate deterministic API-domain fixture logs for local adapter and
   shadow-artifact validation;
 - displays live backend data, actor clusters, and recommended triage cases on a
