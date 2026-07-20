@@ -21,7 +21,8 @@ capabilities remain proposal targets. See
 - authenticated WebSocket dashboard snapshots for events, alerts, metrics,
   traffic, risk history, decoy status, training readiness, ML shadow status,
   honeytokens, canary assignments, and actor/case workflows;
-- ML-ready feature vectors, optional ML shadow scoring, and an offline Random Forest training pipeline;
+- versioned ML-ready request and bounded payload-shape features, optional ML
+  shadow scoring, and an offline Random Forest training pipeline;
 - locally reviewed CICIDS2017 DDoS and full-directory splits, shadow-ready
   Random Forest artifacts, and repeatable ML shadow smoke tests;
 - analyst event labels for future training data curation;

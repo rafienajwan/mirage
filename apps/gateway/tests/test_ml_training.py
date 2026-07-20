@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 import joblib
+import pytest
 
 from app.ml.datasets import build_dataset_lineage, prepare_dataset
 from app.ml.inference import RiskClassifier
@@ -63,6 +64,7 @@ def test_training_artifact_embeds_dataset_lineage(tmp_path):
     train_risk_classifier(rows, artifact, dataset_lineage=lineage)
 
     payload = joblib.load(artifact)
+    assert payload["feature_contract_version"] == 2
     assert payload["artifact_version"] == 2
     assert payload["dataset_lineage"] == lineage
     assert set(lineage) == {
@@ -73,6 +75,18 @@ def test_training_artifact_embeds_dataset_lineage(tmp_path):
         "train_sha256",
         "test_sha256",
     }
+
+
+def test_classifier_rejects_feature_contract_version_mismatch(tmp_path):
+    artifact = tmp_path / "risk-model.joblib"
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(20)]
+    train_risk_classifier(rows, artifact)
+    payload = joblib.load(artifact)
+    payload["feature_contract_version"] = 1
+    joblib.dump(payload, artifact)
+
+    with pytest.raises(ValueError, match="feature contract version"):
+        RiskClassifier(artifact)
 
 
 def test_train_script_binds_reviewed_manifest(tmp_path, monkeypatch):
@@ -111,5 +125,6 @@ def test_train_script_binds_reviewed_manifest(tmp_path, monkeypatch):
     train_model.main()
 
     payload = joblib.load(artifact)
+    assert payload["feature_contract_version"] == 2
     assert payload["artifact_version"] == 2
     assert payload["dataset_lineage"]["dataset_name"] == "runtime-export"

@@ -10,7 +10,10 @@ from app.schemas.decision import Decision
 from app.schemas.request import InspectRequest
 from app.services.canary_assignments import record_canary_assignments
 from app.services.inspection import inspect_and_log
-from app.services.payload_signals import detect_payload_indicators
+from app.services.payload_signals import (
+    build_payload_excerpt,
+    detect_payload_indicators,
+)
 from app.services.proxy_client import forward_request
 from app.services.traffic_tracker import traffic_tracker
 
@@ -45,11 +48,9 @@ async def proxy_request(target_path: str, request: Request) -> Response:
     source_ip = request.client.host if request.client else "unknown"
     request_count = await traffic_tracker.record(source_ip)
     indicators = detect_payload_indicators(path, request.url.query, body)
-    payload_excerpt = " ".join(
-        [
-            request.url.query,
-            body[: settings.proxy_max_body_bytes].decode("utf-8", errors="ignore")[:4096],
-        ]
+    payload_excerpt = build_payload_excerpt(
+        request.url.query,
+        body[: settings.proxy_max_body_bytes].decode("utf-8", errors="ignore"),
     )
     metadata = InspectRequest(
         ip_address=source_ip,

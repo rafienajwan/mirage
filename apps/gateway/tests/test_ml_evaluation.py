@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+import joblib
+
 from app.ml.evaluation import evaluate_model_artifact
 from app.ml.training import LabeledFeatures, train_risk_classifier
 from app.services.feature_extraction import FEATURE_NAMES
@@ -74,3 +76,28 @@ def test_evaluate_model_artifact_blocks_strict_threshold(tmp_path):
 
     assert evaluation.holdout_ready is False
     assert any("Precision" in blocker for blocker in evaluation.blockers)
+
+
+def test_evaluate_model_artifact_blocks_feature_contract_version_mismatch(tmp_path):
+    artifact = tmp_path / "risk_model.joblib"
+    holdout = tmp_path / "test.jsonl"
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(30)]
+    train_risk_classifier(rows, artifact)
+    payload = joblib.load(artifact)
+    payload["feature_contract_version"] = 1
+    joblib.dump(payload, artifact)
+    _write_jsonl(
+        holdout,
+        [
+            {"label": label, "features": _features(label, float(index + 100))}
+            for label in (0, 1)
+            for index in range(8)
+        ],
+    )
+
+    evaluation = evaluate_model_artifact(artifact, holdout)
+
+    assert evaluation.holdout_ready is False
+    assert "Artifact feature contract version does not match the gateway" in (
+        evaluation.blockers
+    )

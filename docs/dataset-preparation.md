@@ -34,7 +34,17 @@ Labels are binary:
 - `1`: suspicious or false negative.
 
 Missing known features are filled with `0.0`. Unknown features are ignored so
-training and inference keep the same feature order.
+training and inference keep the same feature order. Prepared manifests and
+trained artifacts record `feature_contract_version`. A dataset or artifact from
+an older contract must be regenerated instead of being mixed with runtime
+features from the current contract.
+
+Feature contract version 2 adds five bounded, runtime-compatible payload-shape
+features: log-scaled payload length, Shannon entropy, non-alphanumeric ratio,
+log-scaled percent-encoded token count, and log-scaled parameter count. The
+extractor uses at most 4,096 characters from the combined query and request
+body. The proxy, custom API-log adapter, and HTTP CSIC adapter all construct this
+excerpt in the same query-then-body order.
 
 ## Prepare Custom API Logs
 
@@ -66,7 +76,7 @@ Common field aliases are accepted to reduce preprocessing:
 | User agent | `user_agent`, `userAgent`, `ua`, `user-agent`, or `headers.User-Agent` |
 | Request count | `request_count`, `source_request_count`, `count`, `hits` |
 | Payload indicators | `payload_indicators`, `indicators`, `signals`, `tags` |
-| Payload excerpt | `payload_excerpt`, `body_excerpt`, `request_body`, `body`, `payload`, `query`, `query_string` |
+| Payload excerpt | Explicit `payload_excerpt`, or query aliases combined with `body_excerpt`, `request_body`, `body`, or `payload` |
 
 Prepare a split with the same production feature extractor used by the gateway:
 
@@ -220,13 +230,13 @@ cd apps/gateway
 python scripts/prepare_dataset.py \
   --source csic-http-dir \
   --input data/csic-2010 \
-  --output-dir data/prepared/csic-http-2010-v1 \
+  --output-dir data/prepared/csic-http-2010-v2 \
   --dataset-name csic-http-2010 \
-  --dataset-version redata-rwuusv-v1 \
+  --dataset-version redata-rwuusv-v2 \
   --checksums data/csic-2010/sha256.json
 
 python scripts/review_dataset.py \
-  --manifest data/prepared/csic-http-2010-v1/manifest.json \
+  --manifest data/prepared/csic-http-2010-v2/manifest.json \
   --min-total-rows 10000 \
   --min-train-rows 7000 \
   --min-test-rows 2000 \
@@ -240,10 +250,11 @@ agent, and body, so the same canonical request identity cannot appear in both
 train and test sets. The manifest records the official catalog,
 distribution DOI, SHA-256 values, rejected rows, and removed duplicates.
 Prepared manifests also record SHA-256 values for `train.jsonl` and
-`test.jsonl`. Dataset review fails if either split changes without regenerating
-the manifest, even when its row count remains unchanged.
-Prepared directories created before these hashes were introduced must be
-regenerated before training a promotion-eligible artifact.
+`test.jsonl` plus the current feature-contract version. Dataset review fails if
+either split changes without regenerating the manifest, even when its row count
+remains unchanged, or when the feature contract is outdated. Prepared
+directories created before split hashes or feature-contract version 2 were
+introduced must be regenerated before training a promotion-eligible artifact.
 
 CSIC traffic was generated for a 2010 e-commerce application. It is useful for
 reproducible parser, payload-signal, and model benchmarking, but it is not

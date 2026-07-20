@@ -12,7 +12,7 @@ import numpy as np
 from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
 
 from app.ml.datasets import normalize_features, normalize_label
-from app.services.feature_extraction import FEATURE_NAMES
+from app.services.feature_extraction import FEATURE_CONTRACT_VERSION, FEATURE_NAMES
 
 
 @dataclass(frozen=True)
@@ -90,6 +90,8 @@ def evaluate_model_artifact(
     if not isinstance(artifact, dict):
         blockers.append("Artifact must be a dictionary payload")
         artifact = {}
+    if artifact.get("feature_contract_version") != FEATURE_CONTRACT_VERSION:
+        blockers.append("Artifact feature contract version does not match the gateway")
     if tuple(artifact.get("feature_names", ())) != FEATURE_NAMES:
         blockers.append("Artifact feature contract does not match the gateway")
     model = artifact.get("model")

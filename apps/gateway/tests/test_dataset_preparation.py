@@ -111,6 +111,30 @@ def test_load_api_log_jsonl_extracts_request_features(tmp_path):
     assert rows[1].features["destination_port"] == 443.0
 
 
+def test_load_api_log_jsonl_combines_query_and_body_features(tmp_path):
+    source = tmp_path / "api_logs.jsonl"
+    _write_jsonl(
+        source,
+        [
+            {
+                "label": "suspicious",
+                "source_ip": "10.0.0.66",
+                "method": "POST",
+                "path": "/api/search",
+                "query_string": "next=%2e%2e/admin",
+                "request_body": "role=admin",
+            }
+        ],
+    )
+
+    row = load_api_log_jsonl(source)[0]
+
+    assert row.features["payload_percent_encoded_count_log"] > 0.0
+    assert row.features["payload_parameter_count_log"] == pytest.approx(
+        1.098612,
+    )
+
+
 def test_load_api_log_jsonl_accepts_access_log_aliases(tmp_path):
     source = tmp_path / "api_logs.jsonl"
     _write_jsonl(
@@ -247,6 +271,7 @@ def test_prepare_dataset_writes_split_and_manifest(tmp_path):
     assert manifest.total_rows == 20
     assert manifest.train_rows == 16
     assert manifest.test_rows == 4
+    assert manifest_data["feature_contract_version"] == 2
     assert manifest_data["label_counts"] == {"0": 10, "1": 10}
     assert manifest_data["file_sha256"] == {
         "train": hashlib.sha256((output_dir / "train.jsonl").read_bytes()).hexdigest(),
@@ -338,6 +363,33 @@ def test_review_prepared_dataset_blocks_split_hash_mismatch(tmp_path):
 
     assert review.ready_for_training is False
     assert "Train file SHA-256 does not match manifest" in review.blockers
+
+
+def test_review_prepared_dataset_blocks_feature_contract_version_mismatch(tmp_path):
+    source = tmp_path / "training_events.jsonl"
+    rows = [
+        {"label": label, "features": _features(float(index))}
+        for label in (0, 1)
+        for index in range(12)
+    ]
+    _write_jsonl(source, rows)
+    output_dir = tmp_path / "prepared" / "runtime-v1"
+    prepare_dataset(
+        source,
+        output_dir,
+        source_kind="mirage-jsonl",
+        dataset_name="runtime-export",
+        dataset_version="v1",
+    )
+    manifest_path = output_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["feature_contract_version"] = 1
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    review = review_prepared_dataset(manifest_path)
+
+    assert review.ready_for_training is False
+    assert "Feature contract version does not match the gateway" in review.blockers
 
 
 def test_build_dataset_lineage_rejects_unrelated_training_file(tmp_path):

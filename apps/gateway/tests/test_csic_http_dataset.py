@@ -10,6 +10,7 @@ import pytest
 from app.ml.csic_http import load_csic_http_directory, parse_csic_http_requests
 from app.ml.datasets import (
     DatasetValidationError,
+    load_csic_http_rows,
     prepare_dataset,
     review_prepared_dataset,
 )
@@ -42,7 +43,7 @@ def _write_csic_directory(path) -> None:
     anomalous = b"".join(
         _request(
             "POST",
-            "/tienda1/publico/autenticar.jsp",
+            "/tienda1/publico/autenticar.jsp?next=%2e%2e/admin",
             f"modo=entrar&login=' or 1=1&sample={index}",
             user_agent="w3af",
         )
@@ -70,6 +71,20 @@ def test_parser_reads_absolute_target_headers_and_post_body():
     assert records[0].body == b"modo=entrar&login=' or 1=1"
     assert records[0].user_agent == "w3af"
     assert records[0].label == 1
+
+
+def test_csic_rows_combine_query_and_body_features(tmp_path):
+    source = tmp_path / "csic"
+    _write_csic_directory(source)
+
+    suspicious = next(
+        row for row in load_csic_http_rows(source) if row.label == 1
+    )
+
+    assert suspicious.features["payload_percent_encoded_count_log"] > 0.0
+    assert suspicious.features["payload_parameter_count_log"] == pytest.approx(
+        1.609438,
+    )
 
 
 def test_parser_rejects_truncated_content_length():
