@@ -8,6 +8,7 @@ import json
 import math
 import random
 import re
+import shutil
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -39,6 +40,7 @@ from app.services.payload_signals import (
 DatasetSource = Literal[
     "mirage-jsonl",
     "api-log-jsonl",
+    "reviewed-api-log-jsonl",
     "cicids-csv",
     "cicids-csv-dir",
     "csic-http-dir",
@@ -512,6 +514,21 @@ def load_api_log_jsonl(path: Path) -> list[PreparedTrainingRow]:
     return rows
 
 
+def load_reviewed_api_log_jsonl(path: Path) -> list[PreparedTrainingRow]:
+    """Load deduplicated reviewed logs with privacy-safe record identifiers."""
+    from app.ml.api_log_review import load_reviewed_api_log_rows
+
+    return [
+        PreparedTrainingRow(
+            features=row.features,
+            label=row.label,
+            source="reviewed-api-log-jsonl",
+            record_id=row.record_id,
+        )
+        for row in load_reviewed_api_log_rows(path)
+    ]
+
+
 def _load_cicids_csv_rows(
     path: Path,
     *,
@@ -656,6 +673,8 @@ def load_dataset(path: Path, source_kind: DatasetSource) -> list[PreparedTrainin
         return load_mirage_jsonl(path)
     if source_kind == "api-log-jsonl":
         return load_api_log_jsonl(path)
+    if source_kind == "reviewed-api-log-jsonl":
+        return load_reviewed_api_log_jsonl(path)
     if source_kind == "cicids-csv":
         return load_cicids_csv(path)
     if source_kind == "cicids-csv-dir":
@@ -754,19 +773,49 @@ def prepare_dataset(
     train_ratio: float = 0.75,
     random_seed: int = 42,
     expected_checksums: dict[str, str] | None = None,
+    source_review_path: Path | None = None,
 ) -> DatasetManifest:
     """Validate, split, and write a versioned training dataset."""
     csic_source: LoadedCSICHTTP | None = None
+    api_log_source_review: dict | None = None
     if source_kind == "csic-http-dir":
+        if source_review_path is not None:
+            raise DatasetValidationError(
+                "source_review_path is only supported for reviewed-api-log-jsonl"
+            )
         csic_source = load_csic_http_directory(
             input_path,
             expected_checksums=expected_checksums,
         )
         rows = _csic_http_rows(csic_source)
+    elif source_kind == "reviewed-api-log-jsonl":
+        if expected_checksums:
+            raise DatasetValidationError(
+                "expected_checksums is only supported for csic-http-dir"
+            )
+        if source_review_path is None:
+            raise DatasetValidationError(
+                "API log source review is required for reviewed-api-log-jsonl"
+            )
+        from app.ml.api_log_review import validate_api_log_source_review
+
+        api_log_source_review = validate_api_log_source_review(
+            source_review_path,
+            input_path,
+        )
+        rows = load_reviewed_api_log_jsonl(input_path)
+        if len(rows) != api_log_source_review.get("accepted_rows"):
+            raise DatasetValidationError(
+                "API log accepted row count does not match its source review"
+            )
     else:
         if expected_checksums:
             raise DatasetValidationError(
                 "expected_checksums is only supported for csic-http-dir"
+            )
+        if source_review_path is not None:
+            raise DatasetValidationError(
+                "source_review_path is only supported for reviewed-api-log-jsonl"
             )
         rows = load_dataset(input_path, source_kind)
     train_rows, test_rows = stratified_split(
@@ -779,13 +828,45 @@ def prepare_dataset(
     train_path = output_dir / "train.jsonl"
     test_path = output_dir / "test.jsonl"
     manifest_path = output_dir / "manifest.json"
+    copied_source_review_path = output_dir / "source-review.json"
 
     write_jsonl(train_path, train_rows)
     write_jsonl(test_path, test_rows)
+    if source_review_path is not None:
+        shutil.copyfile(source_review_path, copied_source_review_path)
 
     label_counts = Counter(row.label for row in rows)
     train_label_counts = Counter(row.label for row in train_rows)
     test_label_counts = Counter(row.label for row in test_rows)
+    files = {
+        "train": train_path.name,
+        "test": test_path.name,
+        "manifest": manifest_path.name,
+    }
+    file_sha256 = {
+        "train": sha256_file(train_path),
+        "test": sha256_file(test_path),
+    }
+    if api_log_source_review is not None:
+        files["source_review"] = copied_source_review_path.name
+        file_sha256["source_review"] = sha256_file(copied_source_review_path)
+
+    input_sha256: dict[str, str] = {}
+    duplicate_rows_removed = 0
+    rejected_rows = 0
+    if csic_source is not None:
+        input_sha256 = csic_source.input_sha256
+        duplicate_rows_removed = csic_source.duplicate_rows_removed
+        rejected_rows = csic_source.rejected_rows
+    elif api_log_source_review is not None:
+        input_sha256 = {
+            input_path.name: str(api_log_source_review["input_sha256"])
+        }
+        duplicate_rows_removed = int(
+            api_log_source_review["duplicate_rows_removed"]
+        )
+        rejected_rows = int(api_log_source_review["rejected_rows"])
+
     manifest = DatasetManifest(
         dataset_name=dataset_name,
         dataset_version=dataset_version,
@@ -801,22 +882,13 @@ def prepare_dataset(
         random_seed=random_seed,
         feature_contract_version=FEATURE_CONTRACT_VERSION,
         feature_names=list(FEATURE_NAMES),
-        files={
-            "train": train_path.name,
-            "test": test_path.name,
-            "manifest": manifest_path.name,
-        },
-        file_sha256={
-            "train": sha256_file(train_path),
-            "test": sha256_file(test_path),
-        },
+        files=files,
+        file_sha256=file_sha256,
         source_url=CSIC_SOURCE_URL if csic_source else None,
         distribution_url=CSIC_DISTRIBUTION_URL if csic_source else None,
-        input_sha256=csic_source.input_sha256 if csic_source else {},
-        duplicate_rows_removed=(
-            csic_source.duplicate_rows_removed if csic_source else 0
-        ),
-        rejected_rows=csic_source.rejected_rows if csic_source else 0,
+        input_sha256=input_sha256,
+        duplicate_rows_removed=duplicate_rows_removed,
+        rejected_rows=rejected_rows,
     )
 
     manifest_path.write_text(
@@ -870,6 +942,33 @@ def _manifest_counts(manifest: dict, key: str, blockers: list[str]) -> dict[str,
     return counts
 
 
+def _manifest_local_filename(
+    files: dict,
+    key: str,
+    base_dir: Path,
+    blockers: list[str],
+) -> str | None:
+    value = files.get(key)
+    if not isinstance(value, str):
+        blockers.append(f"manifest is missing {key.replace('_', ' ')} file")
+        return None
+    candidate = Path(value)
+    try:
+        stays_local = (
+            not candidate.is_absolute()
+            and candidate.name == value
+            and (base_dir / candidate).resolve().parent == base_dir.resolve()
+        )
+    except OSError:
+        stays_local = False
+    if not stays_local:
+        blockers.append(
+            f"manifest {key.replace('_', ' ')} file must stay in the prepared directory"
+        )
+        return None
+    return value
+
+
 def _review_csic_provenance(manifest: dict, blockers: list[str]) -> None:
     if manifest.get("source_url") != CSIC_SOURCE_URL:
         blockers.append("CSIC source_url does not match the official catalog")
@@ -898,6 +997,58 @@ def _review_csic_provenance(manifest: dict, blockers: list[str]) -> None:
             blockers.append(f"manifest {key} must be non-negative")
 
 
+def _review_api_log_provenance(
+    manifest: dict,
+    base_dir: Path,
+    blockers: list[str],
+) -> None:
+    files = manifest.get("files")
+    if not isinstance(files, dict):
+        blockers.append("Reviewed API log manifest files are invalid")
+        return
+    review_name = _manifest_local_filename(
+        files,
+        "source_review",
+        base_dir,
+        blockers,
+    )
+    if review_name is None:
+        return
+    try:
+        review = json.loads((base_dir / review_name).read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        blockers.append("Reviewed API log source review could not be loaded")
+        return
+    if not isinstance(review, dict):
+        blockers.append("Reviewed API log source review must be an object")
+        return
+
+    from app.ml.api_log_review import api_log_source_review_errors
+
+    blockers.extend(
+        f"Reviewed API log {error}"
+        for error in api_log_source_review_errors(review)
+    )
+
+    input_file = review.get("input_file")
+    input_hash = review.get("input_sha256")
+    if (
+        not isinstance(input_file, str)
+        or not isinstance(input_hash, str)
+        or re.fullmatch(r"[0-9a-f]{64}", input_hash) is None
+        or manifest.get("input_sha256") != {input_file: input_hash}
+    ):
+        blockers.append("Reviewed API log input provenance does not match manifest")
+
+    expected_counts = {
+        "accepted_rows": manifest.get("total_rows"),
+        "duplicate_rows_removed": manifest.get("duplicate_rows_removed"),
+        "rejected_rows": manifest.get("rejected_rows"),
+    }
+    if any(review.get(key) != value for key, value in expected_counts.items()):
+        blockers.append("Reviewed API log row counts do not match manifest")
+
+
 def review_prepared_dataset(
     manifest_path: Path,
     *,
@@ -916,12 +1067,8 @@ def review_prepared_dataset(
         files = {}
         blockers.append("manifest files must be an object")
 
-    train_file = files.get("train")
-    test_file = files.get("test")
-    if not isinstance(train_file, str):
-        blockers.append("manifest is missing train file")
-    if not isinstance(test_file, str):
-        blockers.append("manifest is missing test file")
+    train_file = _manifest_local_filename(files, "train", base_dir, blockers)
+    test_file = _manifest_local_filename(files, "test", base_dir, blockers)
 
     train_rows_actual = (
         _count_jsonl(base_dir / train_file) if isinstance(train_file, str) else 0
@@ -929,23 +1076,47 @@ def review_prepared_dataset(
     test_rows_actual = (
         _count_jsonl(base_dir / test_file) if isinstance(test_file, str) else 0
     )
+    expected_hashed_files = {"train", "test"}
+    source_review_file: str | None = None
+    if manifest.get("source_kind") == "reviewed-api-log-jsonl":
+        expected_hashed_files.add("source_review")
+        source_review_file = _manifest_local_filename(
+            files,
+            "source_review",
+            base_dir,
+            blockers,
+        )
     file_sha256 = manifest.get("file_sha256")
-    if not isinstance(file_sha256, dict) or set(file_sha256) != {"train", "test"}:
-        blockers.append("manifest file_sha256 must cover train and test files")
+    if not isinstance(file_sha256, dict) or set(file_sha256) != expected_hashed_files:
+        blockers.append(
+            "manifest file_sha256 must cover "
+            + ", ".join(sorted(expected_hashed_files))
+        )
         file_sha256 = {}
 
-    for split, filename in (("train", train_file), ("test", test_file)):
+    hashed_files = [("train", train_file), ("test", test_file)]
+    if "source_review" in expected_hashed_files:
+        hashed_files.append(("source_review", source_review_file))
+    for split, filename in hashed_files:
         expected_hash = file_sha256.get(split)
         if not isinstance(expected_hash, str) or re.fullmatch(
             r"[0-9a-fA-F]{64}", expected_hash
         ) is None:
             blockers.append(f"manifest {split} file SHA-256 is invalid")
             continue
-        if (
-            isinstance(filename, str)
-            and sha256_file(base_dir / filename) != expected_hash
-        ):
-            blockers.append(f"{split.title()} file SHA-256 does not match manifest")
+        if isinstance(filename, str):
+            try:
+                matches = sha256_file(base_dir / filename) == expected_hash
+            except OSError:
+                blockers.append(
+                    f"{split.replace('_', ' ').title()} file could not be read"
+                )
+                continue
+            if not matches:
+                display_name = split.replace("_", " ").title()
+                blockers.append(
+                    f"{display_name} file SHA-256 does not match manifest"
+                )
 
     total_rows = _manifest_int(manifest, "total_rows", blockers)
     train_rows = _manifest_int(manifest, "train_rows", blockers)
@@ -956,6 +1127,8 @@ def review_prepared_dataset(
 
     if manifest.get("source_kind") == "csic-http-dir":
         _review_csic_provenance(manifest, blockers)
+    if manifest.get("source_kind") == "reviewed-api-log-jsonl":
+        _review_api_log_provenance(manifest, base_dir, blockers)
 
     if total_rows < min_total_rows:
         blockers.append(f"Total rows {total_rows} is below {min_total_rows}")

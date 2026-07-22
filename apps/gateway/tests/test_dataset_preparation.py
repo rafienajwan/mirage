@@ -7,6 +7,11 @@ import json
 
 import pytest
 
+from app.ml.api_log_review import (
+    APILogReviewMetadata,
+    review_api_log_source,
+    write_api_log_source_review,
+)
 from app.ml.datasets import (
     DatasetValidationError,
     PreparedTrainingRow,
@@ -200,6 +205,190 @@ def test_load_api_log_jsonl_rejects_unknown_label(tmp_path):
 
     with pytest.raises(DatasetValidationError, match="API log label"):
         load_api_log_jsonl(source)
+
+
+def test_prepare_reviewed_api_logs_binds_safe_provenance_and_hashes_ids(tmp_path):
+    source = tmp_path / "production-api.jsonl"
+    rows = [
+        {
+            "request_id": f"private-normal-{index}",
+            "label": "normal",
+            "source_ip": f"203.0.113.{index + 10}",
+            "method": "GET",
+            "path": f"/api/orders/{index}",
+            "user_agent": "private-client/1.0",
+        }
+        for index in range(12)
+    ] + [
+        {
+            "request_id": f"private-attack-{index}",
+            "label": "suspicious",
+            "source_ip": f"198.51.100.{index + 10}",
+            "method": "POST",
+            "path": f"/api/search/{index}",
+            "payload_excerpt": f"password=private-{index}&query=' or 1=1",
+            "payload_indicators": ["sql-like"],
+        }
+        for index in range(12)
+    ]
+    _write_jsonl(source, [*rows, rows[0]])
+    source_review = review_api_log_source(
+        source,
+        APILogReviewMetadata(
+            data_origin="staging-api-gateway",
+            collection_started_at="2026-07-01T00:00:00Z",
+            collection_ended_at="2026-07-02T00:00:00Z",
+            labeling_method="analyst-reviewed",
+            sanitized=True,
+            approved_for_training=True,
+        ),
+    )
+    source_review_path = tmp_path / "production-api-review.json"
+    write_api_log_source_review(source_review_path, source_review)
+    output_dir = tmp_path / "prepared" / "production-api-v1"
+
+    manifest = prepare_dataset(
+        source,
+        output_dir,
+        source_kind="reviewed-api-log-jsonl",
+        dataset_name="production-api",
+        dataset_version="v1",
+        source_review_path=source_review_path,
+    )
+    dataset_review = review_prepared_dataset(output_dir / "manifest.json")
+    prepared_text = "".join(
+        path.read_text(encoding="utf-8")
+        for path in output_dir.iterdir()
+        if path.is_file()
+    )
+    prepared_rows = [
+        json.loads(line)
+        for name in ("train.jsonl", "test.jsonl")
+        for line in (output_dir / name).read_text(encoding="utf-8").splitlines()
+    ]
+
+    assert manifest.source_kind == "reviewed-api-log-jsonl"
+    assert manifest.total_rows == 24
+    assert manifest.duplicate_rows_removed == 1
+    assert manifest.rejected_rows == 0
+    assert manifest.input_sha256 == {source.name: source_review.input_sha256}
+    assert manifest.files["source_review"] == "source-review.json"
+    assert set(manifest.file_sha256) == {"train", "test", "source_review"}
+    assert dataset_review.ready_for_training is True
+    assert all(
+        row["record_id"].startswith("sha256:")
+        and len(row["record_id"]) == len("sha256:") + 64
+        for row in prepared_rows
+    )
+    assert "private-normal" not in prepared_text
+    assert "private-attack" not in prepared_text
+    assert "203.0.113" not in prepared_text
+    assert "private-client" not in prepared_text
+
+
+def test_prepare_reviewed_api_logs_requires_source_review(tmp_path):
+    source = tmp_path / "production-api.jsonl"
+    _write_jsonl(source, [])
+
+    with pytest.raises(DatasetValidationError, match="source review is required"):
+        prepare_dataset(
+            source,
+            tmp_path / "prepared",
+            source_kind="reviewed-api-log-jsonl",
+            dataset_name="production-api",
+            dataset_version="v1",
+        )
+
+
+def test_dataset_review_blocks_tampered_api_log_source_review(tmp_path):
+    source = tmp_path / "production-api.jsonl"
+    rows = [
+        {
+            "label": label,
+            "source_ip": f"203.0.113.{index + 10}",
+            "method": "GET",
+            "path": f"/api/{label}/{index}",
+        }
+        for label in ("normal", "suspicious")
+        for index in range(12)
+    ]
+    _write_jsonl(source, rows)
+    source_review = review_api_log_source(
+        source,
+        APILogReviewMetadata(
+            data_origin="staging-api-gateway",
+            collection_started_at="2026-07-01T00:00:00Z",
+            collection_ended_at="2026-07-02T00:00:00Z",
+            labeling_method="analyst-reviewed",
+            sanitized=True,
+            approved_for_training=True,
+        ),
+    )
+    source_review_path = tmp_path / "source-review.json"
+    write_api_log_source_review(source_review_path, source_review)
+    output_dir = tmp_path / "prepared"
+    prepare_dataset(
+        source,
+        output_dir,
+        source_kind="reviewed-api-log-jsonl",
+        dataset_name="production-api",
+        dataset_version="v1",
+        source_review_path=source_review_path,
+    )
+    copied_review_path = output_dir / "source-review.json"
+    copied_review = json.loads(copied_review_path.read_text(encoding="utf-8"))
+    copied_review_path.write_text("{}\n", encoding="utf-8")
+
+    review = review_prepared_dataset(output_dir / "manifest.json")
+
+    assert review.ready_for_training is False
+    assert "Source Review file SHA-256 does not match manifest" in review.blockers
+
+    copied_review["metadata"]["collection_ended_at"] = "2026-06-30T00:00:00Z"
+    copied_review_path.write_text(json.dumps(copied_review), encoding="utf-8")
+    manifest_path = output_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["file_sha256"]["source_review"] = hashlib.sha256(
+        copied_review_path.read_bytes()
+    ).hexdigest()
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    review = review_prepared_dataset(manifest_path)
+
+    assert review.ready_for_training is False
+    assert any("collection window" in blocker for blocker in review.blockers)
+
+
+def test_dataset_review_blocks_manifest_paths_outside_prepared_directory(tmp_path):
+    source = tmp_path / "source.jsonl"
+    rows = [
+        {"label": label, "features": _features(float(index))}
+        for label in (0, 1)
+        for index in range(12)
+    ]
+    _write_jsonl(source, rows)
+    output_dir = tmp_path / "prepared"
+    prepare_dataset(
+        source,
+        output_dir,
+        source_kind="mirage-jsonl",
+        dataset_name="runtime-export",
+        dataset_version="v1",
+    )
+    outside = tmp_path / "outside.jsonl"
+    outside.write_text('{"label":0}\n', encoding="utf-8")
+    manifest_path = output_dir / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["files"]["train"] = "../outside.jsonl"
+    manifest["file_sha256"]["train"] = hashlib.sha256(
+        outside.read_bytes()
+    ).hexdigest()
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    review = review_prepared_dataset(manifest_path)
+
+    assert review.ready_for_training is False
+    assert "manifest train file must stay in the prepared directory" in review.blockers
 
 
 def test_load_cicids_csv_directory_combines_sorted_csv_files(tmp_path):
