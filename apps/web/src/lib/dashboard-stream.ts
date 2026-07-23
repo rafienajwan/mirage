@@ -19,8 +19,7 @@ export type DashboardSocket = Pick<
 >;
 
 interface DashboardStreamClientOptions {
-  url: string;
-  token?: string;
+  getConnection: () => Promise<{ url: string; token: string }>;
   createSocket: (url: string) => DashboardSocket;
   schedule: (callback: () => void, delay: number) => unknown;
   cancel: (handle: unknown) => void;
@@ -111,13 +110,30 @@ export class DashboardStreamClient {
     this.socket = null;
   }
 
-  private connect() {
+  private scheduleReconnect() {
+    if (this.stopped || this.reconnectHandle !== null) return;
+    this.options.onStatus("disconnected");
+    const delay = reconnectDelay(this.attempt++, this.options.random);
+    this.reconnectHandle = this.options.schedule(() => {
+      this.reconnectHandle = null;
+      void this.connect();
+    }, delay);
+  }
+
+  private async connect() {
     if (this.stopped) return;
     this.options.onStatus("connecting");
-    const target = new URL(this.options.url);
-    if (this.options.token) {
-      target.searchParams.set("token", this.options.token);
+    let connection: { url: string; token: string };
+    try {
+      connection = await this.options.getConnection();
+    } catch {
+      this.scheduleReconnect();
+      return;
     }
+    if (this.stopped) return;
+
+    const target = new URL(connection.url);
+    target.searchParams.set("token", connection.token);
 
     const socket = this.options.createSocket(target.toString());
     this.socket = socket;
@@ -140,12 +156,7 @@ export class DashboardStreamClient {
     socket.onerror = () => socket.close();
     socket.onclose = () => {
       if (this.stopped) return;
-      this.options.onStatus("disconnected");
-      const delay = reconnectDelay(this.attempt++, this.options.random);
-      this.reconnectHandle = this.options.schedule(() => {
-        this.reconnectHandle = null;
-        this.connect();
-      }, delay);
+      this.scheduleReconnect();
     };
   }
 }

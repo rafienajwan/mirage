@@ -44,7 +44,11 @@ from app.services.threat_analysis import get_threat_summary
 from app.services.training_export import events_to_jsonl, training_data_summary
 from app.storage import store
 
-router = APIRouter(prefix="/dashboard", tags=["dashboard"])
+router = APIRouter(
+    prefix="/dashboard",
+    tags=["dashboard"],
+    dependencies=[Depends(require_api_key)],
+)
 
 
 @router.get("/overview", response_model=DashboardOverview)
@@ -68,7 +72,6 @@ async def dashboard_events(limit: int = Query(default=50, ge=1, le=200)):
 
 @router.patch(
     "/events/{event_id}/label",
-    dependencies=[Depends(require_api_key)],
 )
 async def label_dashboard_event(event_id: str, payload: EventLabelRequest):
     """Apply an analyst label to an existing event."""
@@ -84,7 +87,6 @@ async def label_dashboard_event(event_id: str, payload: EventLabelRequest):
 
 @router.get(
     "/training-data/export",
-    dependencies=[Depends(require_api_key)],
 )
 async def export_training_data(limit: int = Query(default=10000, ge=1, le=50000)):
     """Export analyst-labeled feature vectors as JSON Lines for model training."""
@@ -101,7 +103,6 @@ async def export_training_data(limit: int = Query(default=10000, ge=1, le=50000)
 @router.get(
     "/training-data/summary",
     response_model=TrainingDataSummary,
-    dependencies=[Depends(require_api_key)],
 )
 async def training_data_readiness(limit: int = Query(default=10000, ge=1, le=50000)):
     """Summarize whether analyst labels are sufficient for model training."""
@@ -112,7 +113,6 @@ async def training_data_readiness(limit: int = Query(default=10000, ge=1, le=500
 @router.post(
     "/training-data/retrain",
     response_model=RetrainingRun,
-    dependencies=[Depends(require_api_key)],
 )
 async def retrain_from_training_data(
     limit: int = Query(default=10000, ge=20, le=50000),
@@ -136,7 +136,6 @@ async def ml_shadow_summary(limit: int = Query(default=200, ge=1, le=1000)):
 @router.get(
     "/ml-promotion/readiness",
     response_model=MLPromotionReadiness,
-    dependencies=[Depends(require_api_key)],
 )
 async def ml_promotion_readiness(
     limit: int = Query(default=1000, ge=1, le=10000),
@@ -174,7 +173,6 @@ async def dashboard_canary_assignments(
 
 @router.post(
     "/canary-assignments/{assignment_id}/revoke",
-    dependencies=[Depends(require_api_key)],
 )
 async def revoke_dashboard_canary_assignment(
     assignment_id: str,
@@ -225,7 +223,6 @@ async def dashboard_actor_case_workflows(
 
 @router.post(
     "/actor-cases/{case_id}/open",
-    dependencies=[Depends(require_api_key)],
 )
 async def open_dashboard_actor_case(case_id: str, payload: ActorCaseOpenRequest):
     """Open a recommended actor case as a persisted workflow record."""
@@ -241,7 +238,6 @@ async def open_dashboard_actor_case(case_id: str, payload: ActorCaseOpenRequest)
 
 @router.patch(
     "/actor-case-workflows/{case_id}",
-    dependencies=[Depends(require_api_key)],
 )
 async def update_dashboard_actor_case(case_id: str, payload: ActorCaseUpdateRequest):
     """Update a persisted actor case workflow status."""

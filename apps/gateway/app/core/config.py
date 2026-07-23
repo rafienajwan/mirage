@@ -47,6 +47,9 @@ class Settings:
     dashboard_stream_token: str | None = field(
         default_factory=lambda: os.getenv("MIRAGE_DASHBOARD_STREAM_TOKEN") or None
     )
+    dashboard_stream_ticket_secret: str | None = field(
+        default_factory=lambda: os.getenv("MIRAGE_DASHBOARD_TICKET_SECRET") or None
+    )
     rate_limit_per_minute: int = field(
         default_factory=lambda: int(os.getenv("RATE_LIMIT_PER_MINUTE", "120"))
     )

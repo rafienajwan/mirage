@@ -12,6 +12,8 @@
   },
   "include": [
     "src/lib/dashboard-stream.ts",
-    "src/lib/dashboard-stream.test.ts"
+    "src/lib/dashboard-stream.test.ts",
+    "src/lib/operator-auth.ts",
+    "src/lib/operator-auth.test.ts"
   ]
 }

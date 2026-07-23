@@ -22,9 +22,6 @@ import { motion, AnimatePresence } from "framer-motion";
 const TrafficChart = dynamic(() => import("@/components/dashboard/TrafficChart"), { ssr: false });
 const RiskScoreWidget = dynamic(() => import("@/components/dashboard/RiskScoreWidget"), { ssr: false });
 
-const DASHBOARD_WS_URL = process.env.NEXT_PUBLIC_DASHBOARD_WS_URL;
-const DASHBOARD_WS_TOKEN = process.env.NEXT_PUBLIC_DASHBOARD_WS_TOKEN;
-
 interface ToastNotification {
   id: string;
   title: string;
@@ -384,8 +381,6 @@ export default function DashboardPage() {
   );
 
   const connectionStatus = useDashboardStream({
-    url: DASHBOARD_WS_URL,
-    token: DASHBOARD_WS_TOKEN,
     onMessage: handleStreamMessage,
     onReconcile: load,
   });
@@ -439,7 +434,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-bg-dark-navy text-white relative">
-      <Header />
+      <Header showLogout />
 
       <main className="flex-1 w-full max-w-350 mx-auto px-6 pt-28 pb-8 lg:pt-32 lg:pb-12">
         {/* Page title */}

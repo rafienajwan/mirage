@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Shield, Menu, X, LayoutDashboard } from "lucide-react";
+import { Shield, Menu, X, LayoutDashboard, LogOut } from "lucide-react";
 import Link from "next/link";
 
 const NAV_ITEMS = [
@@ -12,9 +12,14 @@ const NAV_ITEMS = [
   { name: "Dashboard", href: "/dashboard" },
 ];
 
-export default function Header() {
+export default function Header({ showLogout = false }: { showLogout?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
+  async function signOut() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.assign("/login");
+  }
 
   return (
     <header className="fixed top-0 left-0 w-full z-50 border-b border-white/5 bg-[#060816]/65 backdrop-blur-md">
@@ -63,6 +68,17 @@ export default function Header() {
 
         {/* CTA Button */}
         <div className="hidden lg:flex items-center space-x-4">
+          {showLogout && (
+            <button
+              type="button"
+              onClick={signOut}
+              className="p-2 text-white/55 transition-colors hover:text-white"
+              aria-label="Sign out"
+              title="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          )}
           <Link
             href="/dashboard"
             className="flex items-center space-x-1.5 font-display text-[10px] tracking-widest text-brand-cyan hover:text-white transition-colors border border-brand-cyan/20 hover:border-brand-cyan/40 bg-brand-cyan/5 px-3 py-1.5 rounded"
@@ -123,6 +139,16 @@ export default function Header() {
               transition={{ delay: 0.3 }}
               className="mt-16 w-full max-w-xs flex flex-col space-y-4"
             >
+              {showLogout && (
+                <button
+                  type="button"
+                  onClick={signOut}
+                  className="flex items-center justify-center gap-2 px-6 py-2.5 font-display text-sm text-white/60 transition-colors hover:text-white"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Sign out</span>
+                </button>
+              )}
               <Link
                 href="/dashboard"
                 onClick={() => setIsOpen(false)}
