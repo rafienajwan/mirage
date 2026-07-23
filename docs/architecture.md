@@ -11,10 +11,12 @@ graph LR
     E -->|Allow or monitor| F[Protected Demo App]
     E -->|Redirect| G[Static Decoy Service]
     D --> H[(Events and Alerts)]
-    H --> I[Dashboard API and WebSocket]
-    I --> J[Next.js Real-Time Dashboard]
-    C --> K[ML-ready Feature Vectors]
-    K --> L[Offline Random Forest Trainer]
+    H --> I[API-Key-Protected Dashboard API]
+    I --> J[Session-Protected Next.js Dashboard]
+    H --> K[Origin and Ticket-Protected WebSocket]
+    K --> J
+    C --> L[ML-ready Feature Vectors]
+    L --> M[Offline Random Forest Trainer]
 ```
 
 The gateway only proxies requests received under `/api/v1/proxy/*`. Inspection,
@@ -41,11 +43,13 @@ simulation, dashboard, and decoy-management routes remain separate APIs.
 - Hop-by-hop headers are never forwarded.
 - Decoy forwarding uses an allowlist and removes cookies, authorization values,
   and `X-Mirage-API-Key`.
-- Operator write endpoints require `X-Mirage-API-Key` in Docker deployments.
-- The WebSocket uses a separate local/demo read-only token and never accepts
-  `MIRAGE_API_KEY`.
-- Browser simulations pass through a server-side Next.js route. The operator key
-  is not exposed through a `NEXT_PUBLIC_*` variable.
+- Every dashboard API endpoint requires `X-Mirage-API-Key` in Docker
+  deployments. Browser calls pass through session-protected Next.js bridges, so
+  the key never enters the browser bundle.
+- The dashboard uses an eight-hour signed `HttpOnly`, `SameSite=Strict` session.
+- Each WebSocket connection receives a new 60-second HMAC ticket. The gateway
+  validates its signature, audience, lifetime, and configured browser origin;
+  it never accepts `MIRAGE_API_KEY` as a stream credential.
 - Request body size, upstream timeout, rate limit, and tracked-source count are bounded.
 
 ## Persistence

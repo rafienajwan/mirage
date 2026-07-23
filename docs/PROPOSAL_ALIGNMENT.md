@@ -27,8 +27,8 @@ the beginning of a real ML pipeline.
 | Application-layer HTTP benchmark | Partial | HTTP CSIC 2010 has been parsed, deduplicated, retrained with generic payload-shape features, and evaluated with checksum, feature-contract, and artifact-lineage controls. The enriched candidate materially improves precision, recall, and F1 but still misses conservative promotion-quality gates; CSIC is also generated legacy web traffic, not production-like custom API logs. |
 | Custom API logs | Partial | Runtime exports and common access-log aliases are supported. Production-like JSONL can be reviewed with input hashing, bounded rows, sanitization/training attestations, duplicate and conflicting-label controls, hashed prepared identifiers, and provenance-bound splits. An actual reviewed production-like dataset and its benchmark are still pending. |
 | Precision/recall/F1/FPR evaluation | Implemented | The Random Forest trainer calculates all four metrics. |
-| Real-time WebSocket dashboard | Implemented for demo | A dedicated read-only WebSocket sends immediate events/alerts and complete coalesced snapshots after traffic or operator changes; adaptive HTTP polling remains as reconciliation and disconnect fallback. Production session/edge authentication is pending. |
-| Security dashboard and alerts | Implemented for demo | Live metrics, events, risk history, decoy status, actor triage, and internal alerts are available. |
+| Real-time WebSocket dashboard | Implemented locally | A dedicated WebSocket sends immediate events/alerts and complete coalesced snapshots; each reconnect obtains a new 60-second signed ticket from an authenticated operator session, the gateway validates browser origin, and adaptive HTTP polling remains as reconciliation and disconnect fallback. Online TLS deployment is pending. |
+| Security dashboard and alerts | Implemented locally | Live metrics, events, risk history, decoy status, actor triage, and internal alerts sit behind an eight-hour signed `HttpOnly` operator session. Browser API calls use server-side bridges and the gateway requires its API key for every dashboard endpoint. |
 | Adaptive decoy generation | Partial | The in-process decoy API and redirected external decoy service select variants and issue epoch-rotatable per-actor synthetic canary tokens; assignment/revoke lifecycle records exist, while multi-operator lifecycle workflows are pending. |
 | Docker Compose | Locally verified | Compose, health checks, and Dockerfiles exist; local image build and service startup have been verified, but CI and production deployment are still pending. |
 | Vercel/Railway/Supabase deployment | Not implemented | No verified online deployment configuration is present. |
@@ -74,11 +74,11 @@ The current demo can accurately claim that MIRAGE:
 - can generate deterministic API-domain fixture logs for local adapter and
   shadow-artifact validation;
 - displays live backend data, actor clusters, and recommended triage cases on a
-  dashboard with complete authenticated WebSocket snapshots, reconnect handling,
-  and adaptive polling fallback;
+  session-protected dashboard with complete short-lived-ticket WebSocket
+  snapshots, reconnect handling, and adaptive polling fallback;
 - can train and evaluate a Random Forest model from labeled feature records.
 
 It should not yet claim arbitrary ingress interception, a production ML model,
 trained actor clustering, multi-analyst queues, multi-operator token lifecycle
-approval workflows, production dashboard authentication, or deployed Supabase/Railway/Vercel
-infrastructure.
+approval workflows, hardened public authentication with provider-level abuse
+controls, or deployed Supabase/Railway/Vercel infrastructure.

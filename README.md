@@ -98,8 +98,12 @@ Fill every variable marked `REQUIRED` in `.env`:
 - `POSTGRES_PASSWORD` must be strong and URL-safe.
 - `DATABASE_URL` must use the `postgresql+asyncpg` driver, host `db`, and the
   same user, password, and database configured by `POSTGRES_*`.
-- `MIRAGE_API_KEY` protects operator write endpoints and the dashboard simulation bridge.
-- `MIRAGE_DASHBOARD_STREAM_TOKEN` grants local/demo read-only dashboard stream access.
+- `MIRAGE_API_KEY` protects every dashboard endpoint and stays server-side.
+- `MIRAGE_OPERATOR_PASSWORD` is the shared operator login (16+ characters).
+- `MIRAGE_OPERATOR_SESSION_SECRET` and `MIRAGE_DASHBOARD_TICKET_SECRET` must be
+  independent random values of at least 32 characters.
+- `MIRAGE_DASHBOARD_WS_URL` is the browser-reachable stream URL; use `wss://`
+  and set `MIRAGE_SECURE_COOKIES=true` for HTTPS staging.
 - `DECOY_*` values must be synthetic and invalid on every real system.
 - `DECOY_CANARY_EPOCH` can be increased when rotating newly issued canary
   tokens.

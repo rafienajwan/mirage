@@ -18,12 +18,13 @@ appropriate example and this reference in the same change.
 
 | Variable | Required | Scope | Purpose |
 | --- | --- | --- | --- |
-| `NEXT_PUBLIC_API_URL` | No | Browser | Public gateway URL used for dashboard reads |
-| `NEXT_PUBLIC_DASHBOARD_WS_URL` | No | Browser | Optional gateway URL for complete dashboard streaming |
-| `NEXT_PUBLIC_DASHBOARD_WS_TOKEN` | No | Browser | Optional local/demo read-only stream token |
-| `MIRAGE_INTERNAL_API_URL` | No | Web server | Internal gateway URL used by the simulation bridge |
-| `MIRAGE_API_KEY` | Yes | Gateway and web server | Protects operator writes and authenticates simulations |
-| `MIRAGE_DASHBOARD_STREAM_TOKEN` | No | Gateway | Matches the browser stream token without granting write access |
+| `MIRAGE_INTERNAL_API_URL` | No | Web server | Internal gateway URL used by all dashboard API bridges |
+| `MIRAGE_API_KEY` | Yes | Gateway and web server | Protects dashboard APIs and authenticates server-side bridges |
+| `MIRAGE_OPERATOR_PASSWORD` | Yes | Web server | Operator login password; minimum 16 characters |
+| `MIRAGE_OPERATOR_SESSION_SECRET` | Yes | Web server | HMAC secret for eight-hour operator sessions; minimum 32 random characters |
+| `MIRAGE_DASHBOARD_TICKET_SECRET` | Yes | Gateway and web server | Shared HMAC secret for 60-second stream tickets; minimum 32 random characters |
+| `MIRAGE_DASHBOARD_WS_URL` | Yes | Web server | Browser-reachable `ws://` or `wss://` dashboard stream URL |
+| `MIRAGE_SECURE_COOKIES` | No | Web server | Set `true` for HTTPS staging/production and `false` only for local HTTP |
 | `DATABASE_URL` | Yes | Gateway | Async PostgreSQL connection used by SQLAlchemy |
 | `POSTGRES_USER` | No | PostgreSQL | Database user; defaults to `mirage` |
 | `POSTGRES_PASSWORD` | Yes | PostgreSQL | Strong URL-safe database password |
@@ -97,12 +98,13 @@ the localhost values from the root template.
 
 ## Browser Exposure
 
-Only variables beginning with `NEXT_PUBLIC_` are safe to expose to browser code.
-`MIRAGE_API_KEY`, `DATABASE_URL`, `POSTGRES_PASSWORD`, and `DECOY_*` must remain
-server-side. Dashboard simulations use the Next.js server route
-`/api/simulate/{kind}` to avoid exposing the operator key.
+`MIRAGE_API_KEY`, operator credentials, signing secrets, database credentials,
+and `DECOY_*` values must remain server-side. Dashboard reads and writes use
+authenticated Next.js routes, so the gateway key is never embedded in the
+browser bundle.
 
-`NEXT_PUBLIC_DASHBOARD_WS_TOKEN` is browser-visible by design and must match
-`MIRAGE_DASHBOARD_STREAM_TOKEN`. Use this pair only for the local/demo read
-stream. It does not authorize operator writes. For production, place the
-WebSocket behind a server-side session or edge authentication layer.
+After login, the web server stores an eight-hour signed session in an
+`HttpOnly`, `SameSite=Strict` cookie. Each WebSocket connection requests a new
+60-second signed ticket; the gateway validates its signature, lifetime,
+audience, and browser `Origin`. Set `MIRAGE_DASHBOARD_WS_URL` to `wss://` and
+`MIRAGE_SECURE_COOKIES=true` outside local development.

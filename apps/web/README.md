@@ -19,11 +19,13 @@ Open `http://localhost:3000` or `http://localhost:3000/dashboard`.
 
 | Variable | Exposure | Purpose |
 | --- | --- | --- |
-| `NEXT_PUBLIC_API_URL` | Browser | Public gateway base URL for dashboard reads |
-| `NEXT_PUBLIC_DASHBOARD_WS_URL` | Browser | Optional gateway dashboard WebSocket URL |
-| `NEXT_PUBLIC_DASHBOARD_WS_TOKEN` | Browser | Local/demo read-only stream token |
-| `MIRAGE_INTERNAL_API_URL` | Server only | Gateway URL used by the simulation bridge |
-| `MIRAGE_API_KEY` | Server only | Authenticates simulation calls to the gateway |
+| `MIRAGE_INTERNAL_API_URL` | Server only | Internal gateway URL used by dashboard bridges |
+| `MIRAGE_API_KEY` | Server only | Authenticates all dashboard calls to the gateway |
+| `MIRAGE_OPERATOR_PASSWORD` | Server only | Operator password; minimum 16 characters |
+| `MIRAGE_OPERATOR_SESSION_SECRET` | Server only | Signs eight-hour operator sessions |
+| `MIRAGE_DASHBOARD_TICKET_SECRET` | Server only | Signs 60-second WebSocket tickets |
+| `MIRAGE_DASHBOARD_WS_URL` | Server only | Browser-reachable dashboard WebSocket URL |
+| `MIRAGE_SECURE_COOKIES` | Server only | Enables Secure session cookies for HTTPS |
 
 Never rename `MIRAGE_API_KEY` with a `NEXT_PUBLIC_` prefix. That would expose it
 in the browser bundle.
@@ -42,7 +44,7 @@ WebSocket snapshots; artifact and dataset filesystem paths remain server-only.
 | `npm run build` | Build production assets |
 | `npm start` | Serve a production build |
 
-The optional WebSocket sends complete snapshots plus immediate event and alert
-updates. HTTP reconciliation runs every 60 seconds while connected and every
-10 seconds while disconnected. The browser-visible token is only suitable for
-the local demo; managed deployment requires session or edge authentication.
+The authenticated WebSocket sends complete snapshots plus immediate event and
+alert updates. The client obtains a fresh 60-second ticket for every reconnect.
+HTTP reconciliation runs every 60 seconds while connected and every 10 seconds
+while disconnected.
