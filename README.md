@@ -268,11 +268,14 @@ python scripts/prepare_dataset.py \
   --dataset-version v1
 ```
 
-Use `--source api-log-jsonl` for labeled custom API request logs, or
-`--source cicids-csv` / `--source cicids-csv-dir` for compatible
-CICIDS-style CSV exports. The `--source csic-http-dir` adapter accepts the
-three raw HTTP CSIC 2010 files and a complete SHA-256 checksum map; see
-`docs/dataset-preparation.md` for the provenance and review workflow.
+Use `--source api-log-jsonl` for local custom-log fixtures. Production-like
+custom logs must first pass `scripts/review_api_log_source.py`, then use
+`--source reviewed-api-log-jsonl --source-review <review.json>`. This binds the
+sanitized provenance, input hash, deduplication statistics, and hashed record
+identifiers to the prepared split. Use `--source cicids-csv` /
+`--source cicids-csv-dir` for compatible CICIDS-style exports. The
+`--source csic-http-dir` adapter accepts the three raw HTTP CSIC 2010 files and
+a complete SHA-256 checksum map; see `docs/dataset-preparation.md`.
 
 For a deterministic local API-domain fixture that exercises the custom API-log
 adapter without a running gateway:
@@ -360,8 +363,9 @@ infra/
 
 ## Next Priorities
 
-1. Collect and review a substantially larger production-like custom API-log
-   dataset until the promotion-readiness dataset gates pass.
+1. Collect a substantially larger sanitized custom API-log dataset through the
+   reviewed ingestion workflow, then evaluate it against promotion-quality
+   gates.
 2. Observe a reviewed API-domain model in shadow mode until the promotion gate
    has sufficient runtime evidence; keep live routing heuristic meanwhile.
 3. Replace the local dashboard stream token with session or edge authentication

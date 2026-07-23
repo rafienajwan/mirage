@@ -25,7 +25,7 @@ the beginning of a real ML pipeline.
 | Feature-vector storage | Implemented | Versioned request, bounded payload-shape, and optional CICIDS-style flow features are stored with events. Dataset, artifact, evaluation, and runtime paths reject stale feature contracts. |
 | CICIDS2017 dataset | Partial | CICIDS-style single-CSV and directory adapters exist; local DDoS and full-directory CICIDS2017 splits have been prepared, reviewed, trained, and evaluated. Dataset provenance review is local-only and custom API-domain data is still pending. |
 | Application-layer HTTP benchmark | Partial | HTTP CSIC 2010 has been parsed, deduplicated, retrained with generic payload-shape features, and evaluated with checksum, feature-contract, and artifact-lineage controls. The enriched candidate materially improves precision, recall, and F1 but still misses conservative promotion-quality gates; CSIC is also generated legacy web traffic, not production-like custom API logs. |
-| Custom API logs | Partial | Runtime events, features, analyst-corrected labels, JSONL export, raw API-log JSONL ingestion with common access-log aliases, validation, split tooling, deterministic local API-domain fixture generation, and local retraining are available; reviewed production-like API-domain datasets are still pending. |
+| Custom API logs | Partial | Runtime exports and common access-log aliases are supported. Production-like JSONL can be reviewed with input hashing, bounded rows, sanitization/training attestations, duplicate and conflicting-label controls, hashed prepared identifiers, and provenance-bound splits. An actual reviewed production-like dataset and its benchmark are still pending. |
 | Precision/recall/F1/FPR evaluation | Implemented | The Random Forest trainer calculates all four metrics. |
 | Real-time WebSocket dashboard | Implemented for demo | A dedicated read-only WebSocket sends immediate events/alerts and complete coalesced snapshots after traffic or operator changes; adaptive HTTP polling remains as reconciliation and disconnect fallback. Production session/edge authentication is pending. |
 | Security dashboard and alerts | Implemented for demo | Live metrics, events, risk history, decoy status, actor triage, and internal alerts are available. |
@@ -63,6 +63,8 @@ The current demo can accurately claim that MIRAGE:
 - trains local shadow-mode candidate artifacts from analyst-labeled events;
 - prepares validated train/test splits from MIRAGE JSONL, custom API-log JSONL,
   CICIDS-style CSV, CICIDS-style CSV directory, and HTTP CSIC 2010 sources;
+- can bind sanitized custom API-log provenance and input hashes to prepared
+  splits while removing same-label duplicates and blocking label conflicts;
 - verifies complete CSIC input checksums, records source provenance, and removes
   repeated request identities before train/test splitting;
 - binds trained artifacts to reviewed dataset manifests and blocks mismatched

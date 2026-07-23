@@ -10,7 +10,8 @@ directly into the trainer.
 | Source | Adapter | Status |
 | --- | --- | --- |
 | Analyst-labeled MIRAGE export | `mirage-jsonl` | Ready |
-| Custom API JSONL logs | `api-log-jsonl` | Ready for labeled request metadata |
+| Custom API JSONL fixtures | `api-log-jsonl` | Flexible adapter for local experiments |
+| Reviewed custom API JSONL logs | `reviewed-api-log-jsonl` | Requires a hash-bound sanitized source review |
 | CICIDS2017-style CSV | `cicids-csv` | Basic adapter for one compatible CSV |
 | CICIDS2017-style CSV directory | `cicids-csv-dir` | Loads all immediate `*.csv` files in stable filename order |
 | HTTP CSIC 2010 directory | `csic-http-dir` | Parses the three official raw HTTP request files with provenance and deduplication |
@@ -78,17 +79,43 @@ Common field aliases are accepted to reduce preprocessing:
 | Payload indicators | `payload_indicators`, `indicators`, `signals`, `tags` |
 | Payload excerpt | Explicit `payload_excerpt`, or query aliases combined with `body_excerpt`, `request_body`, `body`, or `payload` |
 
-Prepare a split with the same production feature extractor used by the gateway:
+For production-like logs, create a source review before preparing a split. Use
+generic origin text that does not contain credentials or customer identifiers.
+The two boolean flags are explicit operator attestations, not automatic claims:
 
 ```bash
 cd apps/gateway
-python scripts/prepare_dataset.py \
-  --source api-log-jsonl \
+python scripts/review_api_log_source.py \
   --input data/raw/api-logs/labeled_requests.jsonl \
+  --output data/raw/api-logs/labeled_requests-review.json \
+  --data-origin staging-api-gateway \
+  --collection-started-at 2026-07-01T00:00:00Z \
+  --collection-ended-at 2026-07-02T00:00:00Z \
+  --labeling-method analyst-reviewed \
+  --sanitized \
+  --approved-for-training
+
+python scripts/prepare_dataset.py \
+  --source reviewed-api-log-jsonl \
+  --input data/raw/api-logs/labeled_requests.jsonl \
+  --source-review data/raw/api-logs/labeled_requests-review.json \
   --output-dir data/prepared/api-logs-v1 \
   --dataset-name api-logs \
   --dataset-version v1
 ```
+
+The review records only provenance, input SHA-256, bounded quality statistics,
+class counts, and blocker codes. It does not store request bodies, IP addresses,
+user agents, or source record identifiers. Rows larger than 1 MiB, malformed
+rows, invalid collection windows, conflicting labels for the same canonical
+request, missing sanitization, or missing training approval block preparation.
+Same-label duplicate requests are removed before splitting. Prepared record IDs
+are one-way hashes, and a sanitized copy of the review is hash-bound into the
+dataset manifest. Any change to the raw input or copied review invalidates the
+workflow.
+
+Use the flexible `api-log-jsonl` source only for local fixtures and adapter
+experiments that do not claim reviewed production provenance.
 
 ## Prepare MIRAGE Runtime Export
 

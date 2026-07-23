@@ -18,6 +18,7 @@ def parse_args() -> argparse.Namespace:
         choices=[
             "mirage-jsonl",
             "api-log-jsonl",
+            "reviewed-api-log-jsonl",
             "cicids-csv",
             "cicids-csv-dir",
             "csic-http-dir",
@@ -33,6 +34,11 @@ def parse_args() -> argparse.Namespace:
         "--checksums",
         type=Path,
         help="Optional JSON object mapping CSIC filenames to expected SHA-256 values",
+    )
+    parser.add_argument(
+        "--source-review",
+        type=Path,
+        help="Required review JSON for reviewed-api-log-jsonl sources",
     )
     return parser.parse_args()
 
@@ -56,6 +62,7 @@ def main() -> None:
         train_ratio=args.train_ratio,
         random_seed=args.seed,
         expected_checksums=expected_checksums,
+        source_review_path=args.source_review,
     )
     print(json.dumps(manifest.__dict__, indent=2, sort_keys=True))
 
