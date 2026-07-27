@@ -34,13 +34,22 @@ async def inspect_and_log(
     if anomaly.signals:
         risk.reasons.extend([f"Anomaly: {signal}" for signal in anomaly.signals])
 
+    # First score ML shadow score to evaluate model prediction
+    ml_shadow = score_ml_shadow(feature_vector, heuristic_decision=Decision.ALLOW)
+
+    # Make final routing decision (supports heuristic, hybrid, and ml_only modes)
     decision = make_decision(
         risk=risk,
         fingerprint_hash=fingerprint_hash,
         is_anomalous=anomaly.is_anomalous,
         anomaly_confidence=anomaly.confidence,
+        ml_shadow=ml_shadow,
     )
-    ml_shadow = score_ml_shadow(feature_vector, heuristic_decision=decision)
+
+    # Recalculate agreement between ML shadow decision and final routing decision
+    if ml_shadow is not None:
+        ml_shadow.agrees_with_decision = (ml_shadow.shadow_decision == decision.value)
+
     await log_inspection(
         request,
         risk.score,
