@@ -30,7 +30,8 @@ Open `http://localhost:8000/docs` for the generated API reference.
 | Variable | Purpose |
 | --- | --- |
 | `DATABASE_URL` | Async SQLite or PostgreSQL connection |
-| `MIRAGE_API_KEY` | Protects inspection, simulation, and decoy-write endpoints |
+| `MIRAGE_API_KEY` | Protects inspection, simulation, and every dashboard endpoint |
+| `MIRAGE_DASHBOARD_TICKET_SECRET` | Validates short-lived production stream tickets |
 | `MIRAGE_DASHBOARD_STREAM_TOKEN` | Local/demo read-only WebSocket access |
 | `REAL_APP_URL` | Upstream for allowed or monitored requests |
 | `DECOY_SERVICE_URL` | Upstream for redirected requests |

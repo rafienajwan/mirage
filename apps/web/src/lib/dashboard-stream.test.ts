@@ -135,10 +135,12 @@ describe("dashboard stream helpers", () => {
     );
   });
 
-  it("reconnects with reset backoff and reconciles malformed messages", () => {
+  it("refreshes its ticket on reconnect and reconciles malformed messages", async () => {
     const sockets: FakeSocket[] = [];
+    const targets: string[] = [];
     const scheduled: Array<{ callback: () => void; delay: number }> = [];
     const statuses: string[] = [];
+    let connectionRequests = 0;
     let reconciliations = 0;
 
     class FakeSocket {
@@ -154,10 +156,13 @@ describe("dashboard stream helpers", () => {
     }
 
     const client = new DashboardStreamClient({
-      url: "ws://localhost:8000/api/v1/dashboard/ws",
-      token: "stream-key",
-      createSocket: () => {
+      getConnection: async () => ({
+        url: "ws://localhost:8000/api/v1/dashboard/ws",
+        token: `ticket-${++connectionRequests}`,
+      }),
+      createSocket: (target) => {
         const socket = new FakeSocket();
+        targets.push(target);
         sockets.push(socket);
         return socket;
       },
@@ -177,6 +182,7 @@ describe("dashboard stream helpers", () => {
     });
 
     client.start();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     sockets[0].onopen?.call(sockets[0] as unknown as WebSocket, {} as Event);
     sockets[0].onmessage?.call(
       sockets[0] as unknown as WebSocket,
@@ -196,6 +202,7 @@ describe("dashboard stream helpers", () => {
     assert.equal(scheduled[0].delay, 1_000);
 
     scheduled[0].callback();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     sockets[1].onopen?.call(sockets[1] as unknown as WebSocket, {} as Event);
     sockets[1].onclose?.call(
       sockets[1] as unknown as WebSocket,
@@ -203,7 +210,40 @@ describe("dashboard stream helpers", () => {
     );
 
     assert.equal(scheduled[1].delay, 1_000);
+    assert.equal(connectionRequests, 2);
+    assert.match(targets[0], /token=ticket-1/);
+    assert.match(targets[1], /token=ticket-2/);
     client.stop();
     assert.equal(sockets[1].closed, true);
+  });
+
+  it("retries when a fresh connection ticket cannot be obtained", async () => {
+    const scheduled: Array<{ callback: () => void; delay: number }> = [];
+    const statuses: string[] = [];
+
+    const client = new DashboardStreamClient({
+      getConnection: async () => {
+        throw new Error("session expired");
+      },
+      createSocket: () => {
+        throw new Error("socket must not be created without a ticket");
+      },
+      schedule: (callback, delay) => {
+        scheduled.push({ callback, delay });
+        return callback;
+      },
+      cancel: () => undefined,
+      random: () => 0.5,
+      onStatus: (status) => statuses.push(status),
+      onMessage: () => undefined,
+      onReconcile: () => undefined,
+    });
+
+    client.start();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    assert.deepEqual(statuses, ["connecting", "disconnected"]);
+    assert.equal(scheduled[0].delay, 1_000);
+    client.stop();
   });
 });

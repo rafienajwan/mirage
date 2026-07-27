@@ -7,8 +7,7 @@ import type { ThreatSeverity, ThreatStatus, AlertSeverity } from "@/lib/mock-dat
 
 // ─── Configuration ──────────────────────────────────────────────
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-const API_PREFIX = `${API_URL}/api/v1`;
+const API_PREFIX = "/api/gateway";
 
 // ─── Backend response types ─────────────────────────────────────
 

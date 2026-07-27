@@ -3,8 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
+import hashlib
+import hmac
+import json
 import logging
 import secrets
+import time
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -57,12 +63,90 @@ class DashboardStreamManager:
 dashboard_stream = DashboardStreamManager()
 
 
-def dashboard_stream_authorized(token: str | None) -> bool:
-    """Validate the dedicated browser-visible dashboard stream token."""
+def _decode_ticket_segment(value: str) -> bytes:
+    padding = "=" * (-len(value) % 4)
+    return base64.urlsafe_b64decode(value + padding)
+
+
+def _dashboard_ticket_authorized(
+    token: str,
+    secret: str,
+    *,
+    now: int,
+) -> bool:
+    if len(secret) < 32:
+        return False
+    try:
+        payload_segment, signature_segment = token.split(".")
+        supplied_signature = _decode_ticket_segment(signature_segment)
+        expected_signature = hmac.new(
+            secret.encode(),
+            payload_segment.encode(),
+            hashlib.sha256,
+        ).digest()
+        if not hmac.compare_digest(supplied_signature, expected_signature):
+            return False
+        payload = json.loads(_decode_ticket_segment(payload_segment))
+    except (
+        binascii.Error,
+        UnicodeDecodeError,
+        ValueError,
+        json.JSONDecodeError,
+    ):
+        return False
+    if not isinstance(payload, dict):
+        return False
+
+    issued_at = payload.get("iat")
+    expires_at = payload.get("exp")
+    nonce = payload.get("nonce")
+    if (
+        payload.get("aud") != "mirage-dashboard-stream"
+        or not isinstance(issued_at, int)
+        or isinstance(issued_at, bool)
+        or not isinstance(expires_at, int)
+        or isinstance(expires_at, bool)
+        or not isinstance(nonce, str)
+        or len(nonce) < 16
+    ):
+        return False
+    return (
+        issued_at - 5 <= now < expires_at
+        and 0 < expires_at - issued_at <= 120
+    )
+
+
+def dashboard_stream_authorized(
+    token: str | None,
+    *,
+    now: int | None = None,
+) -> bool:
+    """Validate a short-lived production ticket or local legacy token."""
+    if token is None:
+        return False
+
+    ticket_secret = getattr(settings, "dashboard_stream_ticket_secret", None)
+    if ticket_secret and _dashboard_ticket_authorized(
+        token,
+        ticket_secret,
+        now=int(time.time()) if now is None else now,
+    ):
+        return True
+
+    if getattr(settings, "app_env", "development").lower() == "production":
+        return False
     expected = settings.dashboard_stream_token
-    if expected is None or token is None:
+    if expected is None:
         return False
     return secrets.compare_digest(token, expected)
+
+
+def dashboard_stream_origin_authorized(origin: str | None) -> bool:
+    """Accept dashboard sockets only from the configured browser origin."""
+    expected = settings.frontend_origin.rstrip("/")
+    if not origin or not expected:
+        return False
+    return secrets.compare_digest(origin.rstrip("/"), expected)
 
 
 async def broadcast_dashboard_update(kind: str, payload: dict[str, Any]) -> None:

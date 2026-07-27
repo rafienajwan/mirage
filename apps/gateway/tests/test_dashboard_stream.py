@@ -1,6 +1,9 @@
 """Tests for dashboard WebSocket stream helpers."""
 
 import asyncio
+import base64
+import hashlib
+import hmac
 import json
 
 from types import SimpleNamespace
@@ -9,9 +12,37 @@ import pytest
 
 from app.schemas.decision import Decision
 from app.schemas.event import EventRecord
+from app.core import security
 from app.services import actor_clusters, actor_profiles, dashboard_stream
 from app.storage.memory_store import MemoryStore
 from app.utils.time import utcnow
+
+
+def _stream_ticket(
+    secret: str,
+    *,
+    issued_at: int,
+    expires_at: int,
+    audience: str = "mirage-dashboard-stream",
+) -> str:
+    payload = json.dumps(
+        {
+            "aud": audience,
+            "exp": expires_at,
+            "iat": issued_at,
+            "nonce": "0123456789abcdef",
+        },
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode()
+    encoded_payload = base64.urlsafe_b64encode(payload).rstrip(b"=")
+    signature = hmac.new(
+        secret.encode(),
+        encoded_payload,
+        hashlib.sha256,
+    ).digest()
+    encoded_signature = base64.urlsafe_b64encode(signature).rstrip(b"=")
+    return f"{encoded_payload.decode()}.{encoded_signature.decode()}"
 
 
 class FakeWebSocket:
@@ -54,6 +85,128 @@ def test_dashboard_stream_auth_is_disabled_without_stream_token(monkeypatch):
 
     assert dashboard_stream.dashboard_stream_authorized(None) is False
     assert dashboard_stream.dashboard_stream_authorized("operator-key") is False
+
+
+def test_dashboard_stream_auth_accepts_valid_short_lived_ticket(monkeypatch):
+    secret = "s" * 32
+    monkeypatch.setattr(
+        dashboard_stream,
+        "settings",
+        SimpleNamespace(
+            app_env="production",
+            dashboard_stream_ticket_secret=secret,
+            dashboard_stream_token="legacy-stream-key",
+        ),
+    )
+
+    ticket = _stream_ticket(secret, issued_at=1_000, expires_at=1_060)
+
+    assert dashboard_stream.dashboard_stream_authorized(ticket, now=1_030) is True
+
+
+@pytest.mark.parametrize(
+    ("ticket_factory", "now"),
+    [
+        (lambda secret: _stream_ticket(secret, issued_at=1_000, expires_at=1_010), 1_010),
+        (lambda secret: _stream_ticket(secret, issued_at=1_100, expires_at=1_160), 1_000),
+        (
+            lambda secret: _stream_ticket(
+                secret,
+                issued_at=1_000,
+                expires_at=1_060,
+                audience="other-service",
+            ),
+            1_030,
+        ),
+        (
+            lambda secret: _stream_ticket(
+                "x" * 32,
+                issued_at=1_000,
+                expires_at=1_060,
+            ),
+            1_030,
+        ),
+    ],
+)
+def test_dashboard_stream_auth_rejects_invalid_tickets(
+    monkeypatch,
+    ticket_factory,
+    now,
+):
+    secret = "s" * 32
+    monkeypatch.setattr(
+        dashboard_stream,
+        "settings",
+        SimpleNamespace(
+            app_env="production",
+            dashboard_stream_ticket_secret=secret,
+            dashboard_stream_token=None,
+        ),
+    )
+
+    assert (
+        dashboard_stream.dashboard_stream_authorized(
+            ticket_factory(secret),
+            now=now,
+        )
+        is False
+    )
+
+
+def test_dashboard_stream_auth_rejects_legacy_token_in_production(monkeypatch):
+    monkeypatch.setattr(
+        dashboard_stream,
+        "settings",
+        SimpleNamespace(
+            app_env="production",
+            dashboard_stream_ticket_secret=None,
+            dashboard_stream_token="legacy-stream-key",
+        ),
+    )
+
+    assert (
+        dashboard_stream.dashboard_stream_authorized("legacy-stream-key") is False
+    )
+
+
+def test_dashboard_stream_origin_requires_configured_frontend(monkeypatch):
+    monkeypatch.setattr(
+        dashboard_stream,
+        "settings",
+        SimpleNamespace(frontend_origin="https://mirage.example"),
+    )
+
+    assert (
+        dashboard_stream.dashboard_stream_origin_authorized(
+            "https://mirage.example"
+        )
+        is True
+    )
+    assert (
+        dashboard_stream.dashboard_stream_origin_authorized(
+            "https://attacker.example"
+        )
+        is False
+    )
+    assert dashboard_stream.dashboard_stream_origin_authorized(None) is False
+
+
+@pytest.mark.asyncio
+async def test_dashboard_http_reads_require_operator_api_key(client, monkeypatch):
+    monkeypatch.setattr(
+        security,
+        "settings",
+        SimpleNamespace(api_key="operator-key"),
+    )
+
+    denied = await client.get("/api/v1/dashboard/overview")
+    allowed = await client.get(
+        "/api/v1/dashboard/overview",
+        headers={"X-Mirage-API-Key": "operator-key"},
+    )
+
+    assert denied.status_code == 401
+    assert allowed.status_code == 200
 
 
 @pytest.mark.asyncio

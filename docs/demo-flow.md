@@ -35,14 +35,15 @@ Expected result: synthetic configuration data from the static decoy service.
 
 ## 5. Observe
 
-Open `http://localhost:3000/dashboard`. When configured, the read-only WebSocket
-sends immediate events/alerts and complete snapshots for metrics, decoys,
-honeytokens, actor triage, and case workflows. HTTP polling reconciles every 60
-seconds while connected and falls back to every 10 seconds while disconnected.
+Open `http://localhost:3000/dashboard` and enter the configured
+`MIRAGE_OPERATOR_PASSWORD`. The authenticated WebSocket sends immediate
+events/alerts and complete snapshots for metrics, decoys, honeytokens, actor
+triage, and case workflows. HTTP polling reconciles every 60 seconds while
+connected and falls back to every 10 seconds while disconnected.
 
-The dashboard simulation buttons call a server-side Next.js route that adds the
-operator API key before contacting the gateway. The key remains outside the
-browser bundle.
+All dashboard reads and actions call session-protected server-side Next.js
+routes that add the operator API key before contacting the gateway. The key and
+signing secrets remain outside the browser bundle.
 
 To call a simulation endpoint directly:
 
@@ -62,5 +63,5 @@ docker compose --env-file .env -f infra/docker-compose.yml down
 - Routing is heuristic rather than model-driven.
 - Decoy payloads are synthetic and can issue deterministic per-actor canary
   tokens with epoch-based rotation; multi-operator approval remains pending.
-- WebSocket authentication is suitable for the local demo; production session
-  or edge authentication remains pending.
+- Online deployment, managed TLS, and provider-level login rate limiting remain
+  pending.
