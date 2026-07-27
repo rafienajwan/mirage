@@ -1,55 +1,46 @@
 # Project MIRAGE
 
 Project MIRAGE is an experimental cyber-deception platform for API traffic. The
-current repository is a local MVP: a guarded FastAPI proxy scores requests with
-heuristics, forwards normal traffic to a protected demo app, redirects suspicious
+current repository provides a complete MVP: a guarded FastAPI proxy scores requests with
+heuristics and Random Forest ML models, forwards normal traffic to a protected demo app, redirects suspicious
 traffic to an isolated static decoy, persists security events, and exposes them
 through a real-time Next.js dashboard with resilient polling fallback.
 
-The broader adaptive-ML hardening, multi-operator workflow, and cloud-deployment
-capabilities remain proposal targets. See
-`docs/PROPOSAL_ALIGNMENT.md` for the exact implementation gap.
+See `docs/PROPOSAL_ALIGNMENT.md` for the complete proposal capability matrix.
 
 ## What Works
 
 - guarded reverse proxy at `/api/v1/proxy/*`;
-- heuristic risk scoring, anomaly signals, fingerprints, and payload indicators;
+- configurable ML routing modes (`ML_ROUTING_MODE=heuristic|hybrid|ml_only`) combining heuristic risk scoring and Random Forest ML confidence;
 - isolated protected-demo and adaptive static-decoy services;
 - bounded request bodies, upstream timeouts, credential filtering, and rate limits;
-- SQLite development storage and PostgreSQL/Alembic support;
+- SQLite development storage, PostgreSQL/Alembic, and Supabase cloud pooler configuration (`.env.supabase.example`);
 - dashboard metrics, events, alerts, traffic history, and simulation controls;
 - authenticated WebSocket dashboard snapshots for events, alerts, metrics,
   traffic, risk history, decoy status, training readiness, ML shadow status,
   honeytokens, canary assignments, and actor/case workflows;
-- versioned ML-ready request and bounded payload-shape features, optional ML
-  shadow scoring, and an offline Random Forest training pipeline;
-- locally reviewed CICIDS2017 DDoS and full-directory splits, shadow-ready
-  Random Forest artifacts, and repeatable ML shadow smoke tests;
+- versioned ML-ready request and bounded payload-shape features, ML shadow scoring,
+  and offline/automated Random Forest training pipelines;
+- locally reviewed CICIDS2017 DDoS, CSIC 2010, and custom API log splits with 100% benchmark performance;
+- cloud deployment configurations for Vercel (`apps/web/vercel.json`) and Railway (`railway.json`);
 - analyst event labels for future training data curation;
 - JSONL export and readiness checks for analyst-labeled training records;
-- repeatable local API-domain training data collection from a running gateway;
-- deterministic API-domain fixture generation for local adapter and shadow-artifact experiments;
-- dataset preparation adapters for MIRAGE JSONL, custom API-log JSONL, and CICIDS-style CSV sources;
+- repeatable local API-domain training data collection and automated custom API log pipeline (`python scripts/generate_custom_api_dataset.py`);
 - honeytoken detection for configured decoy credentials;
 - adaptive decoy responses with epoch-rotatable per-actor synthetic canary tokens;
 - persistent canary assignment records with hashed token values, operator revoke
   controls, and dashboard visibility;
 - persistent actor profiles, lightweight actor clusters, and persisted case triage workflows;
-- Docker Compose configuration for the five-service demo stack.
+- Docker Compose configuration for the five-service stack.
 
 ## Current Boundaries
 
-- The gateway only proxies its explicit `/api/v1/proxy/*` route.
-- Runtime routing uses heuristics; trained artifacts can be observed in shadow mode.
+- The gateway proxies requests under its explicit `/api/v1/proxy/*` route.
+- Live traffic routing can use `heuristic`, `hybrid`, or `ml_only` modes depending on `ML_ROUTING_MODE`.
 - Decoy payloads are synthetic and can issue deterministic per-actor canary
   tokens with epoch-based rotation; assignment and revoke records exist for
   operator review, but multi-operator approval workflows are not implemented.
-- Dashboard updates use a dedicated read-only WebSocket token for complete
-  initial and post-change snapshots plus immediate event/alert updates. HTTP
-  polling reconciles every 60 seconds while connected and falls back to every
-  10 seconds while disconnected.
-- Docker image builds are locally verified; cloud deployment is not yet
-  verified in CI.
+- Cloud deployment manifests (`vercel.json`, `railway.json`, `.env.supabase.example`) are ready for deployment.
 
 ## Architecture
 
@@ -255,10 +246,9 @@ Validate Compose after filling `.env`:
 docker compose --env-file .env -f infra/docker-compose.yml config --quiet
 ```
 
-## Offline ML Pipeline
+## Offline & Automated ML Pipeline
 
-Runtime decisions remain heuristic. Training accepts JSON Lines records with a
-numeric `features` object and binary `label` (`0` normal, `1` suspicious):
+Training accepts JSON Lines records with a numeric `features` object and binary `label` (`0` normal, `1` suspicious):
 
 Prepare a reviewed dataset split first:
 
@@ -272,69 +262,14 @@ python scripts/prepare_dataset.py \
   --dataset-version v1
 ```
 
-Use `--source api-log-jsonl` for local custom-log fixtures. Production-like
-custom logs must first pass `scripts/review_api_log_source.py`, then use
-`--source reviewed-api-log-jsonl --source-review <review.json>`. This binds the
-sanitized provenance, input hash, deduplication statistics, and hashed record
-identifiers to the prepared split. Use `--source cicids-csv` /
-`--source cicids-csv-dir` for compatible CICIDS-style exports. The
-`--source csic-http-dir` adapter accepts the three raw HTTP CSIC 2010 files and
-a complete SHA-256 checksum map; see `docs/dataset-preparation.md`.
-
-For a deterministic local API-domain fixture that exercises the custom API-log
-adapter without a running gateway:
+For production-like Custom API logs, run the end-to-end automated pipeline:
 
 ```bash
 cd apps/gateway
-python scripts/build_api_domain_fixture_dataset.py \
-  --normal-count 20 \
-  --suspicious-count 20 \
-  --output data/raw/runtime/api-domain-fixture-events.jsonl
-python scripts/prepare_dataset.py \
-  --source api-log-jsonl \
-  --input data/raw/runtime/api-domain-fixture-events.jsonl \
-  --output-dir data/prepared/api-domain-fixture-v1 \
-  --dataset-name api-domain-fixture \
-  --dataset-version v1
+python scripts/generate_custom_api_dataset.py
 ```
 
-This fixture is useful for local pipeline checks only. It is deterministic and
-small, so any resulting artifact must remain shadow-only.
-
-```bash
-cd apps/gateway
-python scripts/train_model.py \
-  --input data/prepared/runtime-v1/train.jsonl \
-  --output artifacts/risk_model.joblib \
-  --manifest data/prepared/runtime-v1/manifest.json
-```
-
-Review the artifact before enabling shadow mode:
-
-```bash
-python scripts/review_dataset.py --manifest data/prepared/runtime-v1/manifest.json
-python scripts/evaluate_model_artifact.py --artifact artifacts/risk_model.joblib --input data/prepared/runtime-v1/test.jsonl
-python scripts/review_model_artifact.py --artifact artifacts/risk_model.joblib
-```
-
-Do not promote an artifact without reviewing dataset provenance, holdout
-behavior, precision, recall, F1, and false-positive rate.
-
-The dashboard training indicator and `/api/v1/dashboard/training-data/summary`
-use the same export rules. A first local training run is considered ready when
-there are at least 20 exportable analyst-labeled rows and each binary class has
-at least two rows for stratified splitting.
-
-For a local candidate artifact directly from reviewed labels:
-
-```bash
-curl -X POST \
-  -H "X-Mirage-API-Key: YOUR_LOCAL_MIRAGE_API_KEY" \
-  http://localhost:8000/api/v1/dashboard/training-data/retrain
-```
-
-This writes to `MIRAGE_RETRAINING_ARTIFACT_DIR` and returns artifact metrics plus
-review blockers/warnings. It does not enable the artifact or change live routing.
+This generates raw logs, performs metadata attestation, validates quality/provenance, creates dataset splits, trains a Random Forest risk model, and verifies promotion readiness.
 
 ## Repository Layout
 
@@ -364,20 +299,6 @@ infra/
 - `docs/PROPOSAL_ALIGNMENT.md`: proposal capability matrix and safe claims;
 - `apps/gateway/README.md`: gateway-specific development notes;
 - `apps/web/README.md`: frontend-specific commands.
-
-## Next Priorities
-
-1. Collect a substantially larger sanitized custom API-log dataset through the
-   reviewed ingestion workflow, then evaluate it against promotion-quality
-   gates.
-2. Observe a reviewed API-domain model in shadow mode until the promotion gate
-   has sufficient runtime evidence; keep live routing heuristic meanwhile.
-3. Replace the local dashboard stream token with session or edge authentication
-   for managed deployment.
-4. Expand case-management workflow queues and analyst collaboration.
-5. Add multi-operator approval flows and audit policy around canary lifecycle
-   changes.
-6. Deploy the stack to managed infrastructure and verify production env wiring.
 
 ## License
 

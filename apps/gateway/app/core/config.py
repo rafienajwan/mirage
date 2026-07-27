@@ -71,6 +71,9 @@ class Settings:
     ml_dataset_manifest: str | None = field(
         default_factory=lambda: os.getenv("MIRAGE_MODEL_DATASET_MANIFEST") or None
     )
+    ml_routing_mode: str = field(
+        default_factory=lambda: os.getenv("ML_ROUTING_MODE", "heuristic")
+    )
     ml_promotion_min_total_rows: int = field(
         default_factory=lambda: int(os.getenv("ML_PROMOTION_MIN_TOTAL_ROWS", "1000"))
     )
