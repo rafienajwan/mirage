@@ -44,6 +44,7 @@ appropriate example and this reference in the same change.
 | `ML_PROMOTION_MIN_ROWS_PER_CLASS` | No | Gateway | Minimum rows for each binary class; defaults to `100` |
 | `ML_PROMOTION_MIN_SHADOW_EVENTS` | No | Gateway | Minimum runtime shadow observations; defaults to `500` |
 | `ML_PROMOTION_MIN_AGREEMENT_RATE` | No | Gateway | Minimum heuristic compatibility rate; defaults to `0.8` |
+| `ML_ROUTING_MODE` | No | Gateway | Routing decision mode: `heuristic` (default), `hybrid`, or `ml_only` |
 | `DECOY_LOGIN_TOKEN` | Yes | Gateway and decoy | Synthetic login token shown in decoy data |
 | `DECOY_OAUTH_TOKEN` | Yes | Gateway and decoy | Synthetic OAuth token shown in decoy data |
 | `DECOY_SERVICE_TOKEN` | Yes | Gateway and decoy | Synthetic service token shown in decoy data |
