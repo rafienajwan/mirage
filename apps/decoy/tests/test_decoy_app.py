@@ -2,7 +2,7 @@
 
 from fastapi.testclient import TestClient
 
-from apps.decoy.app.main import app
+from app.main import app
 
 
 def test_decoy_service_issues_actor_token_from_gateway_context():
