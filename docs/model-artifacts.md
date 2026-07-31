@@ -560,8 +560,21 @@ Only sanitized file names are returned. The report never changes the active
 artifact or heuristic routing policy. Agreement is a compatibility signal
 against current heuristics, not proof of real-world model accuracy.
 
+## Experimental Live Routing
+
+The gateway contains experimental `hybrid` and `ml_only` decision paths, but
+they are guarded by two independent settings. Selecting a mode through
+`ML_ROUTING_MODE` is insufficient on its own; `ML_LIVE_ROUTING_APPROVED=true`
+must also be set deliberately. The default remains `heuristic`.
+
+Only consider that approval after the promotion report is `eligible`, the
+artifact has representative API-domain holdout results, and the shadow
+observation has an acceptable false-positive impact. Keep `ml_only` limited to
+controlled experiments because it can override explainable heuristic signals.
+
 ## Safe Claims
 
-It is safe to say that a reviewed artifact is running in shadow mode. It is not
-safe to say that the model controls live routing until the decision engine is
-explicitly changed and validated for that purpose.
+It is safe to say that a reviewed artifact is running in shadow mode and that
+guarded experimental live-routing code exists. It is not safe to claim
+production ML routing until representative custom API logs, cloud deployment,
+and end-to-end operational behavior have been independently validated.
