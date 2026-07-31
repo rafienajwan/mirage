@@ -6,7 +6,7 @@ import argparse
 import json
 from pathlib import Path
 
-from collect_api_domain_training_data import build_scenarios
+from scripts.collect_api_domain_training_data import build_scenarios
 
 
 def build_fixture_rows(*, normal_count: int, suspicious_count: int) -> list[dict]:

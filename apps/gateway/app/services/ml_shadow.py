@@ -7,6 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from app.core.config import settings
+from app.ml.artifacts import review_model_artifact
 from app.ml.inference import RiskClassifier
 from app.schemas.decision import Decision
 from app.schemas.ml import MLShadowScore
@@ -24,6 +25,14 @@ def _load_classifier() -> RiskClassifier | None:
     artifact_path = Path(artifact)
     if not artifact_path.exists():
         logger.warning("ML shadow artifact does not exist: %s", artifact_path)
+        return None
+
+    review = review_model_artifact(artifact_path)
+    if not review.shadow_ready:
+        logger.warning(
+            "ML shadow artifact failed review: %s",
+            "; ".join(review.blockers),
+        )
         return None
 
     try:

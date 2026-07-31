@@ -3,6 +3,8 @@
 from types import SimpleNamespace
 from pathlib import Path
 
+import joblib
+
 from app.ml.training import LabeledFeatures, train_risk_classifier
 from app.schemas.decision import Decision
 from app.services import ml_shadow
@@ -57,6 +59,36 @@ def test_ml_shadow_scores_with_valid_artifact(monkeypatch):
         assert score.artifact == ".test-shadow-risk-model.joblib"
         assert score.prediction == "suspicious"
         assert score.score > 50
+    finally:
+        ml_shadow._load_classifier.cache_clear()
+        artifact.unlink(missing_ok=True)
+
+
+def test_ml_shadow_rejects_artifact_that_fails_review(monkeypatch):
+    artifact = Path(".test-invalid-shadow-risk-model.joblib")
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(20)]
+    try:
+        train_risk_classifier(rows, artifact)
+        payload = joblib.load(artifact)
+        payload["metrics"] = {}
+        joblib.dump(payload, artifact)
+        monkeypatch.setattr(
+            ml_shadow,
+            "settings",
+            SimpleNamespace(
+                ml_model_artifact=str(artifact),
+                ml_shadow_monitor_threshold=0.35,
+                ml_shadow_redirect_threshold=0.65,
+            ),
+        )
+        ml_shadow._load_classifier.cache_clear()
+
+        score = ml_shadow.score_ml_shadow(
+            _row(1, 20).features,
+            heuristic_decision=Decision.REDIRECT_TO_DECOY,
+        )
+
+        assert score is None
     finally:
         ml_shadow._load_classifier.cache_clear()
         artifact.unlink(missing_ok=True)

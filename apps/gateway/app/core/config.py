@@ -14,6 +14,13 @@ except ImportError:
     pass
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 @dataclass(frozen=True)
 class Settings:
     """Immutable application settings."""
@@ -73,6 +80,9 @@ class Settings:
     )
     ml_routing_mode: str = field(
         default_factory=lambda: os.getenv("ML_ROUTING_MODE", "heuristic")
+    )
+    ml_live_routing_approved: bool = field(
+        default_factory=lambda: _env_bool("ML_LIVE_ROUTING_APPROVED")
     )
     ml_promotion_min_total_rows: int = field(
         default_factory=lambda: int(os.getenv("ML_PROMOTION_MIN_TOTAL_ROWS", "1000"))

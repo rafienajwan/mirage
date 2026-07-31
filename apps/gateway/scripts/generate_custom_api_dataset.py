@@ -1,8 +1,9 @@
-"""Generate, review, train, and evaluate a production-like custom API log dataset and artifact."""
+"""Exercise the ML pipeline with a deterministic synthetic API-domain fixture."""
 
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 import sys
@@ -12,7 +13,10 @@ gateway_dir = Path(__file__).resolve().parent.parent
 if str(gateway_dir) not in sys.path:
     sys.path.insert(0, str(gateway_dir))
 
-from build_api_domain_fixture_dataset import build_fixture_rows, write_fixture_jsonl
+from scripts.build_api_domain_fixture_dataset import (
+    build_fixture_rows,
+    write_fixture_jsonl,
+)
 from app.ml.api_log_review import (
     APILogReviewMetadata,
     review_api_log_source,
@@ -35,23 +39,25 @@ def generate_and_train_custom_api_dataset(
     prepared_dir: Path = Path("data/prepared/custom_api_logs"),
     artifact_dir: Path = Path("artifacts/custom_api_logs"),
 ) -> dict:
-    """Generate, review, prepare, and train a custom API log candidate artifact."""
+    """Generate, review, prepare, and train a pipeline-validation artifact."""
     raw_dir.mkdir(parents=True, exist_ok=True)
     prepared_dir.mkdir(parents=True, exist_ok=True)
     artifact_dir.mkdir(parents=True, exist_ok=True)
 
     input_jsonl = raw_dir / "custom-api-logs.jsonl"
 
-    # Step 1: Generate synthetic production-like custom API log rows
+    # Step 1: Generate deterministic synthetic API-domain rows.
     rows = build_fixture_rows(normal_count=normal_count, suspicious_count=suspicious_count)
     write_fixture_jsonl(input_jsonl, rows)
 
-    # Step 2: Metadata attestation required for API log source review
+    generated_at = datetime.now(timezone.utc).isoformat()
+
+    # Step 2: Identify fixture provenance without implying human review.
     meta = APILogReviewMetadata(
-        data_origin="production-like-synthetic-api-logs",
-        collection_started_at="2026-07-01T00:00:00Z",
-        collection_ended_at="2026-07-27T12:00:00Z",
-        labeling_method="expert-analyst-rules",
+        data_origin="deterministic-synthetic-api-domain-fixture",
+        collection_started_at=generated_at,
+        collection_ended_at=generated_at,
+        labeling_method="generator-scenario-labels",
         sanitized=True,
         approved_for_training=True,
     )
@@ -74,7 +80,7 @@ def generate_and_train_custom_api_dataset(
         input_jsonl,
         prepared_dir,
         source_kind="reviewed-api-log-jsonl",
-        dataset_name="custom-api-logs-candidate",
+        dataset_name="api-domain-synthetic-fixture",
         dataset_version="1.0.0",
         random_seed=42,
         source_review_path=source_review_path,
@@ -101,7 +107,7 @@ def generate_and_train_custom_api_dataset(
 
     # Step 6: Train Random Forest model artifact bound to dataset lineage
     lineage = build_dataset_lineage(dataset_manifest_path, train_jsonl_path)
-    artifact_path = artifact_dir / "custom_api_risk_model.joblib"
+    artifact_path = artifact_dir / "api_domain_fixture_risk_model.joblib"
     train_metrics = train_risk_classifier(
         training_rows,
         artifact_path,
@@ -117,6 +123,7 @@ def generate_and_train_custom_api_dataset(
         "total_rows": dataset_review.total_rows,
         "metrics": train_metrics.__dict__,
         "shadow_ready": artifact_review.shadow_ready,
+        "intended_use": "pipeline-validation-only",
     }
 
 
