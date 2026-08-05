@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 import {
   createDashboardStreamTicket,
   createOperatorSession,
+  isSameOriginRequest,
   verifyDashboardStreamTicket,
   verifyOperatorSession,
 } from "./operator-auth";
@@ -85,6 +86,36 @@ describe("operator authentication tokens", () => {
         nonce: "session-nonce-0123456789",
       }),
       /at least 32 characters/,
+    );
+  });
+
+  it("accepts the public host when Docker maps it to an internal port", () => {
+    assert.equal(
+      isSameOriginRequest({
+        origin: "http://localhost:3001",
+        host: "localhost:3001",
+        protocol: "http:",
+      }),
+      true,
+    );
+  });
+
+  it("rejects cross-origin and malformed login origins", () => {
+    assert.equal(
+      isSameOriginRequest({
+        origin: "https://attacker.example",
+        host: "localhost:3001",
+        protocol: "http:",
+      }),
+      false,
+    );
+    assert.equal(
+      isSameOriginRequest({
+        origin: "not-a-valid-origin",
+        host: "localhost:3001",
+        protocol: "http:",
+      }),
+      false,
     );
   });
 });

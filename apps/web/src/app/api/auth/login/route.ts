@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import {
   createOperatorSession,
+  isSameOriginRequest,
   OPERATOR_SESSION_COOKIE,
   OPERATOR_SESSION_MAX_AGE,
 } from "@/lib/operator-auth";
@@ -25,7 +26,15 @@ export async function POST(request: NextRequest) {
   }
 
   const origin = request.headers.get("origin");
-  if (origin && origin !== request.nextUrl.origin) {
+  const forwardedProtocol = request.headers
+    .get("x-forwarded-proto")
+    ?.split(",", 1)[0]
+    ?.trim();
+  if (!isSameOriginRequest({
+    origin,
+    host: request.headers.get("host"),
+    protocol: forwardedProtocol || request.nextUrl.protocol,
+  })) {
     return NextResponse.json({ detail: "Invalid request origin" }, { status: 403 });
   }
 
