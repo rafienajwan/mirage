@@ -66,9 +66,13 @@ unavailable and rejects request bodies above the configured limit.
 python -m alembic upgrade head
 ```
 
-For a legacy database created before Alembic, back it up before stamping the
-baseline revision. See `docs/CONTINUATION.md` in local development context for
-the current migration note.
+For a legacy database created before Alembic, back it up and verify that its
+event and alert tables match the baseline migration before running:
+
+```bash
+python -m alembic stamp 20260622_0001
+python -m alembic upgrade head
+```
 
 ## Tests
 
