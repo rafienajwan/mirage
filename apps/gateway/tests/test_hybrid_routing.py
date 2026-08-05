@@ -41,6 +41,7 @@ def test_hybrid_mode_promotes_high_ml_probability_to_decoy():
         is_anomalous=False,
         ml_shadow=ml_shadow,
         routing_mode="hybrid",
+        live_routing_approved=True,
     )
     assert decision == Decision.REDIRECT_TO_DECOY
 
@@ -55,6 +56,7 @@ def test_hybrid_mode_promotes_moderate_ml_probability_to_monitor():
         is_anomalous=False,
         ml_shadow=ml_shadow,
         routing_mode="hybrid",
+        live_routing_approved=True,
     )
     assert decision == Decision.MONITOR
 
@@ -69,6 +71,7 @@ def test_hybrid_mode_allows_low_ml_and_low_risk():
         is_anomalous=False,
         ml_shadow=ml_shadow,
         routing_mode="hybrid",
+        live_routing_approved=True,
     )
     assert decision == Decision.ALLOW
 
@@ -83,6 +86,7 @@ def test_ml_only_mode_follows_model_prediction():
         is_anomalous=False,
         ml_shadow=ml_shadow,
         routing_mode="ml_only",
+        live_routing_approved=True,
     )
     assert decision == Decision.REDIRECT_TO_DECOY
 
@@ -96,5 +100,38 @@ def test_ml_only_mode_falls_back_if_no_model():
         is_anomalous=False,
         ml_shadow=None,
         routing_mode="ml_only",
+        live_routing_approved=True,
     )
+    assert decision == Decision.ALLOW
+
+
+def test_hybrid_mode_falls_back_to_heuristic_without_live_approval():
+    risk = RiskResult(score=10.0, level=RiskLevel.LOW, reasons=["Normal"])
+    ml_shadow = _mock_ml_shadow(probability=0.9, shadow_decision="redirect_to_decoy")
+
+    decision = make_decision(
+        risk,
+        fingerprint_hash="abc",
+        is_anomalous=False,
+        ml_shadow=ml_shadow,
+        routing_mode="hybrid",
+        live_routing_approved=False,
+    )
+
+    assert decision == Decision.ALLOW
+
+
+def test_unknown_routing_mode_falls_back_to_heuristic():
+    risk = RiskResult(score=10.0, level=RiskLevel.LOW, reasons=["Normal"])
+    ml_shadow = _mock_ml_shadow(probability=0.9, shadow_decision="redirect_to_decoy")
+
+    decision = make_decision(
+        risk,
+        fingerprint_hash="abc",
+        is_anomalous=False,
+        ml_shadow=ml_shadow,
+        routing_mode="unexpected",
+        live_routing_approved=True,
+    )
+
     assert decision == Decision.ALLOW

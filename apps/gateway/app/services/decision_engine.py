@@ -23,12 +23,22 @@ def make_decision(
     anomaly_confidence: float = 0.0,
     ml_shadow: MLShadowScore | None = None,
     routing_mode: str | None = None,
+    live_routing_approved: bool | None = None,
 ) -> Decision:
     """Choose allow, monitor, or decoy routing for an inspected request.
 
     Supports 'heuristic', 'hybrid', and 'ml_only' routing modes.
     """
     mode = (routing_mode or settings.ml_routing_mode or "heuristic").lower()
+    approved = (
+        settings.ml_live_routing_approved
+        if live_routing_approved is None
+        else live_routing_approved
+    )
+    if mode not in {"heuristic", "hybrid", "ml_only"}:
+        mode = "heuristic"
+    if mode != "heuristic" and not approved:
+        mode = "heuristic"
     threshold = settings.risk_threshold
 
     if fingerprint_hash in _KNOWN_MALICIOUS_FINGERPRINTS:

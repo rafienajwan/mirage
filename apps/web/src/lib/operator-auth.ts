@@ -25,8 +25,32 @@ interface StreamTicket {
   expiresAt: number;
 }
 
+interface SameOriginOptions {
+  origin: string | null;
+  host: string | null;
+  protocol: string;
+}
+
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+
+export function isSameOriginRequest({
+  origin,
+  host,
+  protocol,
+}: SameOriginOptions): boolean {
+  if (!origin) return true;
+  if (!host) return false;
+
+  const normalizedProtocol = protocol.endsWith(":")
+    ? protocol
+    : `${protocol}:`;
+  try {
+    return new URL(origin).origin === `${normalizedProtocol}//${host}`;
+  } catch {
+    return false;
+  }
+}
 
 function assertSecret(secret: string) {
   if (secret.length < 32) {

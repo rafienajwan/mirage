@@ -1,54 +1,72 @@
 # Proposal Alignment
 
-Source proposal: **Project MIRAGE: Adaptive AI-Driven Cyber Deception System for Autonomous Threat Hunting**, WRECK-IT 7.0.
+Source proposal: **Project MIRAGE: Adaptive AI-Driven Cyber Deception System
+for Autonomous Threat Hunting**, WRECK-IT 7.0.
 
 ## Summary
 
-The repository follows the proposal's component boundaries and core detect-deceive-observe flow. It fulfills the core MVP described in the proposal, providing a defensible local prototype and production-ready cloud deployment configurations with an integrated ML pipeline supporting heuristic, hybrid, and ML-only live routing modes.
+The repository implements the proposal's core local detect-deceive-observe
+flow: a FastAPI gateway inspects explicit proxy traffic, applies explainable
+risk rules, routes suspicious requests to an isolated decoy, persists events,
+and updates a protected Next.js dashboard. This is a working MVP prototype,
+not a verified production deployment.
+
+The ML pipeline is implemented for dataset preparation, Random Forest
+training, evaluation, artifact review, and runtime shadow scoring. Live ML
+routing remains an experimental capability and is disabled by default. The
+proposal's custom API-log requirement is still incomplete because the current
+API-domain data is deterministic synthetic test data rather than independently
+reviewed runtime logs.
 
 ## Capability Matrix
 
 | Proposal capability | Status | Repository reality |
 | --- | --- | --- |
-| FastAPI defense gateway | Implemented for demo | `/api/v1/proxy/*` inspects and forwards traffic; configurable ML routing modes allow active hybrid or ML-only traffic decisions. |
-| Hybrid risk scoring | Implemented | Heuristic, hybrid, and ML-only live routing modes are fully supported via `ML_ROUTING_MODE`. Random Forest training, evaluation, and promotion readiness checks actively integrate ML predictions into live traffic decisions. |
-| Scikit-learn anomaly detection | Implemented | Scikit-learn Random Forest model training, inference, artifact review, and runtime ML scoring are fully integrated. |
-| Threat fingerprint matching | Implemented | Stable request fingerprints, persistent actor profiles, lightweight triage clusters, and assigned case workflows exist. |
-| Automated real/decoy routing | Implemented for demo | The proxy routes to separate real-app and decoy services using the configurable live decision engine. |
-| Fake endpoints and fake data | Implemented for demo | The isolated decoy service exposes static, synthetic responses without real secrets. |
-| Honeytoken detection | Implemented for demo | Configured decoy credential use and per-actor canary tokens are detected, stored, alerted, and shown on the dashboard; issued canary assignments are persisted without raw token values and can be revoked for operator review. |
-| PostgreSQL/Supabase storage | Implemented | Async PostgreSQL and Alembic are supported for events, alerts, honeytoken hits, and actor profiles. Supabase Cloud PostgreSQL pooler configuration is documented and tested (`.env.supabase.example`). |
-| Feature-vector storage | Implemented | Versioned request, bounded payload-shape, and optional CICIDS-style flow features are stored with events. Dataset, artifact, evaluation, and runtime paths reject stale feature contracts. |
-| CICIDS2017 dataset | Implemented | CICIDS-style single-CSV and directory adapters exist; local DDoS and full-directory CICIDS2017 splits have been prepared, reviewed, trained, and evaluated. |
-| Application-layer HTTP benchmark | Implemented | HTTP CSIC 2010 has been parsed, deduplicated, retrained with generic payload-shape features, and evaluated with checksum, feature-contract, and artifact-lineage controls. |
-| Custom API logs | Implemented | Production-like custom API log datasets (1,200 rows) are generated, reviewed with sanitization/provenance attestations, split, trained, and evaluated with 100% precision, recall, and F1. |
-| Precision/recall/F1/FPR evaluation | Implemented | The Random Forest trainer calculates all four metrics automatically. |
-| Real-time WebSocket dashboard | Implemented locally | A dedicated WebSocket sends immediate events/alerts and complete coalesced snapshots; each reconnect obtains a new 60-second signed ticket from an authenticated operator session, the gateway validates browser origin, and adaptive HTTP polling remains as reconciliation fallback. |
-| Security dashboard and alerts | Implemented locally | Live metrics, events, risk history, decoy status, actor triage, and internal alerts sit behind an eight-hour signed `HttpOnly` operator session. |
-| Adaptive decoy generation | Implemented | The in-process decoy API and redirected external decoy service select variants and issue epoch-rotatable per-actor synthetic canary tokens with operator revoke controls. |
-| Docker Compose | Locally verified | Compose, health checks, and Dockerfiles exist; local image build and service startup have been verified. |
-| Vercel/Railway/Supabase deployment | Implemented | Verified cloud deployment manifests are present: `apps/web/vercel.json` for Next.js, `railway.json` for multi-service stack, and `.env.supabase.example` for Supabase database connection. |
+| FastAPI defense gateway | Implemented for MVP | `/api/v1/proxy/*` inspects and forwards traffic through explicit guarded routes. It does not intercept arbitrary infrastructure traffic. |
+| Hybrid risk scoring | Partial | Explainable heuristic scoring is the safe default. Experimental `hybrid` and `ml_only` modes require both a reviewed artifact and explicit `ML_LIVE_ROUTING_APPROVED=true`. |
+| Scikit-learn anomaly detection | Partial | Random Forest training, evaluation, artifact lineage checks, and shadow inference exist. Runtime anomaly detection itself is still heuristic. |
+| Threat fingerprint matching | Implemented for MVP | Stable fingerprints, persistent actor profiles, lightweight triage clusters, and case workflows are available. |
+| Automated real/decoy routing | Implemented for MVP | The proxy routes allowed or monitored traffic to the demo app and suspicious traffic to the isolated decoy. |
+| Fake endpoints and fake data | Implemented for MVP | The decoy exposes synthetic responses and never needs real credentials. |
+| Honeytoken detection | Implemented for MVP | Configured decoy credentials and issued per-actor canaries are recorded, alerted, displayed, and revocable. |
+| PostgreSQL/Supabase storage | Partial | Async PostgreSQL and Alembic are implemented and Compose-tested. Supabase connection guidance exists, but no live Supabase deployment is verified. |
+| Feature-vector storage | Implemented | Versioned request and bounded payload-shape features are persisted with lineage and contract checks. |
+| CICIDS2017 dataset | Implemented as supporting benchmark | Local ignored CICIDS2017 splits have been prepared and evaluated. Their network-flow domain does not by itself validate API routing quality. |
+| Custom API logs | Partial | JSONL adapters, analyst-label export, runtime collection tooling, and deterministic synthetic fixtures exist. Real reviewed API logs and independent labels are still missing. |
+| Precision, recall, F1, and FPR | Implemented | Training and holdout tools calculate all four metrics. Results must be reported with their dataset and sample size. |
+| Real-time WebSocket dashboard | Implemented locally | Authenticated sessions, short-lived signed stream tickets, WebSocket snapshots, and polling reconciliation are implemented. |
+| Security dashboard and alerts | Implemented locally | Metrics, events, alerts, risk history, actor triage, and cases are protected by the operator session and server-side API bridge. |
+| Adaptive decoy generation | Partial | Route-aware variants and rotatable per-actor synthetic canaries exist; the decoy is template-driven rather than generative. |
+| Docker Compose | Locally verified | The five-service stack, health checks, Dockerfiles, and PostgreSQL migration startup are present. |
+| Vercel, Railway, and Supabase deployment | Configuration scaffold | Per-service manifests and environment guidance exist, but actual cloud provisioning, networking, migrations, and smoke tests remain to be completed. |
 
 ## Safe Claims
 
-The current codebase can accurately claim that MIRAGE:
+MIRAGE can accurately claim that it:
 
-- analyzes submitted metadata and requests on the guarded proxy route;
-- combines heuristic risk scoring, anomaly signals, and ML predictions in `hybrid` or `ml_only` mode;
-- automatically decides allow, monitor, or redirect-to-decoy;
-- forwards demo traffic to isolated real-app or static decoy services;
-- stores events, alerts, and ML-ready feature vectors;
-- uses the same bounded query-and-body payload feature contract across live proxy requests, custom API logs, and HTTP CSIC preparation;
-- supports `ML_ROUTING_MODE` (`heuristic`, `hybrid`, `ml_only`) to allow ML models to actively influence live traffic routing;
-- can review trained artifacts for feature-contract and metric readiness before promotion;
-- generates and reviews production-like custom API log datasets with 100% precision, recall, and F1 benchmark performance;
-- provides cloud deployment configurations for Vercel, Railway, and Supabase PostgreSQL poolers;
-- records and alerts on configured and per-actor issued decoy credential reuse as honeytoken hits;
-- generates adaptive decoy responses with epoch-rotatable synthetic per-actor canary tokens;
-- persists issued canary assignment records with hashed token values and supports operator revocation;
-- persists actor profiles from fingerprints, events, and honeytoken hits;
-- groups actor profiles into lightweight dashboard triage clusters;
-- recommends, assigns, filters, and persists investigation case workflows from actor clusters;
-- displays live backend data, actor clusters, and recommended triage cases on a session-protected dashboard with complete short-lived-ticket WebSocket snapshots.
+- demonstrates the proposal's core local request inspection, risk analysis,
+  decoy routing, logging, alerting, and dashboard flow;
+- keeps dashboard API credentials server-side and uses signed operator sessions
+  plus short-lived WebSocket tickets;
+- prepares, trains, evaluates, and reviews Random Forest artifacts with
+  precision, recall, F1, false-positive rate, and dataset lineage;
+- runs reviewed artifacts in shadow mode without changing routing by default;
+- provides experimental hybrid and ML-only routing behind a separate explicit
+  approval switch;
+- supports PostgreSQL locally and provides cloud configuration scaffolding.
 
-It should not yet claim arbitrary ingress interception, multi-analyst queues, or multi-operator token lifecycle approval workflows.
+It should not yet claim production readiness, validated cloud deployment,
+arbitrary ingress interception, production-quality custom API training data,
+or real-world ML accuracy. Metrics from deterministic synthetic fixtures must
+be labeled as pipeline validation, not model-quality evidence.
+
+## Remaining Proposal Work
+
+1. Collect sanitized runtime API logs from the MIRAGE proxy, define a human
+   review protocol, and produce independently reviewed normal/suspicious labels.
+2. Train and evaluate a candidate on that API-domain dataset with a separate
+   holdout, then observe it in shadow mode against representative traffic.
+3. Approve active hybrid routing only after dataset, artifact, false-positive,
+   and shadow-observation gates pass; keep `ml_only` experimental.
+4. Provision Vercel, Railway, and Supabase, run migrations, verify private and
+   public networking, and execute an end-to-end HTTPS/WSS smoke test.
