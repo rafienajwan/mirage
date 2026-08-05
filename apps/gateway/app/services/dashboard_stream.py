@@ -161,7 +161,7 @@ async def broadcast_dashboard_snapshot() -> None:
 
 async def build_dashboard_snapshot() -> dict[str, Any]:
     """Build the initial dashboard WebSocket snapshot payload."""
-    recent_events = await store.get_recent_events(limit=20)
+    recent_events = await store.get_recent_events(limit=50)
     recent_alerts = await store.get_alerts(limit=20)
     labeled_events = await store.get_labeled_events(limit=10000)
     last_decoy_trigger = await store.get_last_decoy_trigger()

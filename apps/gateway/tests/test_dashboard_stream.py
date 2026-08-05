@@ -284,6 +284,34 @@ async def test_dashboard_stream_snapshot_includes_dashboard_metrics(monkeypatch)
 
 
 @pytest.mark.asyncio
+async def test_dashboard_stream_snapshot_keeps_full_recent_event_window(monkeypatch):
+    memory_store = MemoryStore()
+    for index in range(51):
+        await memory_store.add_event(
+            EventRecord(
+                event_id=f"evt-{index}",
+                timestamp=utcnow(),
+                ip_address="10.0.0.1",
+                path=f"/api/items/{index}",
+                method="GET",
+                risk_score=5.0,
+                decision=Decision.ALLOW,
+                event_type="inspection",
+            )
+        )
+
+    monkeypatch.setattr(dashboard_stream, "store", memory_store)
+    monkeypatch.setattr(actor_profiles, "store", memory_store)
+    monkeypatch.setattr(actor_clusters, "store", memory_store)
+
+    snapshot = await dashboard_stream.build_dashboard_snapshot()
+
+    assert len(snapshot["events"]) == 50
+    assert snapshot["events"][0]["event_id"] == "evt-50"
+    assert snapshot["events"][-1]["event_id"] == "evt-1"
+
+
+@pytest.mark.asyncio
 async def test_snapshot_refresh_coalesces_while_build_is_running():
     started = asyncio.Event()
     release = asyncio.Event()
