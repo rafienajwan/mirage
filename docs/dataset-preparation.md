@@ -191,7 +191,10 @@ The finalizer verifies the queue SHA-256, requires every queued ID to appear in
 the analyst-labeled dashboard export, requires both binary classes, filters out
 unrelated historical events, and emits only the feature vector plus manual
 label fields. The summary records the collection window, class counts, queue
-hash, and output dataset hash.
+hash, and output dataset hash. Hash-bound queue and dataset files are written as
+exact UTF-8 bytes with LF line endings, so their recorded SHA-256 values remain
+stable across Windows and Linux. Verify the byte-level hashes before preparing
+or training from a finalized batch.
 
 The older collector below assigns deterministic scenario labels automatically.
 Use it only to validate API, labeling, and export plumbing, never as independent
