@@ -158,9 +158,44 @@ Review `data/prepared/runtime-v1/manifest.json` before training or enabling an
 artifact in shadow mode. It records row counts, label balance, split ratio,
 seed, feature names, and generated files.
 
-For repeatable local API-domain collection, run the collector against a running
-gateway. It submits deterministic normal and suspicious API requests, labels the
-resulting dashboard events, and exports the same reviewed training JSONL:
+For proposal-aligned staging collection, run the manual-review collector
+against a running gateway. It sends 20 normal and 20 suspicious requests through
+the real proxy path but does not attach or submit any labels:
+
+```bash
+cd apps/gateway
+python scripts/collect_runtime_review_batch.py \
+  --base-url http://localhost:8000 \
+  --normal-count 20 \
+  --suspicious-count 20 \
+  --queue-output data/raw/runtime/manual-review-queue.json \
+  --manifest-output data/raw/runtime/manual-review-manifest.json
+```
+
+The operator API key is read from `MIRAGE_API_KEY`. It is used only to read the
+dashboard event queue and is never forwarded through the protected proxy. The
+queue contains only event ID, timestamp, method, and path; it omits expected
+labels, IP addresses, risk decisions, payloads, and credentials. Existing queue
+or manifest files must be archived before another collection can start. Review
+all queued event IDs in the operator dashboard. Once the labels have been
+checked and the batch is approved for training, finalize it explicitly:
+
+```bash
+python scripts/finalize_runtime_review_batch.py \
+  --approved-for-training \
+  --output data/raw/runtime/manual-reviewed-events.jsonl \
+  --summary-output data/raw/runtime/manual-reviewed-summary.json
+```
+
+The finalizer verifies the queue SHA-256, requires every queued ID to appear in
+the analyst-labeled dashboard export, requires both binary classes, filters out
+unrelated historical events, and emits only the feature vector plus manual
+label fields. The summary records the collection window, class counts, queue
+hash, and output dataset hash.
+
+The older collector below assigns deterministic scenario labels automatically.
+Use it only to validate API, labeling, and export plumbing, never as independent
+human-reviewed model-quality evidence:
 
 ```bash
 cd apps/gateway
@@ -174,8 +209,8 @@ python scripts/collect_api_domain_training_data.py \
 ```
 
 The generated files should stay in ignored local `data/` paths unless they have
-been reviewed and explicitly approved for publication. Use the exported JSONL
-with `--source mirage-jsonl` because it already contains MIRAGE feature vectors.
+been reviewed and explicitly approved for publication. Both collector outputs
+use `--source mirage-jsonl` because they already contain MIRAGE feature vectors.
 
 When a running gateway is not available, use the deterministic API-domain
 fixture generator to exercise the same custom API-log adapter path locally:

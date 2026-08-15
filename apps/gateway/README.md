@@ -152,6 +152,31 @@ must include a feature vector. A first local training run is considered ready
 after at least 20 exportable rows exist and each binary class has at least two
 rows for stratified splitting.
 
+To collect a proposal-aligned staging batch without automatic labels, keep the
+Compose stack running and execute:
+
+```bash
+python scripts/collect_runtime_review_batch.py \
+  --base-url http://localhost:8000 \
+  --normal-count 20 \
+  --suspicious-count 20
+```
+
+The command reads `MIRAGE_API_KEY` from the environment, sends all traffic
+through `/api/v1/proxy/*`, and writes an ignored queue and hash manifest under
+`data/raw/runtime/`. It never calls the dashboard label endpoint. Review every
+queued event in the dashboard, then explicitly approve and finalize the exact
+batch:
+
+```bash
+python scripts/finalize_runtime_review_batch.py --approved-for-training
+```
+
+Finalization fails if the queue hash changed, any queued event lacks an
+exportable analyst label, or the reviewed batch contains only one binary class.
+The older `collect_api_domain_training_data.py` command assigns scenario labels
+automatically and is only for deterministic pipeline validation.
+
 ## Known Limitations
 
 - proxy coverage is limited to `/api/v1/proxy/*`;

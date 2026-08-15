@@ -14,9 +14,9 @@ not a verified production deployment.
 The ML pipeline is implemented for dataset preparation, Random Forest
 training, evaluation, artifact review, and runtime shadow scoring. Live ML
 routing remains an experimental capability and is disabled by default. The
-proposal's custom API-log requirement is still incomplete because the current
-API-domain data is deterministic synthetic test data rather than independently
-reviewed runtime logs.
+proposal's custom API-log requirement is still incomplete. A hash-bound manual
+review workflow now exists, but its first independently reviewed runtime batch
+has not yet been completed and evaluated.
 
 ## Capability Matrix
 
@@ -32,7 +32,7 @@ reviewed runtime logs.
 | PostgreSQL/Supabase storage | Partial | Async PostgreSQL and Alembic are implemented and Compose-tested. Supabase connection guidance exists, but no live Supabase deployment is verified. |
 | Feature-vector storage | Implemented | Versioned request and bounded payload-shape features are persisted with lineage and contract checks. |
 | CICIDS2017 dataset | Implemented as supporting benchmark | Local ignored CICIDS2017 splits have been prepared and evaluated. Their network-flow domain does not by itself validate API routing quality. |
-| Custom API logs | Partial | JSONL adapters, analyst-label export, runtime collection tooling, and deterministic synthetic fixtures exist. Real reviewed API logs and independent labels are still missing. |
+| Custom API logs | Partial | JSONL adapters, analyst-label export, a hash-bound manual runtime review workflow, and deterministic synthetic fixtures exist. The first completed and evaluated independently labeled runtime batch is still pending. |
 | Precision, recall, F1, and FPR | Implemented | Training and holdout tools calculate all four metrics. Results must be reported with their dataset and sample size. |
 | Real-time WebSocket dashboard | Implemented locally | Authenticated sessions, short-lived signed stream tickets, WebSocket snapshots, and polling reconciliation are implemented. |
 | Security dashboard and alerts | Implemented locally | Metrics, events, alerts, risk history, actor triage, and cases are protected by the operator session and server-side API bridge. |
@@ -62,8 +62,8 @@ be labeled as pipeline validation, not model-quality evidence.
 
 ## Remaining Proposal Work
 
-1. Collect sanitized runtime API logs from the MIRAGE proxy, define a human
-   review protocol, and produce independently reviewed normal/suspicious labels.
+1. Run the 40-event staging collection, independently label every queued event
+   in the dashboard, finalize the hash-bound batch, and review its class balance.
 2. Train and evaluate a candidate on that API-domain dataset with a separate
    holdout, then observe it in shadow mode against representative traffic.
 3. Approve active hybrid routing only after dataset, artifact, false-positive,

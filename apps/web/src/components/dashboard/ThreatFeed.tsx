@@ -111,11 +111,17 @@ export default function ThreatFeed({
                           onLabel(event.id, item.target.value as AnalystLabel);
                         }
                       }}
-                      className="mt-1 w-fit max-w-full rounded border border-white/10 bg-white/5 px-2 py-1 text-[8px] font-mono uppercase text-white/55 outline-none transition-colors hover:border-white/20 disabled:cursor-wait disabled:opacity-40"
+                      className="mt-1 w-fit max-w-full rounded border border-white/10 bg-bg-dark-navy px-2 py-1 text-[8px] font-mono uppercase text-white/70 outline-none scheme-dark transition-colors hover:border-white/20 disabled:cursor-wait disabled:opacity-40"
                     >
-                      <option value="">Unlabeled</option>
+                      <option value="" className="bg-bg-dark-navy text-white/70">
+                        Unlabeled
+                      </option>
                       {analystLabels.map((item) => (
-                        <option key={item.value} value={item.value}>
+                        <option
+                          key={item.value}
+                          value={item.value}
+                          className="bg-bg-dark-navy text-white"
+                        >
                           {item.label}
                         </option>
                       ))}
