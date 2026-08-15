@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 
@@ -26,6 +27,12 @@ def serialize_review_queue(queue: dict[str, Any]) -> str:
 
 def sha256_text(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def write_text_exact(path: Path, content: str) -> None:
+    """Write canonical UTF-8 bytes without platform newline translation."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(content.encode("utf-8"))
 
 
 def _parse_export_rows(export_jsonl: str) -> dict[str, dict[str, Any]]:

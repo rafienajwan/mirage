@@ -13,6 +13,7 @@ import httpx
 from app.ml.runtime_review_batch import (
     FinalizedReviewBatch,
     finalize_review_batch,
+    write_text_exact,
 )
 
 
@@ -86,11 +87,6 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-def _write_text(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
-
-
 async def run(args: argparse.Namespace) -> FinalizedReviewBatch:
     queue_text = args.queue.read_text(encoding="utf-8")
     manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
@@ -103,8 +99,8 @@ async def run(args: argparse.Namespace) -> FinalizedReviewBatch:
             manifest=manifest,
             approved_for_training=args.approved_for_training,
         )
-    _write_text(args.output, result.export_jsonl)
-    _write_text(
+    write_text_exact(args.output, result.export_jsonl)
+    write_text_exact(
         args.summary_output,
         json.dumps(result.summary, indent=2, sort_keys=True) + "\n",
     )
