@@ -17,8 +17,9 @@ routing remains an experimental capability and is disabled by default. The
 proposal's custom API-log requirement is still incomplete at representative
 scale. The first hash-bound runtime batch has been independently reviewed and
 finalized with 40 events split evenly between normal and suspicious labels.
-Candidate training, holdout evaluation, and representative shadow observation
-on that batch are still pending.
+A pilot candidate has been trained and evaluated, but a varied local shadow
+observation reached only `0.642857` agreement and monitored all 15 normal
+requests. The artifact remains local and shadow-only.
 
 ## Capability Matrix
 
@@ -34,7 +35,7 @@ on that batch are still pending.
 | PostgreSQL/Supabase storage | Partial | Async PostgreSQL and Alembic are implemented and Compose-tested. Supabase connection guidance exists, but no live Supabase deployment is verified. |
 | Feature-vector storage | Implemented | Versioned request and bounded payload-shape features are persisted with lineage and contract checks. |
 | CICIDS2017 dataset | Implemented as supporting benchmark | Local ignored CICIDS2017 splits have been prepared and evaluated. Their network-flow domain does not by itself validate API routing quality. |
-| Custom API logs | Partial | JSONL adapters, analyst-label export, a hash-bound manual runtime review workflow, and deterministic synthetic fixtures exist. The first independently labeled batch contains 40 complete feature vectors with 20 normal and 20 suspicious labels; larger representative collection and evaluation are still required. |
+| Custom API logs | Partial | JSONL adapters, analyst-label export, a hash-bound manual runtime review workflow, and deterministic synthetic fixtures exist. The first independently labeled 40-row batch has been trained and evaluated as a shadow-only pilot; larger representative collection is still required. |
 | Precision, recall, F1, and FPR | Implemented | Training and holdout tools calculate all four metrics. Results must be reported with their dataset and sample size. |
 | Real-time WebSocket dashboard | Implemented locally | Authenticated sessions, short-lived signed stream tickets, WebSocket snapshots, and polling reconciliation are implemented. |
 | Security dashboard and alerts | Implemented locally | Metrics, events, alerts, risk history, actor triage, and cases are protected by the operator session and server-side API bridge. |
@@ -64,12 +65,11 @@ be labeled as pipeline validation, not model-quality evidence.
 
 ## Remaining Proposal Work
 
-1. Train and evaluate a pilot candidate on the completed 40-event API-domain
-   dataset using a separate holdout, then observe it in shadow mode against
-   representative traffic.
-2. Collect additional independently reviewed runtime batches until the
-   promotion dataset minimum of 1,000 rows is met with representative traffic
-   and acceptable class coverage.
+1. Collect additional independently reviewed runtime batches until the
+   promotion dataset minimum of 1,000 rows is met, emphasizing diverse normal
+   and borderline traffic as well as suspicious requests.
+2. Retrain with a representative holdout and collect at least 500 shadow events
+   with acceptable false-positive impact and the configured agreement gate.
 3. Approve active hybrid routing only after dataset, artifact, false-positive,
    and shadow-observation gates pass; keep `ml_only` experimental.
 4. Provision Vercel, Railway, and Supabase, run migrations, verify private and

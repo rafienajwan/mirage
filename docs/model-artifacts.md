@@ -357,6 +357,10 @@ python scripts/observe_ml_shadow.py \
   --summary-output .tmp/ml-shadow-observation-summary.json
 ```
 
+The script reads `MIRAGE_API_KEY` automatically when the dashboard API is
+protected. Pass `--api-key` only when an explicit override is needed. The key is
+sent in the `X-Mirage-API-Key` header and is never written to observation files.
+
 The JSONL output is append-only and intended for local review. Keep it ignored
 unless it has been sanitized and intentionally promoted to documentation. The
 summary output reports sample count, artifact modes observed, shadow-ready
@@ -505,6 +509,68 @@ suspicious smoke request.
 This is a pipeline validation artifact only. Because the fixture is
 deterministic and small, it should not be used to claim production ML quality or
 model-controlled routing.
+
+## Analyst-Reviewed Runtime Pilot
+
+The first independently labeled runtime batch was finalized locally with 40
+events: 20 normal and 20 suspicious. Every row contains the version 2 feature
+contract, and the finalized JSONL SHA-256 matches its hash-bound summary. Raw,
+prepared, observation, and artifact files remain under ignored local paths.
+
+Preparation produced a deterministic 30-row training split and a separate
+10-row holdout, each balanced by class. Dataset review passed with no blockers
+and the expected small-dataset warning.
+
+```bash
+cd apps/gateway
+python scripts/prepare_dataset.py \
+  --source mirage-jsonl \
+  --input data/raw/runtime/manual-reviewed-events.jsonl \
+  --output-dir data/prepared/runtime-manual-v1 \
+  --dataset-name runtime-manual-review \
+  --dataset-version v1 \
+  --train-ratio 0.75 \
+  --seed 42
+python scripts/review_dataset.py \
+  --manifest data/prepared/runtime-manual-v1/manifest.json \
+  --min-total-rows 40 \
+  --min-train-rows 30 \
+  --min-test-rows 10 \
+  --min-rows-per-class 10
+```
+
+The candidate artifact was trained with manifest-bound split lineage. Its
+internal 22/8 validation and external 10-row holdout both reported precision,
+recall, and F1 of `1.0` with a false-positive rate of `0.0`. Those metrics are
+not production-quality evidence: the holdout contains only five rows per class
+and comes from the same small collection procedure.
+
+Artifact review returned `shadow_ready: true` with the small-dataset warning.
+Runtime checks were less optimistic:
+
+| Signal | Smoke run | Varied local observation |
+| --- | ---: | ---: |
+| Shadow events | 2 | 42 |
+| Agreements | 1 | 27 |
+| Disagreements | 1 | 15 |
+| Agreement rate | 0.5 | 0.642857 |
+| Live allow decisions | 1 | 15 |
+| Live monitor decisions | 0 | 10 |
+| Live redirects | 1 | 17 |
+| Shadow allow decisions | 1 | 0 |
+| Shadow monitor decisions | 1 | 25 |
+| Shadow redirects | 0 | 17 |
+
+The smoke attack received suspicious probability `0.61`, below the `0.65`
+redirect threshold, so the model monitored a request that the heuristic
+redirected. In the varied observation, all 15 normal requests were raised from
+live `allow` to shadow `monitor` at or above the `0.35` monitor threshold. This
+negative evidence outweighs the perfect tiny holdout metrics. Keep this
+artifact local and shadow-only; do not enable `hybrid` or `ml_only` routing.
+
+The next dataset must add independently reviewed normal and borderline traffic,
+reach the configured 1,000-row promotion minimum, and accumulate at least 500
+shadow events before another promotion review.
 
 ## Retrain From Analyst Labels
 

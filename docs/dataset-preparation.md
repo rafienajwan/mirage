@@ -196,6 +196,28 @@ exact UTF-8 bytes with LF line endings, so their recorded SHA-256 values remain
 stable across Windows and Linux. Verify the byte-level hashes before preparing
 or training from a finalized batch.
 
+Prepare the finalized analyst-reviewed batch as a deterministic pilot split:
+
+```bash
+python scripts/prepare_dataset.py \
+  --source mirage-jsonl \
+  --input data/raw/runtime/manual-reviewed-events.jsonl \
+  --output-dir data/prepared/runtime-manual-v1 \
+  --dataset-name runtime-manual-review \
+  --dataset-version v1 \
+  --train-ratio 0.75 \
+  --seed 42
+python scripts/review_dataset.py \
+  --manifest data/prepared/runtime-manual-v1/manifest.json \
+  --min-total-rows 40 \
+  --min-train-rows 30 \
+  --min-test-rows 10 \
+  --min-rows-per-class 10
+```
+
+These thresholds validate the 40-row pilot pipeline only. They do not replace
+the configured promotion minimums for representative training data.
+
 The older collector below assigns deterministic scenario labels automatically.
 Use it only to validate API, labeling, and export plumbing, never as independent
 human-reviewed model-quality evidence:
