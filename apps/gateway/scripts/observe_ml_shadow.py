@@ -25,6 +25,11 @@ def parse_args() -> argparse.Namespace:
         help="Gateway base URL. Defaults to MIRAGE_GATEWAY_URL or localhost:8000.",
     )
     parser.add_argument(
+        "--api-key",
+        default=os.environ.get("MIRAGE_API_KEY"),
+        help="Operator API key. Defaults to MIRAGE_API_KEY when configured.",
+    )
+    parser.add_argument(
         "--samples",
         type=int,
         default=10,
@@ -94,14 +99,18 @@ async def fetch_observation_snapshot(
     *,
     base_url: str,
     limit: int,
+    api_key: str | None = None,
 ) -> dict[str, Any]:
     """Fetch and normalize one ML shadow status/summary observation."""
+    headers = {"X-Mirage-API-Key": api_key} if api_key else {}
     status_response = await client.get(
-        _endpoint(base_url, "/api/v1/dashboard/ml-shadow/status")
+        _endpoint(base_url, "/api/v1/dashboard/ml-shadow/status"),
+        headers=headers,
     )
     status_response.raise_for_status()
     summary_response = await client.get(
-        _endpoint(base_url, f"/api/v1/dashboard/ml-shadow/summary?limit={limit}")
+        _endpoint(base_url, f"/api/v1/dashboard/ml-shadow/summary?limit={limit}"),
+        headers=headers,
     )
     summary_response.raise_for_status()
     return build_observation_record(
@@ -118,6 +127,7 @@ async def collect_observations(args: argparse.Namespace) -> dict[str, Any]:
                 client,
                 base_url=args.base_url,
                 limit=args.limit,
+                api_key=args.api_key,
             )
             records.append(record)
             if args.output:
