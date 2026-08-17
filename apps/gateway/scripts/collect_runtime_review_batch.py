@@ -13,7 +13,11 @@ from pathlib import Path
 
 import httpx
 
-from app.ml.runtime_review_batch import serialize_review_queue, sha256_text
+from app.ml.runtime_review_batch import (
+    serialize_review_queue,
+    sha256_text,
+    write_text_exact,
+)
 
 
 @dataclass(frozen=True)
@@ -204,11 +208,6 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-def _write_text(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
-
-
 def ensure_outputs_available(*paths: Path) -> None:
     """Protect an in-progress manual review from accidental replacement."""
     existing = [str(path) for path in paths if path.exists()]
@@ -233,8 +232,8 @@ async def run(args: argparse.Namespace) -> tuple[dict, dict]:
             scenarios=scenarios,
             batch_id=args.batch_id,
         )
-    _write_text(args.queue_output, serialize_review_queue(queue))
-    _write_text(
+    write_text_exact(args.queue_output, serialize_review_queue(queue))
+    write_text_exact(
         args.manifest_output,
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
     )

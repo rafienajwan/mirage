@@ -12,13 +12,28 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from app.ml.runtime_review_batch import finalize_review_batch  # noqa: E402
+from app.ml.runtime_review_batch import (  # noqa: E402
+    finalize_review_batch,
+    write_text_exact,
+)
 from collect_runtime_review_batch import (  # noqa: E402
     build_proxy_scenarios,
     collect_review_batch,
     ensure_outputs_available,
 )
 from finalize_runtime_review_batch import fetch_finalized_review_batch  # noqa: E402
+
+
+def test_hash_bound_text_is_written_as_exact_utf8_bytes(tmp_path):
+    content = '{"label": 0}\n{"label": 1}\n'
+    output = tmp_path / "nested" / "reviewed-events.jsonl"
+
+    write_text_exact(output, content)
+
+    assert output.read_bytes() == content.encode("utf-8")
+    assert hashlib.sha256(output.read_bytes()).hexdigest() == hashlib.sha256(
+        content.encode("utf-8")
+    ).hexdigest()
 
 
 @pytest.mark.asyncio
