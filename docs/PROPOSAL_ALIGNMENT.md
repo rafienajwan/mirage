@@ -19,7 +19,9 @@ scale. The first hash-bound runtime batch has been independently reviewed and
 finalized with 40 events split evenly between normal and suspicious labels.
 A pilot candidate has been trained and evaluated, but a varied local shadow
 observation reached only `0.642857` agreement and monitored all 15 normal
-requests. The artifact remains local and shadow-only.
+requests. The artifact remains local and shadow-only. Multi-batch collection
+now supports unlabeled borderline scenarios and hash-verified aggregation, but
+no additional analyst-reviewed rows have been claimed yet.
 
 ## Capability Matrix
 
@@ -35,7 +37,7 @@ requests. The artifact remains local and shadow-only.
 | PostgreSQL/Supabase storage | Partial | Async PostgreSQL and Alembic are implemented and Compose-tested. Supabase connection guidance exists, but no live Supabase deployment is verified. |
 | Feature-vector storage | Implemented | Versioned request and bounded payload-shape features are persisted with lineage and contract checks. |
 | CICIDS2017 dataset | Implemented as supporting benchmark | Local ignored CICIDS2017 splits have been prepared and evaluated. Their network-flow domain does not by itself validate API routing quality. |
-| Custom API logs | Partial | JSONL adapters, analyst-label export, a hash-bound manual runtime review workflow, and deterministic synthetic fixtures exist. The first independently labeled 40-row batch has been trained and evaluated as a shadow-only pilot; larger representative collection is still required. |
+| Custom API logs | Partial | JSONL adapters, analyst-label export, hash-bound manual runtime review, deterministic multi-batch aggregation, and synthetic fixtures exist. The first independently labeled 40-row batch has been trained and evaluated as a shadow-only pilot; collection still needs to reach 1,000 representative analyst-reviewed rows. |
 | Precision, recall, F1, and FPR | Implemented | Training and holdout tools calculate all four metrics. Results must be reported with their dataset and sample size. |
 | Real-time WebSocket dashboard | Implemented locally | Authenticated sessions, short-lived signed stream tickets, WebSocket snapshots, and polling reconciliation are implemented. |
 | Security dashboard and alerts | Implemented locally | Metrics, events, alerts, risk history, actor triage, and cases are protected by the operator session and server-side API bridge. |
@@ -67,7 +69,8 @@ be labeled as pipeline validation, not model-quality evidence.
 
 1. Collect additional independently reviewed runtime batches until the
    promotion dataset minimum of 1,000 rows is met, emphasizing diverse normal
-   and borderline traffic as well as suspicious requests.
+   and borderline traffic as well as suspicious requests. Use the hash-verified
+   multi-batch workflow and do not treat scenario categories as labels.
 2. Retrain with a representative holdout and collect at least 500 shadow events
    with acceptable false-positive impact and the configured agreement gate.
 3. Approve active hybrid routing only after dataset, artifact, false-positive,
