@@ -20,6 +20,110 @@ class FinalizedReviewBatch:
     summary: dict[str, Any]
 
 
+def aggregate_review_batches(
+    batches: list[FinalizedReviewBatch],
+) -> FinalizedReviewBatch:
+    """Combine independently reviewed batches into one training dataset."""
+    if not batches:
+        raise ValueError("at least one reviewed batch is required")
+    if any(not isinstance(batch.summary, dict) for batch in batches):
+        raise ValueError("reviewed batch summary must be an object")
+
+    ordered_batches = sorted(
+        batches,
+        key=lambda batch: str(batch.summary.get("batch_id", "")),
+    )
+    seen_batch_ids: set[str] = set()
+    seen_event_ids: set[str] = set()
+    combined_rows: list[dict[str, Any]] = []
+    source_batches: list[dict[str, Any]] = []
+    total_label_counts = {"0": 0, "1": 0}
+
+    for batch in ordered_batches:
+        summary = batch.summary
+        batch_id = summary.get("batch_id")
+        if not isinstance(batch_id, str) or not batch_id:
+            raise ValueError("reviewed batch has no batch_id")
+        if batch_id in seen_batch_ids:
+            raise ValueError(f"duplicate batch_id: {batch_id}")
+        seen_batch_ids.add(batch_id)
+
+        if summary.get("schema_version") != 1:
+            raise ValueError(f"batch {batch_id} has an unsupported schema")
+        if summary.get("approved_for_training") is not True:
+            raise ValueError(f"batch {batch_id} is not approved for training")
+        if summary.get("labeling_method") != "analyst-reviewed-dashboard":
+            raise ValueError(f"batch {batch_id} was not independently analyst-reviewed")
+
+        actual_hash = sha256_text(batch.export_jsonl)
+        if summary.get("dataset_sha256") != actual_hash:
+            raise ValueError(f"batch {batch_id} dataset SHA-256 does not match")
+
+        rows_by_id = _parse_export_rows(batch.export_jsonl)
+        if summary.get("event_count") != len(rows_by_id):
+            raise ValueError(f"batch {batch_id} event count does not match")
+
+        batch_label_counts = {"0": 0, "1": 0}
+        for event_id, row in rows_by_id.items():
+            if set(row) != set(_EXPORTED_FIELDS):
+                raise ValueError(
+                    f"batch {batch_id} contains unsanitized event {event_id}"
+                )
+            label = row.get("label")
+            if label not in (0, 1):
+                raise ValueError(
+                    f"batch {batch_id} has an invalid label for {event_id}"
+                )
+            analyst_label = row.get("analyst_label")
+            if not isinstance(analyst_label, str) or not analyst_label:
+                raise ValueError(
+                    f"batch {batch_id} has no analyst label for {event_id}"
+                )
+            features = row.get("features")
+            if not isinstance(features, dict) or not features:
+                raise ValueError(
+                    f"batch {batch_id} has a missing feature vector for {event_id}"
+                )
+            if event_id in seen_event_ids:
+                raise ValueError(f"duplicate event_id across batches: {event_id}")
+            seen_event_ids.add(event_id)
+            batch_label_counts[str(label)] += 1
+            total_label_counts[str(label)] += 1
+            combined_rows.append(row)
+
+        if summary.get("label_counts") != batch_label_counts:
+            raise ValueError(f"batch {batch_id} label counts do not match")
+        source_batches.append(
+            {
+                "batch_id": batch_id,
+                "event_count": len(rows_by_id),
+                "label_counts": batch_label_counts,
+                "dataset_sha256": actual_hash,
+            }
+        )
+
+    if 0 in total_label_counts.values():
+        raise ValueError("aggregated dataset must contain both binary classes")
+
+    aggregate_jsonl = "".join(
+        f"{json.dumps(row, sort_keys=True)}\n" for row in combined_rows
+    )
+    aggregate_summary = {
+        "schema_version": 1,
+        "labeling_method": "analyst-reviewed-dashboard",
+        "approved_for_training": True,
+        "batch_count": len(source_batches),
+        "event_count": len(combined_rows),
+        "label_counts": total_label_counts,
+        "source_batches": source_batches,
+        "dataset_sha256": sha256_text(aggregate_jsonl),
+    }
+    return FinalizedReviewBatch(
+        export_jsonl=aggregate_jsonl,
+        summary=aggregate_summary,
+    )
+
+
 def serialize_review_queue(queue: dict[str, Any]) -> str:
     """Return the canonical on-disk representation used for hash validation."""
     return json.dumps(queue, indent=2, sort_keys=True) + "\n"
@@ -103,7 +207,11 @@ def finalize_review_batch(
         raise ValueError("review batch must contain at least one event")
 
     exported_by_id = _parse_export_rows(export_jsonl)
-    missing = [entry["event_id"] for entry in entries if entry["event_id"] not in exported_by_id]
+    missing = [
+        entry["event_id"]
+        for entry in entries
+        if entry["event_id"] not in exported_by_id
+    ]
     if missing:
         raise ValueError(
             "manual labels or feature vectors are missing for: " + ", ".join(missing)
