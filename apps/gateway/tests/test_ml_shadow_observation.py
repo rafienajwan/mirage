@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import httpx
+import pytest
+
 from app.services.ml_shadow_observation import (
     build_observation_record,
     summarize_observation_records,
 )
+from scripts.observe_ml_shadow import fetch_observation_snapshot
 
 
 def _status(mode: str = "shadow_ready") -> dict:
@@ -40,6 +44,36 @@ def _summary(
         "live_decisions": {"allow": 1, "monitor": 2, "redirect_to_decoy": 3},
         "shadow_decisions": {"allow": 3, "monitor": 2, "redirect_to_decoy": 1},
     }
+
+
+@pytest.mark.asyncio
+async def test_fetch_observation_snapshot_sends_operator_api_key():
+    requested_paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.headers.get("X-Mirage-API-Key") == "operator-key"
+        requested_paths.append(request.url.path)
+        if request.url.path.endswith("/status"):
+            return httpx.Response(200, json=_status())
+        return httpx.Response(
+            200,
+            json=_summary(shadow_events=2, agreements=1, disagreements=1),
+        )
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+        record = await fetch_observation_snapshot(
+            client,
+            base_url="http://test",
+            limit=200,
+            api_key="operator-key",
+        )
+
+    assert requested_paths == [
+        "/api/v1/dashboard/ml-shadow/status",
+        "/api/v1/dashboard/ml-shadow/summary",
+    ]
+    assert record["shadow_events"] == 2
 
 
 def test_build_observation_record_normalizes_rates_and_decision_counts():
