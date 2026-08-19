@@ -22,6 +22,7 @@ from collect_runtime_review_batch import (  # noqa: E402
     build_proxy_scenarios,
     collect_review_batch,
     ensure_outputs_available,
+    parse_args,
 )
 from aggregate_runtime_review_batches import aggregate_batch_files  # noqa: E402
 from finalize_runtime_review_batch import fetch_finalized_review_batch  # noqa: E402
@@ -86,6 +87,28 @@ def test_collector_builds_distinct_borderline_requests_without_labels():
     assert scenarios[1].path.startswith("/api/search?")
     assert scenarios[2].headers["User-Agent"] == "curl/8.0 MIRAGE-Staging-Review"
     assert all(not hasattr(scenario, "expected_label") for scenario in scenarios)
+
+
+def test_collector_rejects_batches_larger_than_dashboard_feed(monkeypatch, capsys):
+    monkeypatch.setenv("MIRAGE_API_KEY", "private-local-key")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "collect_runtime_review_batch.py",
+            "--normal-count",
+            "20",
+            "--borderline-count",
+            "11",
+            "--suspicious-count",
+            "20",
+        ],
+    )
+
+    with pytest.raises(SystemExit):
+        parse_args()
+
+    assert "50-event dashboard feed" in capsys.readouterr().err
 
 
 def test_aggregator_combines_hash_bound_batches_in_deterministic_order():
@@ -229,7 +252,7 @@ async def test_collector_creates_unlabeled_queue_without_calling_label_endpoint(
 
     scenarios = build_proxy_scenarios(
         normal_count=1,
-        borderline_count=0,
+        borderline_count=1,
         suspicious_count=1,
     )
     transport = httpx.MockTransport(handler)
@@ -242,14 +265,19 @@ async def test_collector_creates_unlabeled_queue_without_calling_label_endpoint(
             batch_id="runtime-20260805",
         )
 
-    assert request_methods == ["GET", "GET", "POST", "GET"]
-    assert [entry["event_id"] for entry in queue["entries"]] == ["evt-1", "evt-2"]
+    assert request_methods == ["GET", "GET", "GET", "POST", "GET"]
+    assert [entry["event_id"] for entry in queue["entries"]] == [
+        "evt-1",
+        "evt-2",
+        "evt-3",
+    ]
+    assert queue["entries"][1]["path"] == "/api/search"
     assert set(queue["entries"][0]) == {"event_id", "timestamp", "method", "path"}
     serialized = json.dumps(queue)
     assert "private-local-key" not in serialized
     assert "analyst_label" not in serialized
     assert "expected_label" not in serialized
-    assert manifest["event_count"] == 2
+    assert manifest["event_count"] == 3
     assert (
         manifest["queue_sha256"]
         == hashlib.sha256(

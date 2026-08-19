@@ -10,6 +10,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -98,13 +99,14 @@ def _find_new_event(
     scenario: ProxyScenario,
     used_event_ids: set[str],
 ) -> dict | None:
+    scenario_path = urlsplit(scenario.path).path
     for event in events:
         event_id = event.get("event_id")
         if (
             isinstance(event_id, str)
             and event_id not in used_event_ids
             and str(event.get("method", "")).upper() == scenario.method.upper()
-            and event.get("path") == scenario.path
+            and event.get("path") == scenario_path
         ):
             return event
     return None
@@ -192,7 +194,7 @@ def parse_args() -> argparse.Namespace:
         help="Operator API key. Defaults to MIRAGE_API_KEY.",
     )
     parser.add_argument("--normal-count", type=int, default=20)
-    parser.add_argument("--borderline-count", type=int, default=20)
+    parser.add_argument("--borderline-count", type=int, default=10)
     parser.add_argument("--suspicious-count", type=int, default=20)
     parser.add_argument("--batch-id", default=f"runtime-{uuid.uuid4().hex[:12]}")
     parser.add_argument(
@@ -213,8 +215,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("normal and suspicious counts must each be at least 1")
     if args.borderline_count < 0:
         parser.error("borderline count cannot be negative")
-    if args.normal_count + args.borderline_count + args.suspicious_count > 100:
-        parser.error("review batches are limited to 100 events")
+    if args.normal_count + args.borderline_count + args.suspicious_count > 50:
+        parser.error("review batches are limited to the 50-event dashboard feed")
     if args.timeout_seconds <= 0:
         parser.error("--timeout-seconds must be greater than 0")
     return args
