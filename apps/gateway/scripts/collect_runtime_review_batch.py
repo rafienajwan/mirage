@@ -34,8 +34,9 @@ def build_proxy_scenarios(
     *,
     normal_count: int,
     suspicious_count: int,
+    borderline_count: int = 0,
 ) -> list[ProxyScenario]:
-    """Build unique normal and suspicious staging requests without labels."""
+    """Build varied staging requests without assigning training labels."""
     scenarios = [
         ProxyScenario(
             method="GET",
@@ -44,6 +45,14 @@ def build_proxy_scenarios(
         )
         for index in range(normal_count)
     ]
+    scenarios.extend(
+        ProxyScenario(
+            method="GET",
+            path=f"/api/search?q=runtime-review-{index + 1}%20status%3Aactive",
+            headers={"User-Agent": "curl/8.0 MIRAGE-Staging-Review"},
+        )
+        for index in range(borderline_count)
+    )
     suspicious_roots = (
         "/.env/runtime-review",
         "/api/admin/users/runtime-review",
@@ -183,6 +192,7 @@ def parse_args() -> argparse.Namespace:
         help="Operator API key. Defaults to MIRAGE_API_KEY.",
     )
     parser.add_argument("--normal-count", type=int, default=20)
+    parser.add_argument("--borderline-count", type=int, default=20)
     parser.add_argument("--suspicious-count", type=int, default=20)
     parser.add_argument("--batch-id", default=f"runtime-{uuid.uuid4().hex[:12]}")
     parser.add_argument(
@@ -201,7 +211,9 @@ def parse_args() -> argparse.Namespace:
         parser.error("--api-key or MIRAGE_API_KEY is required")
     if args.normal_count < 1 or args.suspicious_count < 1:
         parser.error("normal and suspicious counts must each be at least 1")
-    if args.normal_count + args.suspicious_count > 100:
+    if args.borderline_count < 0:
+        parser.error("borderline count cannot be negative")
+    if args.normal_count + args.borderline_count + args.suspicious_count > 100:
         parser.error("review batches are limited to 100 events")
     if args.timeout_seconds <= 0:
         parser.error("--timeout-seconds must be greater than 0")
@@ -222,6 +234,7 @@ async def run(args: argparse.Namespace) -> tuple[dict, dict]:
     ensure_outputs_available(args.queue_output, args.manifest_output)
     scenarios = build_proxy_scenarios(
         normal_count=args.normal_count,
+        borderline_count=args.borderline_count,
         suspicious_count=args.suspicious_count,
     )
     async with httpx.AsyncClient(timeout=args.timeout_seconds) as client:

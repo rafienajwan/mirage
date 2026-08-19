@@ -159,17 +159,20 @@ artifact in shadow mode. It records row counts, label balance, split ratio,
 seed, feature names, and generated files.
 
 For proposal-aligned staging collection, run the manual-review collector
-against a running gateway. It sends 20 normal and 20 suspicious requests through
-the real proxy path but does not attach or submit any labels:
+against a running gateway. The normal, borderline, and suspicious scenario
+groups diversify the requests sent through the real proxy path. They are not
+training labels and are never exposed in the review queue:
 
 ```bash
 cd apps/gateway
 python scripts/collect_runtime_review_batch.py \
   --base-url http://localhost:8000 \
-  --normal-count 20 \
-  --suspicious-count 20 \
-  --queue-output data/raw/runtime/manual-review-queue.json \
-  --manifest-output data/raw/runtime/manual-review-manifest.json
+  --batch-id runtime-002 \
+  --normal-count 35 \
+  --borderline-count 30 \
+  --suspicious-count 35 \
+  --queue-output data/raw/runtime/review-batches/runtime-002/queue.json \
+  --manifest-output data/raw/runtime/review-batches/runtime-002/manifest.json
 ```
 
 The operator API key is read from `MIRAGE_API_KEY`. It is used only to read the
@@ -177,14 +180,18 @@ dashboard event queue and is never forwarded through the protected proxy. The
 queue contains only event ID, timestamp, method, and path; it omits expected
 labels, IP addresses, risk decisions, payloads, and credentials. Existing queue
 or manifest files must be archived before another collection can start. Review
-all queued event IDs in the operator dashboard. Once the labels have been
-checked and the batch is approved for training, finalize it explicitly:
+all queued event IDs in the operator dashboard. A medium-risk event may still
+be labeled normal or suspicious based on analyst judgment; its generated
+scenario group is not ground truth. Once every label has been checked and the
+batch is approved for training, finalize it explicitly:
 
 ```bash
 python scripts/finalize_runtime_review_batch.py \
   --approved-for-training \
-  --output data/raw/runtime/manual-reviewed-events.jsonl \
-  --summary-output data/raw/runtime/manual-reviewed-summary.json
+  --queue data/raw/runtime/review-batches/runtime-002/queue.json \
+  --manifest data/raw/runtime/review-batches/runtime-002/manifest.json \
+  --output data/raw/runtime/review-batches/runtime-002/reviewed-events.jsonl \
+  --summary-output data/raw/runtime/review-batches/runtime-002/reviewed-summary.json
 ```
 
 The finalizer verifies the queue SHA-256, requires every queued ID to appear in
@@ -196,7 +203,47 @@ exact UTF-8 bytes with LF line endings, so their recorded SHA-256 values remain
 stable across Windows and Linux. Verify the byte-level hashes before preparing
 or training from a finalized batch.
 
-Prepare the finalized analyst-reviewed batch as a deterministic pilot split:
+Repeat collection and manual review with a new batch ID. Keep each batch at no
+more than 100 events so every decision remains reviewable. To combine finalized
+batches, pass each event file together with its summary:
+
+```bash
+python scripts/aggregate_runtime_review_batches.py \
+  --batch data/raw/runtime/manual-reviewed-events.jsonl data/raw/runtime/manual-reviewed-summary.json \
+  --batch data/raw/runtime/review-batches/runtime-002/reviewed-events.jsonl data/raw/runtime/review-batches/runtime-002/reviewed-summary.json \
+  --output data/processed/runtime-reviewed-v1/reviewed-events.jsonl \
+  --summary-output data/processed/runtime-reviewed-v1/reviewed-summary.json
+```
+
+The aggregator revalidates every batch approval, dataset SHA-256, event count,
+class count, and sanitized row shape. It rejects duplicate batch IDs, duplicate
+event IDs across batches, modified files, and output overwrites. Input batches
+are sorted by batch ID so the aggregate hash is deterministic. Add another
+`--batch EVENTS SUMMARY` pair for every completed batch.
+
+Once the aggregate reaches the configured promotion minimum of 1,000 reviewed
+events and at least 100 events per binary class, prepare the representative
+split and run the promotion-sized dataset gate:
+
+```bash
+python scripts/prepare_dataset.py \
+  --source mirage-jsonl \
+  --input data/processed/runtime-reviewed-v1/reviewed-events.jsonl \
+  --output-dir data/prepared/runtime-reviewed-v1 \
+  --dataset-name runtime-manual-review \
+  --dataset-version v1 \
+  --train-ratio 0.75 \
+  --seed 42
+python scripts/review_dataset.py \
+  --manifest data/prepared/runtime-reviewed-v1/manifest.json \
+  --min-total-rows 1000 \
+  --min-train-rows 750 \
+  --min-test-rows 250 \
+  --min-rows-per-class 100
+```
+
+For reference, the first finalized 40-row batch can still be prepared as a
+deterministic pilot split:
 
 ```bash
 python scripts/prepare_dataset.py \

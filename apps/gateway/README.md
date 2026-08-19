@@ -159,6 +159,7 @@ Compose stack running and execute:
 python scripts/collect_runtime_review_batch.py \
   --base-url http://localhost:8000 \
   --normal-count 20 \
+  --borderline-count 20 \
   --suspicious-count 20
 ```
 
@@ -174,6 +175,19 @@ python scripts/finalize_runtime_review_batch.py --approved-for-training
 
 Finalization fails if the queue hash changed, any queued event lacks an
 exportable analyst label, or the reviewed batch contains only one binary class.
+Use a unique `--batch-id` and separate output paths for every batch. Combine
+completed batches with repeated `--batch EVENTS SUMMARY` arguments:
+
+```bash
+python scripts/aggregate_runtime_review_batches.py \
+  --batch data/raw/runtime/batch-001/reviewed-events.jsonl data/raw/runtime/batch-001/reviewed-summary.json \
+  --batch data/raw/runtime/batch-002/reviewed-events.jsonl data/raw/runtime/batch-002/reviewed-summary.json
+```
+
+The scenario groups diversify collection only. They never supply training
+labels; every aggregate row must come from an explicitly approved analyst
+review. The aggregator validates each source hash and rejects duplicate event
+IDs before writing ignored local outputs under `data/processed/runtime/`.
 The older `collect_api_domain_training_data.py` command assigns scenario labels
 automatically and is only for deterministic pipeline validation.
 
