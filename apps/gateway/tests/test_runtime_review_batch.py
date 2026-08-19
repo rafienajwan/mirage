@@ -89,7 +89,7 @@ def test_collector_builds_distinct_borderline_requests_without_labels():
     assert all(not hasattr(scenario, "expected_label") for scenario in scenarios)
 
 
-def test_collector_rejects_batches_larger_than_dashboard_feed(monkeypatch):
+def test_collector_rejects_batches_larger_than_dashboard_feed(monkeypatch, capsys):
     monkeypatch.setenv("MIRAGE_API_KEY", "private-local-key")
     monkeypatch.setattr(
         sys,
@@ -107,6 +107,8 @@ def test_collector_rejects_batches_larger_than_dashboard_feed(monkeypatch):
 
     with pytest.raises(SystemExit):
         parse_args()
+
+    assert "50-event dashboard feed" in capsys.readouterr().err
 
 
 def test_aggregator_combines_hash_bound_batches_in_deterministic_order():
