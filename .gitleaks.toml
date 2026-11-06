@@ -1,0 +1,17 @@
+title = "MIRAGE secret scan"
+
+[extend]
+useDefault = true
+
+# Exact false-positive values only. Never allowlist a path or a pattern that
+# could cover a real credential.
+[allowlist]
+description = "Documented placeholders"
+regexTarget = "secret"
+regexes = [
+    # curl examples in README.md, apps/gateway/README.md and docs/*.md
+    '''^YOUR_LOCAL_MIRAGE_API_KEY$''',
+    # .env.supabase.example: the generic rule reads past the empty
+    # DECOY_SERVICE_TOKEN= line into this non-secret epoch label
+    '''^DECOY_CANARY_EPOCH=v1$''',
+]
