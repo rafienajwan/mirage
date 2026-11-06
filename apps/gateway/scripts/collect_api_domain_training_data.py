@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from dataclasses import dataclass
 import json
 import os
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
 import httpx
-
 
 AnalystLabel = Literal["normal", "suspicious"]
 

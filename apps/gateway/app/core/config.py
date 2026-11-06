@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, field
+import os
 
 # Attempt to load .env file if python-dotenv is available
 try:
@@ -46,7 +46,7 @@ class Settings:
             "DATABASE_URL", "sqlite+aiosqlite:///./mirage.db"
         )
     )
-    host: str = field(default_factory=lambda: os.getenv("HOST", "0.0.0.0"))
+    host: str = field(default_factory=lambda: os.getenv("HOST", "0.0.0.0"))  # noqa: S104 - container bind address; HOST env overrides
     port: int = field(default_factory=lambda: int(os.getenv("PORT", "8000")))
     api_key: str | None = field(
         default_factory=lambda: os.getenv("MIRAGE_API_KEY") or None

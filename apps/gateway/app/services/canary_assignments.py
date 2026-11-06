@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import hashlib
 
 from app.core.config import settings
 from app.schemas.canary import CanaryAssignment

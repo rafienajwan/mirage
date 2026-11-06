@@ -2,17 +2,17 @@
 
 from types import SimpleNamespace
 
+from fastapi.responses import JSONResponse
 import httpx
 import pytest
-from fastapi.responses import JSONResponse
 from starlette.requests import Request
 
 from app.api.routes import proxy as proxy_route
 from app.core.config import settings
 from app.schemas.decision import Decision
-from app.services.traffic_tracker import TrafficTracker, traffic_tracker
 from app.services import honeytoken, proxy_client
 from app.services.proxy_client import _request_headers, forward_request
+from app.services.traffic_tracker import TrafficTracker, traffic_tracker
 
 
 @pytest.fixture(autouse=True)

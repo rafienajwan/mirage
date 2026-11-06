@@ -1,0 +1,24 @@
+target-version = "py311"
+line-length = 100
+extend-exclude = [
+    "apps/web",
+    "**/venv",
+    "**/migrations/versions",
+    "**/*.egg-info",
+    "**/pytest-tmp",
+    ".tmp",
+    "pytest-tmp",
+]
+
+[lint]
+select = ["E", "F", "B", "I", "S"]
+
+[lint.per-file-ignores]
+"**/tests/**" = ["S101", "S105", "S106"]
+
+[lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Query", "fastapi.Depends", "fastapi.Security"]
+
+[lint.isort]
+known-first-party = ["app", "scripts", "tests"]
+force-sort-within-sections = true

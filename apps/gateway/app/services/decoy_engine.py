@@ -12,7 +12,6 @@ from app.core.config import settings
 from app.schemas.dashboard import DecoyResponse
 from app.services.canary_assignments import assigned_token
 
-
 # ── Safe fake data templates ─────────────────────────────────
 
 _FAKE_LOGIN = {

@@ -7,7 +7,6 @@ from typing import Iterable
 
 from app.schemas.event import AnalystLabel, EventRecord
 
-
 LABEL_TO_BINARY = {
     AnalystLabel.NORMAL: 0,
     AnalystLabel.FALSE_POSITIVE: 0,

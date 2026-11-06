@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
+from collections import Counter
 import csv
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 import hashlib
 import json
 import math
+from pathlib import Path
 import random
 import re
 import shutil
-from collections import Counter
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
-from pathlib import Path
 from typing import Iterable, Literal
 from urllib.parse import urlsplit
 
@@ -35,7 +35,6 @@ from app.services.payload_signals import (
     build_payload_excerpt,
     detect_payload_indicators,
 )
-
 
 DatasetSource = Literal[
     "mirage-jsonl",
@@ -718,7 +717,7 @@ def stratified_split(
 
     train: list[PreparedTrainingRow] = []
     test: list[PreparedTrainingRow] = []
-    rng = random.Random(random_seed)
+    rng = random.Random(random_seed)  # noqa: S311 - seeded, reproducible split; not security-sensitive
 
     for label_rows in grouped.values():
         shuffled = list(label_rows)
