@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import case, extract, func, select
 
-from app.schemas.actor import ActorCase, ActorCaseWorkflow, CaseWorkflowStatus, ActorProfile
+from app.schemas.actor import ActorCase, ActorCaseWorkflow, ActorProfile, CaseWorkflowStatus
 from app.schemas.canary import CanaryAssignment, CanaryAssignmentStatus
 from app.schemas.dashboard import AlertRecord, AlertSeverity
 from app.schemas.decision import Decision
@@ -19,8 +19,8 @@ from app.schemas.honeytoken import HoneytokenHit
 from app.services.actor_identity import actor_id_from_key, actor_key, actor_status
 from app.storage.db.database import get_session
 from app.storage.db.models import (
-    ActorProfileModel,
     ActorCaseModel,
+    ActorProfileModel,
     AlertModel,
     CanaryAssignmentModel,
     EventModel,

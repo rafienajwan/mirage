@@ -76,7 +76,9 @@ async def log_inspection(
                 f"Request from {_mask_ip(request.ip_address)} interacted with "
                 f"{match.token_label} on {request.method} {request.path}."
             ),
-            recommended_action="Treat as high-confidence deception interaction and review attacker activity.",
+            recommended_action=(
+                "Treat as high-confidence deception interaction and review attacker activity."
+            ),
         )
         await _broadcast_latest_alert()
 

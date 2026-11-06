@@ -635,7 +635,8 @@ def test_load_cicids_csv_maps_known_columns(tmp_path):
     source.write_text(
         "\n".join(
             [
-                "Destination Port,Flow Duration,Flow Packets/s,Packet Length Mean,SYN Flag Count,Average Packet Size,Label",
+                "Destination Port,Flow Duration,Flow Packets/s,Packet Length Mean,"
+                "SYN Flag Count,Average Packet Size,Label",
                 "443,1200,15.5,42.0,2,64.0,BENIGN",
                 "8080,5000,95.0,128.0,4,256.0,DDoS",
             ]
@@ -655,7 +656,8 @@ def test_load_cicids_csv_accepts_headers_with_extra_spaces(tmp_path):
     source.write_text(
         "\n".join(
             [
-                " Destination Port, Flow Duration, Flow Packets/s, Packet Length Mean, SYN Flag Count, Average Packet Size, Label",
+                " Destination Port, Flow Duration, Flow Packets/s, Packet Length Mean,"
+                " SYN Flag Count, Average Packet Size, Label",
                 "443,1200,15.5,42.0,2,64.0,BENIGN",
                 "8080,5000,95.0,128.0,4,256.0,DDoS",
             ]
@@ -675,7 +677,8 @@ def test_load_cicids_csv_zeroes_non_finite_values(tmp_path):
     source.write_text(
         "\n".join(
             [
-                "Destination Port,Flow Duration,Flow Packets/s,Packet Length Mean,SYN Flag Count,Average Packet Size,Label",
+                "Destination Port,Flow Duration,Flow Packets/s,Packet Length Mean,"
+                "SYN Flag Count,Average Packet Size,Label",
                 "443,Infinity,Infinity,42.0,2,64.0,BENIGN",
                 "8080,5000,95.0,128.0,4,256.0,DDoS",
             ]

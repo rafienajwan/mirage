@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from app.schemas.request import InspectRequest
-from app.schemas.decision import InspectResponse
-from app.services.inspection import inspect_and_log
 from app.core.security import require_api_key
+from app.schemas.decision import InspectResponse
+from app.schemas.request import InspectRequest
+from app.services.inspection import inspect_and_log
 
 router = APIRouter(prefix="/simulate", tags=["simulate"])
 

@@ -13,22 +13,22 @@ gateway_dir = Path(__file__).resolve().parent.parent
 if str(gateway_dir) not in sys.path:
     sys.path.insert(0, str(gateway_dir))
 
-from scripts.build_api_domain_fixture_dataset import (
-    build_fixture_rows,
-    write_fixture_jsonl,
-)
-from app.ml.api_log_review import (
+from app.ml.api_log_review import (  # noqa: E402 - imported after the sys.path bootstrap so the script runs standalone
     APILogReviewMetadata,
     review_api_log_source,
     write_api_log_source_review,
 )
-from app.ml.artifacts import review_model_artifact
-from app.ml.datasets import (
+from app.ml.artifacts import review_model_artifact  # noqa: E402 - imported after the sys.path bootstrap so the script runs standalone
+from app.ml.datasets import (  # noqa: E402 - imported after the sys.path bootstrap so the script runs standalone
     build_dataset_lineage,
     prepare_dataset,
     review_prepared_dataset,
 )
-from app.ml.training import LabeledFeatures, train_risk_classifier
+from app.ml.training import LabeledFeatures, train_risk_classifier  # noqa: E402 - imported after the sys.path bootstrap so the script runs standalone
+from scripts.build_api_domain_fixture_dataset import (  # noqa: E402 - imported after the sys.path bootstrap so the script runs standalone
+    build_fixture_rows,
+    write_fixture_jsonl,
+)
 
 
 def generate_and_train_custom_api_dataset(

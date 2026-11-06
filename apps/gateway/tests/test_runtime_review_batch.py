@@ -4,13 +4,22 @@ from __future__ import annotations
 
 import hashlib
 import json
-import sys
 from pathlib import Path
+import sys
 
 import httpx
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+
+from aggregate_runtime_review_batches import aggregate_batch_files  # noqa: E402
+from collect_runtime_review_batch import (  # noqa: E402
+    build_proxy_scenarios,
+    collect_review_batch,
+    ensure_outputs_available,
+    parse_args,
+)
+from finalize_runtime_review_batch import fetch_finalized_review_batch  # noqa: E402
 
 from app.ml.runtime_review_batch import (  # noqa: E402
     FinalizedReviewBatch,
@@ -18,14 +27,6 @@ from app.ml.runtime_review_batch import (  # noqa: E402
     finalize_review_batch,
     write_text_exact,
 )
-from collect_runtime_review_batch import (  # noqa: E402
-    build_proxy_scenarios,
-    collect_review_batch,
-    ensure_outputs_available,
-    parse_args,
-)
-from aggregate_runtime_review_batches import aggregate_batch_files  # noqa: E402
-from finalize_runtime_review_batch import fetch_finalized_review_batch  # noqa: E402
 
 
 def _reviewed_batch(
