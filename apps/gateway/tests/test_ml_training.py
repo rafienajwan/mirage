@@ -1,7 +1,7 @@
 """Smoke tests for the real ML training and inference path."""
 
-import sys
 from pathlib import Path
+import sys
 
 import joblib
 import pytest

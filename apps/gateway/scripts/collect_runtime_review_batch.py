@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import json
-import os
-import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+import json
+import os
 from pathlib import Path
 from urllib.parse import urlsplit
+import uuid
 
 import httpx
 

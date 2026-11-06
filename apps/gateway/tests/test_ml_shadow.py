@@ -1,7 +1,7 @@
 """Tests for optional ML shadow scoring."""
 
-from types import SimpleNamespace
 from pathlib import Path
+from types import SimpleNamespace
 
 import joblib
 

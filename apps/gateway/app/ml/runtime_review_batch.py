@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 import hashlib
 import json
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-
 
 _EXPORTED_FIELDS = ("event_id", "timestamp", "label", "analyst_label", "features")
 

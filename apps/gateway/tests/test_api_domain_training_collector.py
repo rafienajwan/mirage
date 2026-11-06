@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
+import sys
 
 import httpx
 import pytest
@@ -65,7 +65,8 @@ async def test_collect_training_data_labels_and_exports_rows():
                     return httpx.Response(200, json=event)
             return httpx.Response(404, json={"detail": "Event not found"})
 
-        if request.method == "GET" and request.url.path == "/api/v1/dashboard/training-data/summary":
+        summary_path = "/api/v1/dashboard/training-data/summary"
+        if request.method == "GET" and request.url.path == summary_path:
             return httpx.Response(
                 200,
                 json={
