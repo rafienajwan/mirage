@@ -80,3 +80,48 @@ def test_adversarial_input_is_fast():
     start = time.perf_counter()
     detect_payload_indicators("/x", "q=" + "%2" * 5000, body)
     assert time.perf_counter() - start < 0.2
+
+
+def test_double_encoding_flags_encoded():
+    assert "encoded" in detect_payload_indicators("/x", "q=%2541", b"")
+
+
+def test_single_encoding_not_encoded():
+    assert "encoded" not in detect_payload_indicators("/x", "q=caf%C3%A9", b"")
+
+
+def test_inline_comment_between_words_flags_encoded():
+    assert "encoded" in detect_payload_indicators("/x", "", b"un/**/ion")
+
+
+def test_large_payload():
+    assert "large-payload" in detect_payload_indicators("/x", "", b"a" * 65537)
+    assert "large-payload" not in detect_payload_indicators("/x", "", b"a" * 65536)
+
+
+def test_unusual_content_type():
+    result = detect_payload_indicators(
+        "/x", "", b"x", content_type="application/x-java-serialized-object"
+    )
+    assert "unusual-content-type" in result
+
+
+@pytest.mark.parametrize(
+    "content_type",
+    [
+        "application/json; charset=utf-8",
+        "application/vnd.api+json",
+        "multipart/form-data; boundary=x",
+        "TEXT/PLAIN",
+    ],
+)
+def test_allowed_content_types(content_type):
+    result = detect_payload_indicators("/x", "", b"x", content_type=content_type)
+    assert "unusual-content-type" not in result
+
+
+def test_content_type_ignored_without_body():
+    result = detect_payload_indicators(
+        "/x", "", b"", content_type="application/octet-stream"
+    )
+    assert "unusual-content-type" not in result

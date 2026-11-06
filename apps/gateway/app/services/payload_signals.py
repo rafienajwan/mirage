@@ -75,6 +75,20 @@ _HIGH_RISK_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
     ),
 }
 
+LARGE_PAYLOAD_BYTES = 65_536
+_ALLOWED_MEDIA_TYPES = frozenset(
+    {
+        "application/json",
+        "application/x-www-form-urlencoded",
+        "multipart/form-data",
+        "text/plain",
+        "application/xml",
+        "text/xml",
+    }
+)
+# An SQL inline comment splitting one word ("un/**/ion") is obfuscation.
+_COMMENT_INSIDE_WORD = re.compile(r"\w/\*.{0,200}?\*/\w", re.DOTALL)
+
 _HEADER_LINE = re.compile(r"[\r\n]\s*[a-z0-9-]{1,40}\s*:")
 _ENCODED_LINE_BREAK = re.compile(r"%0[ad]", re.IGNORECASE)
 _ENCODED_NULL = re.compile(r"%00")
@@ -104,7 +118,16 @@ def _part_indicators(raw: str) -> set[str]:
         found.add("header-injection")
     if "\x00" in text or any(_ENCODED_NULL.search(layer) for layer in encoded_layers):
         found.add("null-byte")
+    if normalized.decode_layers >= 2 or _COMMENT_INSIDE_WORD.search(raw):
+        found.add("encoded")
     return found
+
+
+def _is_unusual_content_type(content_type: str) -> bool:
+    media_type = content_type.split(";", 1)[0].strip().lower()
+    if media_type.startswith("application/") and media_type.endswith("+json"):
+        return False
+    return media_type not in _ALLOWED_MEDIA_TYPES
 
 
 def detect_payload_indicators(
@@ -119,4 +142,8 @@ def detect_payload_indicators(
     indicators: set[str] = set()
     for part in (path, query, body_text):
         indicators |= _part_indicators(part)
+    if len(body) > LARGE_PAYLOAD_BYTES:
+        indicators.add("large-payload")
+    if body and content_type and _is_unusual_content_type(content_type):
+        indicators.add("unusual-content-type")
     return sorted(indicators)
