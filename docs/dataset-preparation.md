@@ -397,6 +397,35 @@ reproducible parser, payload-signal, and model benchmarking, but it is not
 modern production traffic and does not satisfy the proposal's pending need for
 reviewed production-like custom API logs.
 
+### Payload detection evaluation
+
+`scripts/evaluate_payload_detection.py` scores every CSIC request as if sent by
+a browser at a low request rate, so the result reflects payload signals alone:
+
+```bash
+cd apps/gateway
+python scripts/evaluate_payload_detection.py --csic-dir data/csic-2010
+```
+
+Measured 2026-11-07 on the full set (15,964 attacks, 18,640 normal requests):
+
+| Detector | Attacks flagged | Attacks routed to decoy | Normal flagged |
+| --- | ---: | ---: | ---: |
+| Before (raw substring checks) | 0.0% (0) | 0.0% | 0.0% |
+| After (normalized signatures) | 23.5% (3,750) | 19.7% | 0.0% (0) |
+
+Attack labels after the change: `sql-like` 1,244; `xss` 984;
+`header-injection` 656; `path-traversal` 134; `rce-indicator` 134;
+`null-byte` 126; `encoded` (double encoding, medium risk) 2,002. Requests
+flagged only as `encoded` are not routed to the decoy.
+
+Most remaining CSIC attacks are parameter tampering (`id=2/`, malformed or
+missing fields), which carries no attack signature and is left to the ML
+detector.
+
+Prepared CSIC datasets derive `high_risk_indicator_count` from this detector,
+so datasets prepared before this change must be regenerated before training.
+
 ## Readiness Rules
 
 Preparation fails unless:
