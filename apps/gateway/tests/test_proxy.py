@@ -267,3 +267,53 @@ async def test_traffic_tracker_bounds_distinct_sources():
 
     assert len(tracker.requests) == 2
     assert "192.0.2.1" not in tracker.requests
+
+
+BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0 Safari/537.36"
+
+
+async def _route(client, monkeypatch, method, url, **kwargs):
+    captured = {}
+
+    async def fake_forward(request, **forward_kwargs):
+        captured.update(forward_kwargs)
+        return JSONResponse({"status": "ok"})
+
+    monkeypatch.setattr(proxy_route, "forward_request", fake_forward)
+    headers = {"user-agent": BROWSER_UA, **kwargs.pop("headers", {})}
+    response = await client.request(method, url, headers=headers, **kwargs)
+    assert response.status_code == 200
+    return captured
+
+
+async def test_plain_sqli_body_reaches_decoy(client, monkeypatch):
+    captured = await _route(
+        client,
+        monkeypatch,
+        "POST",
+        "/api/v1/proxy/api/products",
+        content="id=1' or '1'='1",
+        headers={"content-type": "application/x-www-form-urlencoded"},
+    )
+    assert captured["is_decoy"] is True
+
+
+async def test_encoded_sqli_query_reaches_decoy(client, monkeypatch):
+    captured = await _route(
+        client, monkeypatch, "GET", "/api/v1/proxy/api/products?id=1%27%20UNION%20SELECT%201"
+    )
+    assert captured["is_decoy"] is True
+
+
+async def test_double_encoded_traversal_reaches_decoy(client, monkeypatch):
+    captured = await _route(
+        client, monkeypatch, "GET", "/api/v1/proxy/api/files?f=%252e%252e%252fwin.ini"
+    )
+    assert captured["is_decoy"] is True
+
+
+async def test_benign_search_reaches_real_app(client, monkeypatch):
+    captured = await _route(
+        client, monkeypatch, "GET", "/api/v1/proxy/api/products?q=Union+Square"
+    )
+    assert captured["is_decoy"] is False
