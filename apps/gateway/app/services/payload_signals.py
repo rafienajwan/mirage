@@ -1,4 +1,8 @@
-"""Extract defensive risk labels from request paths, queries, and payloads."""
+"""Extract defensive risk labels from request paths, queries, and payloads.
+
+Every pattern is bounded (no nested unbounded quantifiers) so inspection time
+grows linearly with input size.
+"""
 
 from __future__ import annotations
 
@@ -9,29 +13,31 @@ from app.services.payload_normalization import (
     percent_decode_layers,
 )
 
-BODY_INSPECTION_CHARS = 65_536
-
 # Separators that start a new shell command. A single "&" is deliberately
-# absent: it separates query-string parameters.
-_SHELL_SEPARATOR = r"(?:;|\|\|?|&&|`|\$\()\s*"
+# absent: it separates query-string parameters. The trailing whitespace is
+# bounded and excludes line breaks: "[\r\n]\s*" is quadratic on a newline flood.
+_SHELL_SEPARATOR = r"(?:;|\|\|?|&&|`|\$\(|[\r\n])[ \t]{0,16}"
+# Whitespace, "(" or an SQL line comment between keywords: "union--x\nselect".
+_SQL_GAP = r"(?:[\s(]|--[^\n]{0,100}\n|#[^\n]{0,100}\n){1,20}"
 
 _HIGH_RISK_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
     "sql-like": tuple(
         re.compile(pattern)
         for pattern in (
-            r"\bunion\s+(?:all\s+)?select\b",
-            r"['\"]\s*(?:or|and)\s+['\"]?\w+['\"]?\s*(?:=|<|>|\blike\b)",
-            r"\b(?:or|and)\s+(\d+)\s*=\s*\1\b",
+            rf"\bunion{_SQL_GAP}(?:(?:all|distinct){_SQL_GAP})?select\b",
+            # Quoted tautology: ' or 1=1, 'or'a'='a, '||1=1 (not prose like 'a' or b > c).
+            r"['\"]\s*(?:or|and|\|\|)\s*(['\"]?)(\w{1,40})\1\s*(?:=|\blike\b)\s*['\"]?\2\b",
+            r"\b(?:or|and)\s+(\d{1,10})\s*=\s*\1\b",
             r";\s*(?:drop|delete|insert|update|truncate|alter|exec(?:ute)?|shutdown|create|declare)\b",
-            r"\b(?:drop|truncate)\s+table\b",
-            # A bare numeric argument: "sleep(5)", not prose like "sleep (8 hours)".
-            r"\b(?:sleep|pg_sleep)\s*\(\s*\d+(?:\.\d+)?\s*\)",
+            r"\b(?:drop|truncate)\s+table\s+(?:if\s+exists\s+)?[\w`\"\[\].]{1,64}\s*(?:;|--|#|\)|$)",
+            # A numeric argument: "sleep(5)", "sleep(5-0)", not prose like "sleep (8 hours)".
+            r"\b(?:sleep|pg_sleep)\s*\(\s*[\d\s+\-*/.]{1,20}\)",
             r"\bbenchmark\s*\(\s*\d+\s*,",
             r"\bwaitfor\s+delay\b",
-            r"'\s*(?:--|#|;)",
+            r"'\s*(?:--|#)",
             r"\binformation_schema\b",
             r"\bxp_cmdshell\b",
-            r"\bload_file\s*\(",
+            r"\b(?:load_file|extractvalue|updatexml)\s*\(",
             r"\binto\s+(?:out|dump)file\b",
         )
     ),
@@ -39,19 +45,27 @@ _HIGH_RISK_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
         re.compile(pattern)
         for pattern in (
             r"<\s*script\b",
-            # "javascript:" as a URL scheme, not prose such as "JavaScript: the basics".
-            r"\bjavascript\s*:(?:\S|\s*[\w$.]+\s*\()",
+            # A URL scheme, tolerating control characters browsers strip
+            # (java\tscript:), but not prose such as "JavaScript: the basics".
+            r"\bjava[\s\x00-\x1f]{0,10}script\s*:(?:\S|\s*[\w$.]+\s*\()",
+            r"\bdata\s*:\s*text/html\b",
             r"\bon(?:error|load|mouseover|mouseout|focus|blur|click|dblclick|toggle|begin"
             r"|animationstart|pointerover|keydown|keyup|input|change|submit)\s*=",
-            r"<\s*(?:iframe|svg|object|embed)\b",
+            # Any event handler attribute inside a tag: <div onpointerenter=...>.
+            r"<[a-z][^>]{0,200}?\son[a-z]{3,25}\s*=",
+            r"\bsrcdoc\s*=",
             r"\bdocument\s*\.\s*(?:cookie|domain)\b",
         )
     ),
     "path-traversal": tuple(
         re.compile(pattern)
         for pattern in (
-            r"\.\.[/\\]",
+            # Climbing two or more levels; a single "../guide.md" is an ordinary link.
+            r"(?:\.\.[/\\]){2,}",
+            r"\.\.;/",
+            r"\.\.[/\\](?:etc|proc|windows|winnt|root|var|usr|home|web-inf|\.env|\.git)\b",
             r"/etc/(?:passwd|shadow)\b",
+            r"/proc/self/",
             r"\b(?:boot|win)\.ini\b",
             r"c:\\windows\\",
         )
@@ -59,18 +73,28 @@ _HIGH_RISK_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
     "rce-indicator": tuple(
         re.compile(pattern)
         for pattern in (
-            r"\$\{jndi:",
+            # Log4Shell, including ${${lower:j}ndi:...} and ${${::-j}...} obfuscation.
+            r"\$\{[^}]{0,80}?(?:jndi|lower:|upper:|::-|env:|sys:)",
+            r"\$\{ifs\}",
             r"/bin/(?:ba|z|k|da)?sh\b",
             r"\bcmd(?:\.exe)?\s+/c\b",
             r"\bpowershell\b.{0,40}?\s-(?:e|enc|encodedcommand)\b",
-            # Commands that need a path or flag argument ("; cat /etc/hosts"),
+            # Glob-obfuscated paths: /???/c?t
+            r"/\w{0,10}\?[\w?]{0,10}/\w{0,10}\?",
+            # Commands needing a path, flag or file argument ("; cat flag.txt"),
             # so prose like "dog; cat lovers" does not match.
-            _SHELL_SEPARATOR + r"(?:cat|ls|rm|chmod|cp|mv|tail|head)\s+[-/~.]",
-            # Argument-less recon commands, followed by nothing or another separator.
             _SHELL_SEPARATOR
-            + r"(?:whoami|id|uname|hostname|pwd|ifconfig|ipconfig)\b(?=\s*(?:$|[-;|&`)]))",
+            + r"(?:cat|ls|rm|chmod|cp|mv|tail|head|more|less)(?:\s+|\$\{ifs\})"
+            r"(?:[-/~.$]|[\w-]{1,64}\.\w{1,5}\b)",
+            # Argument-less recon commands at the end or before another separator
+            # (a markdown table "| id | name |" is not a command).
             _SHELL_SEPARATOR
-            + r"(?:wget|curl|nc|ncat|ping|bash|sh|python|perl|nslookup)\s+(?:-|https?:|\d|/)",
+            + r"(?:whoami|id|uname|hostname|pwd|ifconfig|ipconfig)\b(?=\s*(?:$|[-;&`)]))",
+            _SHELL_SEPARATOR
+            + r"(?:wget|curl|nc|ncat|ping|nslookup|telnet)\s+"
+            r"(?:-|https?:|\d|/|[\w-]{1,63}\.[a-z]{2,24}\b)",
+            _SHELL_SEPARATOR + r"(?:bash|sh|zsh|python3?|perl|php|ruby)\s+(?:-|/)",
+            r"\|\s*(?:ba|z)?sh\b",
         )
     ),
 }
@@ -89,9 +113,16 @@ _ALLOWED_MEDIA_TYPES = frozenset(
 # An SQL inline comment splitting one word ("un/**/ion") is obfuscation.
 _COMMENT_INSIDE_WORD = re.compile(r"\w/\*.{0,200}?\*/\w", re.DOTALL)
 
-_HEADER_LINE = re.compile(r"[\r\n]\s*[a-z0-9-]{1,40}\s*:")
+# Only response headers an attacker gains from CRLF injection; ordinary form
+# text such as "Re: yesterday" or "https://..." after a line break is not one.
+_INJECTED_HEADER = re.compile(
+    r"(?:^|[\r\n])[ \t]{0,8}(?:set-cookie|location|refresh|link|cache-control"
+    r"|content-(?:type|length|disposition|security-policy)|www-authenticate"
+    r"|access-control-[a-z-]{1,40}|x-[a-z0-9-]{1,40})[ \t]{0,8}:"
+)
 _ENCODED_LINE_BREAK = re.compile(r"%0[ad]", re.IGNORECASE)
-_ENCODED_NULL = re.compile(r"%00")
+# Encoded NULs only: a literal NUL byte is normal in binary uploads.
+_ENCODED_NULL = re.compile(r"%00|\\u0000|&#0+;|&#x0+;", re.IGNORECASE)
 
 
 def build_payload_excerpt(query: str, body: str, *, limit: int = 4096) -> str:
@@ -103,22 +134,23 @@ def _part_indicators(raw: str) -> set[str]:
     if not raw:
         return set()
     normalized = normalize_for_inspection(raw)
-    text = normalized.text
+    texts = (normalized.text,)
+    if normalized.joined_text != normalized.text:
+        texts += (normalized.joined_text,)
     found = {
         label
         for label, patterns in _HIGH_RISK_PATTERNS.items()
-        if any(pattern.search(text) for pattern in patterns)
+        if any(pattern.search(text) for pattern in patterns for text in texts)
     }
-    # Inspect every encoded layer except the fully decoded one: an encoded
-    # line break or NUL is an injection attempt, a literal one is not.
-    encoded_layers = percent_decode_layers(raw)[:-1] or [raw]
-    if any(_ENCODED_LINE_BREAK.search(layer) for layer in encoded_layers) and _HEADER_LINE.search(
-        text
+    layers = percent_decode_layers(raw)
+    encoded_layers = layers[:-1] or [raw]
+    if any(_ENCODED_LINE_BREAK.search(layer) for layer in encoded_layers) and (
+        _INJECTED_HEADER.search(normalized.text)
     ):
         found.add("header-injection")
-    if "\x00" in text or any(_ENCODED_NULL.search(layer) for layer in encoded_layers):
+    if any(_ENCODED_NULL.search(layer) for layer in layers):
         found.add("null-byte")
-    if normalized.decode_layers >= 2 or _COMMENT_INSIDE_WORD.search(raw):
+    if normalized.decode_layers >= 2 or _COMMENT_INSIDE_WORD.search(layers[-1]):
         found.add("encoded")
     return found
 
@@ -137,8 +169,12 @@ def detect_payload_indicators(
     *,
     content_type: str | None = None,
 ) -> list[str]:
-    """Return sorted, unique labels for attack signatures in any common encoding."""
-    body_text = body.decode("utf-8", errors="ignore")[:BODY_INSPECTION_CHARS]
+    """Return sorted, unique labels for attack signatures in any common encoding.
+
+    The whole body is inspected; callers bound its size (the proxy rejects
+    bodies above ``PROXY_MAX_BODY_BYTES``).
+    """
+    body_text = body.decode("utf-8", errors="ignore")
     indicators: set[str] = set()
     for part in (path, query, body_text):
         indicators |= _part_indicators(part)

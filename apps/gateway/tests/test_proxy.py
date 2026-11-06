@@ -317,3 +317,16 @@ async def test_benign_search_reaches_real_app(client, monkeypatch):
         client, monkeypatch, "GET", "/api/v1/proxy/api/products?q=Union+Square"
     )
     assert captured["is_decoy"] is False
+
+
+async def test_payload_detection_runs_off_the_event_loop(client, monkeypatch):
+    calls = []
+    original = proxy_route.run_in_threadpool
+
+    async def recording_threadpool(func, *args, **kwargs):
+        calls.append(func.__name__)
+        return await original(func, *args, **kwargs)
+
+    monkeypatch.setattr(proxy_route, "run_in_threadpool", recording_threadpool)
+    await _route(client, monkeypatch, "POST", "/api/v1/proxy/api/products", content="x" * 1000)
+    assert "detect_payload_indicators" in calls

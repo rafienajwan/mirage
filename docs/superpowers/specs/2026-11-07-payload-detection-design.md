@@ -64,14 +64,20 @@ Steps, in order:
 1. Percent-decode with `+` treated as a space, repeated until the text stops
    changing, at most **3** rounds. `decode_layers` counts the rounds that
    changed the text.
-2. Decode JSON-style `\uXXXX` escapes.
+2. Decode JSON string escapes (`\uXXXX`, `\n`, `\"`, `\\`, `\/` and the other single-character escapes).
 3. `html.unescape`.
 4. Unicode NFKC (folds full-width characters such as `ＳＥＬＥＣＴ`).
 5. Replace SQL inline comments `/* … */` (bodies up to 200 characters) with a
    single space.
 6. Collapse whitespace runs other than `\r` and `\n` to one space; lowercase.
 
-Input is already bounded by callers (body ≤ 65,536 characters for detection).
+NUL characters are removed (reported separately). MySQL versioned comments
+`/*!NNNNN body*/` keep their body. Two texts are produced: `text` reads
+comments as whitespace, `joined_text` deletes a comment that splits a word
+(`UN/**/ION` → `union`); signatures are matched against both.
+
+*Amended 2026-11-07 after the final review: JSON escapes, NUL removal,
+versioned comments and the joined reading were added.*
 
 ### `app/services/payload_signals.py` (rewritten detection)
 
@@ -81,8 +87,10 @@ Signature extended with an optional keyword; existing callers keep working.
 Returns a **sorted, de-duplicated** list of labels.
 
 Detection runs on `normalize_for_inspection` of `path`, `query` and the
-first 65,536 characters of the body decoded as UTF-8 (errors ignored), each
-separately. Size rules use the full `len(body)` in bytes.
+**whole** body decoded as UTF-8 (errors ignored), each separately. Callers
+bound the body (the proxy rejects bodies above `PROXY_MAX_BODY_BYTES`, 1 MiB by
+default). *Amended: the original 65,536-character window let an attacker hide
+a payload behind padding.*
 
 High-risk labels (patterns on normalized text):
 
@@ -92,8 +100,8 @@ High-risk labels (patterns on normalized text):
 | `xss` | `<script`; `javascript:`; `on<event>=` for common events; `<iframe`, `<svg`, `<object`, `<embed`; `document.cookie`/`document.domain` |
 | `path-traversal` | `../` or `..\`; `/etc/passwd`, `/etc/shadow`; `win.ini`, `boot.ini` |
 | `rce-indicator` | `${jndi:`; `/bin/sh` family; `cmd /c`; `powershell … -e[nc]`; `;`, `|`, `||`, `&&` or a backtick followed by a shell command word (`cat`, `ls`, `id`, `whoami`, `uname`, `wget`, `curl`, `nc`, `bash`, `sh`, `ping`); `$(` command substitution |
-| `header-injection` (new) | The **raw** input contains an encoded line break (`%0d` or `%0a`, any encoding depth) and the decoded text has a line break followed by `<header-name>:` |
-| `null-byte` (new) | The raw input contains `%00`, or decoded text contains `\x00` |
+| `header-injection` (new) | The input contains an encoded line break (`%0d`/`%0a`, any encoding depth) and the decoded text has a line break followed by a **response header an attacker gains** (`set-cookie`, `location`, `refresh`, `link`, `cache-control`, `content-*`, `www-authenticate`, `access-control-*`, `x-*`). *Amended: any `word:` matched ordinary multi-line form fields.* |
+| `null-byte` (new) | An **encoded** NUL: `%00` at any decode layer, `\u0000`, `&#0;` or `&#x0;`. A literal NUL byte is ignored. *Amended: literal NULs routed every binary upload to the decoy.* |
 
 A single `&` is never a command separator (it separates query parameters).
 
@@ -133,7 +141,10 @@ Not run in CI (the dataset is not committed). Results recorded in
   invalid `\u` escapes are left as-is.
 - Detection never raises on arbitrary bytes.
 - All regular expressions are bounded (no nested unbounded quantifiers); a
-  65,536-character adversarial input must be processed in under 200 ms.
+  65,536-character adversarial input (including line-break floods) must be
+  processed in under 200 ms, and a 1 MiB body in under 1 s.
+- The proxy runs detection in Starlette's threadpool so inspecting a large
+  body (about 0.4 s per MiB) does not stall the event loop.
 
 ## Testing
 
@@ -158,6 +169,15 @@ Not run in CI (the dataset is not committed). Results recorded in
 2. CSIC 2010 via the evaluation script: normal requests flagged **≤ 0.5%**;
    attacks routed to the decoy **≥ 7.2%** (the decode-only probe), with the
    achieved figure recorded in the docs.
+
+## Known false positives (inherent to option A)
+
+A single signature routes to the decoy, so user content that legitimately
+contains attack-shaped text is routed there too: pasted shell snippets
+(`cd /tmp; ls -la`, `#!/bin/bash`), SQL or code samples (`sleep(5)`,
+`information_schema`), and rich text with event-handler attributes
+(`<button onclick=...>`). Applications with code or rich-text fields need
+per-route exemptions (sub-project 3).
 
 ## Out of scope
 

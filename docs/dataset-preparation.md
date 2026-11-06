@@ -423,6 +423,12 @@ Most remaining CSIC attacks are parameter tampering (`id=2/`, malformed or
 missing fields), which carries no attack signature and is left to the ML
 detector.
 
+CSIC contains no free-text, code or rich-text fields, so its 0% false-positive
+rate does not cover them. One signature routes to the decoy, so content that
+legitimately contains attack-shaped text (pasted shell commands, SQL samples,
+HTML with `onclick=` attributes) is routed there too; applications with such
+fields need per-route exemptions.
+
 Prepared CSIC datasets derive `high_risk_indicator_count` from this detector,
 so datasets prepared before this change must be regenerated before training.
 

