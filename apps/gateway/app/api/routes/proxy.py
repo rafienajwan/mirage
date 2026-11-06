@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
+from starlette.concurrency import run_in_threadpool
 
 from app.core.config import settings
 from app.schemas.decision import Decision
@@ -47,7 +48,15 @@ async def proxy_request(target_path: str, request: Request) -> Response:
     path = "/" + target_path.lstrip("/")
     source_ip = request.client.host if request.client else "unknown"
     request_count = await traffic_tracker.record(source_ip)
-    indicators = detect_payload_indicators(path, request.url.query, body)
+    # Inspecting a large body is CPU-bound (~0.4 s per MiB); keep it off the
+    # event loop so other requests are not stalled behind it.
+    indicators = await run_in_threadpool(
+        detect_payload_indicators,
+        path,
+        request.url.query,
+        body,
+        content_type=request.headers.get("content-type"),
+    )
     payload_excerpt = build_payload_excerpt(
         request.url.query,
         body[: settings.proxy_max_body_bytes].decode("utf-8", errors="ignore"),

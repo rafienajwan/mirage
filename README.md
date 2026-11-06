@@ -26,6 +26,10 @@ See `docs/PROPOSAL_ALIGNMENT.md` for the complete proposal capability matrix.
 - analyst event labels for future training data curation;
 - JSONL export and readiness checks for analyst-labeled training records;
 - repeatable local API-domain collection and deterministic pipeline fixture (`python scripts/generate_custom_api_dataset.py`);
+- payload signature detection that decodes URL, double-URL, HTML-entity,
+  `\u`-escaped, full-width, and comment-obfuscated input; a single recognized
+  attack signature routes the request to the decoy (see
+  `docs/dataset-preparation.md` for the CSIC 2010 evaluation);
 - honeytoken detection for configured decoy credentials;
 - adaptive decoy responses with epoch-rotatable per-actor synthetic canary tokens;
 - persistent canary assignment records with hashed token values, operator revoke

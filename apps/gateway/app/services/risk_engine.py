@@ -54,8 +54,20 @@ SUSPICIOUS_UA_KEYWORDS = [
 
 # ── Known payload indicator labels ─────────────────────────────
 
-HIGH_RISK_INDICATORS = {"sql-like", "rce-indicator", "path-traversal", "xss"}
+HIGH_RISK_INDICATORS = {
+    "sql-like",
+    "rce-indicator",
+    "path-traversal",
+    "xss",
+    "header-injection",
+    "null-byte",
+}
 MEDIUM_RISK_INDICATORS = {"encoded", "unusual-content-type", "large-payload"}
+
+FIRST_HIGH_INDICATOR_SCORE = 60.0
+EXTRA_HIGH_INDICATOR_SCORE = 10.0
+MEDIUM_INDICATOR_SCORE = 8.0
+PAYLOAD_SCORE_CAP = 80.0
 
 
 @dataclass
@@ -100,17 +112,20 @@ def _score_payload_indicators(indicators: list[str]) -> tuple[float, list[str]]:
     """Score based on payload indicator labels."""
     score = 0.0
     reasons: list[str] = []
+    high_seen = 0
 
     for indicator in indicators:
         ind_lower = indicator.lower()
         if ind_lower in HIGH_RISK_INDICATORS:
-            score += 20.0
+            # One recognized attack signature is enough to reach HIGH (decoy).
+            score += FIRST_HIGH_INDICATOR_SCORE if high_seen == 0 else EXTRA_HIGH_INDICATOR_SCORE
+            high_seen += 1
             reasons.append(f"High-risk payload indicator: {indicator}")
         elif ind_lower in MEDIUM_RISK_INDICATORS:
-            score += 8.0
+            score += MEDIUM_INDICATOR_SCORE
             reasons.append(f"Medium-risk payload indicator: {indicator}")
 
-    return min(score, 40.0), reasons  # cap at 40
+    return min(score, PAYLOAD_SCORE_CAP), reasons
 
 
 def calculate_risk(request: InspectRequest) -> RiskResult:
