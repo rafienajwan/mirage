@@ -159,7 +159,7 @@ Compose stack running and execute:
 python scripts/collect_runtime_review_batch.py \
   --base-url http://localhost:8000 \
   --normal-count 20 \
-  --borderline-count 20 \
+  --borderline-count 10 \
   --suspicious-count 20
 ```
 
@@ -188,6 +188,8 @@ The scenario groups diversify collection only. They never supply training
 labels; every aggregate row must come from an explicitly approved analyst
 review. The aggregator validates each source hash and rejects duplicate event
 IDs before writing ignored local outputs under `data/processed/runtime/`.
+Collection is capped at 50 events so the complete batch remains available in
+the current dashboard feed.
 The older `collect_api_domain_training_data.py` command assigns scenario labels
 automatically and is only for deterministic pipeline validation.
 

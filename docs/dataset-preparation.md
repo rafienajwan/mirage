@@ -168,9 +168,9 @@ cd apps/gateway
 python scripts/collect_runtime_review_batch.py \
   --base-url http://localhost:8000 \
   --batch-id runtime-002 \
-  --normal-count 35 \
-  --borderline-count 30 \
-  --suspicious-count 35 \
+  --normal-count 20 \
+  --borderline-count 10 \
+  --suspicious-count 20 \
   --queue-output data/raw/runtime/review-batches/runtime-002/queue.json \
   --manifest-output data/raw/runtime/review-batches/runtime-002/manifest.json
 ```
@@ -203,9 +203,11 @@ exact UTF-8 bytes with LF line endings, so their recorded SHA-256 values remain
 stable across Windows and Linux. Verify the byte-level hashes before preparing
 or training from a finalized batch.
 
-Repeat collection and manual review with a new batch ID. Keep each batch at no
-more than 100 events so every decision remains reviewable. To combine finalized
-batches, pass each event file together with its summary:
+Repeat collection and manual review with a new batch ID. Each batch is capped
+at 50 events so every queued event remains available in the current dashboard
+feed. Twenty complete batches provide the 1,000 reviewed rows required by the
+default promotion gate. To combine finalized batches, pass each event file
+together with its summary:
 
 ```bash
 python scripts/aggregate_runtime_review_batches.py \
