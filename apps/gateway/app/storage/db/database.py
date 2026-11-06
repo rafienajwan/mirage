@@ -22,7 +22,11 @@ _pool_class = None
 
 if settings.database_url.startswith("sqlite"):
     _connect_args["check_same_thread"] = False
-    _pool_class = StaticPool
+    # An in-memory database exists only inside one connection, so it must be
+    # shared. File databases get a normal pool: sharing one connection lets a
+    # concurrent session's rollback discard another session's pending writes.
+    if ":memory:" in settings.database_url:
+        _pool_class = StaticPool
 
 engine = create_async_engine(
     settings.database_url,
