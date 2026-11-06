@@ -231,16 +231,54 @@ without `MIRAGE_API_KEY`; standalone development permits it to be unset.
 
 ## Tests and Checks
 
+Every push and pull request to `main` runs `.github/workflows/ci.yml`. Each job
+below must pass; run the same commands locally before pushing.
+
+Python services (Python 3.13 in CI; `pip-audit` fails on any known
+vulnerability):
+
 ```bash
 cd apps/gateway
-python -m pytest tests -q
+python -m pip install -e ".[dev,ml,postgres]"
+python -m pytest -q
+python -m pip install pip-audit && pip-audit --skip-editable
+
+cd ../decoy          # same for ../real-app-demo
+python -m pip install -e ".[dev]"
+python -m pytest -q
+pip-audit --skip-editable
 ```
+
+Lint, from the repository root (config in `ruff.toml`, includes bandit-style
+`S` security rules):
+
+```bash
+pip install ruff==0.17.4
+ruff check .
+```
+
+Web (Node 20 in CI):
 
 ```bash
 cd apps/web
+npm ci --ignore-scripts
 npm run lint
+npx tsc --noEmit
+npm test
 npm run build
+npm audit --omit=dev --audit-level=low   # any production-dependency vulnerability fails
+npm audit --audit-level=high             # high/critical anywhere fails
 ```
+
+Secret scan over the full git history (config in `.gitleaks.toml`;
+[gitleaks](https://github.com/gitleaks/gitleaks) 8.30.1):
+
+```bash
+gitleaks git --config .gitleaks.toml --redact .
+```
+
+Dependabot (`.github/dependabot.yml`) proposes weekly updates for pip, npm, and
+GitHub Actions.
 
 Validate Compose after filling `.env`:
 
