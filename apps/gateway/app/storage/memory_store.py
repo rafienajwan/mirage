@@ -5,10 +5,10 @@ Drop-in replacement for DatabaseStore — all methods are async.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from collections import defaultdict
+from datetime import datetime, timezone
 
-from app.schemas.actor import ActorCase, ActorCaseWorkflow, CaseWorkflowStatus, ActorProfile
+from app.schemas.actor import ActorCase, ActorCaseWorkflow, ActorProfile, CaseWorkflowStatus
 from app.schemas.canary import CanaryAssignment, CanaryAssignmentStatus
 from app.schemas.dashboard import AlertRecord, AlertSeverity
 from app.schemas.decision import Decision
