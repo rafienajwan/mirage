@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from urllib.parse import quote
 
-import httpx
 from fastapi import HTTPException, Request
 from fastapi.responses import Response
+import httpx
 
 from app.core.config import settings
 

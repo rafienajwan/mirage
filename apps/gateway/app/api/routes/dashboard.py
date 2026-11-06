@@ -3,33 +3,30 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from app.core.security import require_api_key
-from app.schemas.dashboard import (
-    ActorCaseSummary,
-    ActorCaseWorkflowSummary,
-    DashboardOverview,
-    ActorClusterSummary,
-    ActorProfileSummary,
-    HoneytokenSummary,
-    MLPromotionReadiness,
-    MLShadowSummary,
-    MLShadowStatus,
-    TrainingDataSummary,
+from app.schemas.actor import (
+    ActorCaseOpenRequest,
+    ActorCaseUpdateRequest,
+    CaseWorkflowStatus,
 )
 from app.schemas.canary import (
     CanaryAssignmentRevokeRequest,
     CanaryAssignmentStatus,
     CanaryAssignmentSummary,
 )
-from app.schemas.actor import (
-    ActorCaseOpenRequest,
-    ActorCaseUpdateRequest,
-    CaseWorkflowStatus,
+from app.schemas.dashboard import (
+    ActorCaseSummary,
+    ActorCaseWorkflowSummary,
+    ActorClusterSummary,
+    ActorProfileSummary,
+    DashboardOverview,
+    HoneytokenSummary,
+    MLPromotionReadiness,
+    MLShadowStatus,
+    MLShadowSummary,
+    TrainingDataSummary,
 )
 from app.schemas.event import EventLabelRequest
 from app.schemas.retraining import RetrainingRun
-from app.services.ml_status import get_ml_shadow_status
-from app.services.ml_promotion import evaluate_ml_promotion
-from app.services.ml_shadow_summary import get_ml_shadow_summary
 from app.services.actor_clusters import (
     get_actor_cases,
     get_actor_clusters,
@@ -39,6 +36,9 @@ from app.services.actor_clusters import (
 )
 from app.services.actor_profiles import get_actor_profiles
 from app.services.dashboard_stream import schedule_dashboard_snapshot_refresh
+from app.services.ml_promotion import evaluate_ml_promotion
+from app.services.ml_shadow_summary import get_ml_shadow_summary
+from app.services.ml_status import get_ml_shadow_status
 from app.services.retraining import train_from_labeled_events
 from app.services.threat_analysis import get_threat_summary
 from app.services.training_export import events_to_jsonl, training_data_summary

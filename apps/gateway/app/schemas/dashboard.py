@@ -11,7 +11,6 @@ from pydantic import BaseModel, Field
 from app.schemas.actor import ActorCase, ActorCaseWorkflow, ActorCluster, ActorProfile
 from app.schemas.honeytoken import HoneytokenHit
 
-
 # ─── Overview ──────────────────────────────────────────────────
 
 class DashboardOverview(BaseModel):

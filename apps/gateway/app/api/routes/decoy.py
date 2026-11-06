@@ -2,11 +2,11 @@
 
 from fastapi import APIRouter, Depends
 
-from app.schemas.dashboard import DecoyResponse, DecoyResponseRequest, DecoyStatus
-from app.services.decoy_engine import generate_decoy_response, FAKE_ENDPOINTS
-from app.services.canary_assignments import record_canary_assignments
-from app.storage import store
 from app.core.security import require_api_key
+from app.schemas.dashboard import DecoyResponse, DecoyResponseRequest, DecoyStatus
+from app.services.canary_assignments import record_canary_assignments
+from app.services.decoy_engine import FAKE_ENDPOINTS, generate_decoy_response
+from app.storage import store
 
 router = APIRouter(prefix="/decoy", tags=["decoy"])
 

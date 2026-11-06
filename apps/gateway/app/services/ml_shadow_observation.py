@@ -6,7 +6,6 @@ from collections import Counter
 from datetime import datetime, timezone
 from typing import Any, Iterable
 
-
 DECISION_KEYS = ("allow", "monitor", "redirect_to_decoy")
 
 
