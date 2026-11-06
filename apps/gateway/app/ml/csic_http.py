@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass
+import hashlib
 from pathlib import Path
 from urllib.parse import urlsplit
 
