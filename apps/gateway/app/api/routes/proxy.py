@@ -58,6 +58,7 @@ async def proxy_request(target_path: str, request: Request) -> Response:
         request.url.query,
         body,
         content_type=request.headers.get("content-type"),
+        headers=(request.headers.get("user-agent", ""), request.headers.get("referer", "")),
     )
     indicators, exempted = apply_exemptions(request.method, path, indicators)
     payload_excerpt = build_payload_excerpt(

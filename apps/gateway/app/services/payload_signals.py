@@ -168,15 +168,18 @@ def detect_payload_indicators(
     body: bytes,
     *,
     content_type: str | None = None,
+    headers: tuple[str, ...] = (),
 ) -> list[str]:
     """Return sorted, unique labels for attack signatures in any common encoding.
 
     The whole body is inspected; callers bound its size (the proxy rejects
-    bodies above ``PROXY_MAX_BODY_BYTES``).
+    bodies above ``PROXY_MAX_BODY_BYTES``). ``headers`` are extra header values
+    to inspect (User-Agent, Referer); Cookie and Authorization are left out
+    because their opaque values produce false positives.
     """
     body_text = body.decode("utf-8", errors="ignore")
     indicators: set[str] = set()
-    for part in (path, query, body_text):
+    for part in (path, query, body_text, *headers):
         indicators |= _part_indicators(part)
     if len(body) > LARGE_PAYLOAD_BYTES:
         indicators.add("large-payload")

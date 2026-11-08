@@ -446,6 +446,18 @@ async def test_exempt_route_reaches_real_app_and_records_exemption(client, monke
     assert captured["is_decoy"] is True
 
 
+@pytest.mark.parametrize("header", ["user-agent", "referer"])
+async def test_attack_in_user_agent_or_referer_reaches_decoy(client, monkeypatch, header):
+    captured = await _route(
+        client,
+        monkeypatch,
+        "GET",
+        "/api/v1/proxy/api/products",
+        headers={header: "${jndi:ldap://x/a}"},
+    )
+    assert captured["is_decoy"] is True
+
+
 async def test_oversized_user_agent_and_path_are_routed_and_logged(client, monkeypatch):
     from app.storage import store
 
