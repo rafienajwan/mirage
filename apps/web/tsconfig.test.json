@@ -18,6 +18,8 @@
     "src/lib/login-throttle.ts",
     "src/lib/login-throttle.test.ts",
     "src/lib/safe-next-path.ts",
-    "src/lib/safe-next-path.test.ts"
+    "src/lib/safe-next-path.test.ts",
+    "src/lib/proxy-policy.ts",
+    "src/lib/proxy-policy.test.ts"
   ]
 }
