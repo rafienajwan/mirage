@@ -18,7 +18,7 @@ import type { ActorCaseSummary, ActorCaseWorkflow, ActorCaseWorkflowSummary, Act
 import { useDashboardStream } from "@/hooks/useDashboardStream";
 import { pollIntervalFor } from "@/lib/dashboard-stream";
 import { selectNewAlerts } from "@/lib/alert-toasts";
-import { SessionExpiredError } from "@/lib/http-failure";
+import { SessionExpiredError, summarizeFailures } from "@/lib/http-failure";
 import { Globe, ShieldAlert, ArrowRightLeft, Bell, BrainCircuit, Database, Download, KeyRound, Loader2, AlertTriangle, Volume2, VolumeX, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -315,47 +315,33 @@ export default function DashboardPage() {
   }, [reportError]);
 
   const load = useCallback(async () => {
-    try {
-      const [ov, ev, al, tr, rh, ds, ts, ms, mss, mpr, ht, ca, ap, ac, cases, workflows] = await Promise.all([
-        fetchOverview(),
-        fetchEvents(),
-        fetchAlerts(),
-        fetchTraffic(),
-        fetchRiskHistory(),
-        fetchDecoyStatus(),
-        fetchTrainingDataSummary().catch(() => null),
-        fetchMLShadowStatus().catch(() => null),
-        fetchMLShadowSummary().catch(() => null),
-        fetchMLPromotionReadiness().catch(() => null),
-        fetchHoneytokens().catch(() => null),
-        fetchCanaryAssignments().catch(() => null),
-        fetchActorProfiles().catch(() => null),
-        fetchActorClusters().catch(() => null),
-        fetchActorCases().catch(() => null),
-        fetchActorCaseWorkflows().catch(() => null),
-      ]);
-      setOverview(ov);
-      setEvents(ev);
-      handleAlertsUpdate(al);
-      setTraffic(tr);
-      setRiskHistory(rh);
-      setDecoyStatus(ds);
-      setTrainingSummary(ts);
-      setMlShadowStatus(ms);
-      setMlShadowSummary(mss);
-      setMlPromotionReadiness(mpr);
-      setHoneytokens(ht);
-      setCanaryAssignments(ca);
-      setActorProfiles(ap);
-      setActorClusters(ac);
-      setActorCases(cases);
-      setActorCaseWorkflows(workflows);
+    // allSettled: a failed request keeps the previous value on screen and is
+    // reported in the error banner, instead of rendering as empty or zero.
+    const results = await Promise.allSettled([
+      fetchOverview().then(setOverview),
+      fetchEvents().then(setEvents),
+      fetchAlerts().then(handleAlertsUpdate),
+      fetchTraffic().then(setTraffic),
+      fetchRiskHistory().then(setRiskHistory),
+      fetchDecoyStatus().then(setDecoyStatus),
+      fetchTrainingDataSummary().then(setTrainingSummary),
+      fetchMLShadowStatus().then(setMlShadowStatus),
+      fetchMLShadowSummary().then(setMlShadowSummary),
+      fetchMLPromotionReadiness().then(setMlPromotionReadiness),
+      fetchHoneytokens().then(setHoneytokens),
+      fetchCanaryAssignments().then(setCanaryAssignments),
+      fetchActorProfiles().then(setActorProfiles),
+      fetchActorClusters().then(setActorClusters),
+      fetchActorCases().then(setActorCases),
+      fetchActorCaseWorkflows().then(setActorCaseWorkflows),
+    ]);
+    const failure = summarizeFailures(results);
+    if (failure) {
+      reportError(failure, "Failed to fetch data");
+    } else {
       setError(null);
-    } catch (err) {
-      reportError(err, "Failed to fetch data");
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   }, [handleAlertsUpdate, reportError]);
 
   const handleStreamMessage = useCallback(
@@ -443,12 +429,16 @@ export default function DashboardPage() {
   const promotionBlocker = mlPromotionReadiness?.gates.find((gate) => !gate.passed);
   const promotionDetail = promotionBlocker?.message ?? "all configured gates passed";
   const latestHoneytoken = honeytokens?.hits[0];
-  const honeytokenLabel = honeytokens?.totalHits
-    ? `HONEYTOKEN HITS: ${honeytokens.totalHits}`
-    : "HONEYTOKENS CLEAR";
-  const honeytokenDetail = latestHoneytoken
-    ? `${latestHoneytoken.tokenLabel} on ${latestHoneytoken.method} ${latestHoneytoken.path}`
-    : "no decoy token use observed";
+  const honeytokenLabel = !honeytokens
+    ? "HONEYTOKENS N/A"
+    : honeytokens.totalHits
+      ? `HONEYTOKEN HITS: ${honeytokens.totalHits}`
+      : "HONEYTOKENS CLEAR";
+  const honeytokenDetail = !honeytokens
+    ? "honeytoken data not loaded"
+    : latestHoneytoken
+      ? `${latestHoneytoken.tokenLabel} on ${latestHoneytoken.method} ${latestHoneytoken.path}`
+      : "no decoy token use observed";
 
   return (
     <div className="min-h-screen flex flex-col bg-bg-dark-navy text-white relative">
@@ -470,9 +460,11 @@ export default function DashboardPage() {
             <div
               title={`Honeytokens: ${honeytokenDetail}`}
               className={`flex items-center gap-2 px-3 py-2 rounded border text-[10px] font-mono tracking-widest ${
-                honeytokens?.totalHits
-                  ? "border-red-500/25 bg-red-500/5 text-red-300"
-                  : "border-brand-emerald/25 bg-brand-emerald/10 text-brand-emerald"
+                !honeytokens
+                  ? "border-white/5 bg-white/2 text-white/40"
+                  : honeytokens.totalHits
+                    ? "border-red-500/25 bg-red-500/5 text-red-300"
+                    : "border-brand-emerald/25 bg-brand-emerald/10 text-brand-emerald"
               }`}
             >
               <KeyRound className="w-3.5 h-3.5 shrink-0" />
@@ -631,25 +623,25 @@ export default function DashboardPage() {
             <>
               <MetricCard
                 label="Total Requests"
-                value={overview?.totalRequests ?? 0}
+                value={overview?.totalRequests ?? null}
                 icon={Globe}
                 accentColor="cyan"
               />
               <MetricCard
                 label="Suspicious Requests"
-                value={overview?.suspiciousRequests ?? 0}
+                value={overview?.suspiciousRequests ?? null}
                 icon={ShieldAlert}
                 accentColor="amber"
               />
               <MetricCard
                 label="Decoy Redirects"
-                value={overview?.decoyRedirects ?? 0}
+                value={overview?.decoyRedirects ?? null}
                 icon={ArrowRightLeft}
                 accentColor="emerald"
               />
               <MetricCard
                 label="Active Alerts"
-                value={overview?.activeAlerts ?? 0}
+                value={overview?.activeAlerts ?? null}
                 icon={Bell}
                 accentColor="red"
               />
@@ -663,7 +655,7 @@ export default function DashboardPage() {
             <TrafficChart data={traffic} />
           </div>
           <div>
-            <RiskScoreWidget score={overview?.averageRiskScore ?? 0} history={riskHistory} />
+            <RiskScoreWidget score={overview?.averageRiskScore ?? null} history={riskHistory} />
           </div>
         </div>
 

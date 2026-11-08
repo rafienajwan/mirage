@@ -31,3 +31,22 @@ export class SessionExpiredError extends Error {
     this.name = "SessionExpiredError";
   }
 }
+
+/**
+ * Collapse a batch of settled dashboard requests into one error, or null when
+ * all succeeded. An expired session wins so the caller can redirect.
+ */
+export function summarizeFailures(
+  results: ReadonlyArray<PromiseSettledResult<unknown>>,
+): unknown {
+  const reasons = results.flatMap((result) =>
+    result.status === "rejected" ? [result.reason] : [],
+  );
+  if (reasons.length === 0) return null;
+  const expired = reasons.find((reason) => reason instanceof SessionExpiredError);
+  if (expired) return expired;
+  const first = reasons[0] instanceof Error ? reasons[0].message : "Request failed";
+  return new Error(
+    `${reasons.length} of ${results.length} dashboard requests failed. ${first}`,
+  );
+}

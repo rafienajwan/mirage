@@ -19,11 +19,13 @@ const getSnapshot = () => true;
 const getServerSnapshot = () => false;
 
 interface RiskScoreWidgetProps {
-  score: number;
+  /** null when the overview could not be loaded; renders as "n/a". */
+  score: number | null;
   history: RiskHistoryPoint[];
 }
 
-function getScoreMeta(score: number): { label: string; color: string } {
+function getScoreMeta(score: number | null): { label: string; color: string } {
+  if (score === null) return { label: "n/a", color: "rgba(255,255,255,0.3)" };
   if (score >= 75) return { label: "Critical", color: "#ef4444" };
   if (score >= 50) return { label: "High", color: "#f97316" };
   if (score >= 25) return { label: "Elevated", color: "#f59e0b" };
@@ -37,7 +39,7 @@ export default function RiskScoreWidget({ score, history }: RiskScoreWidgetProps
   const mounted = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const { label, color } = getScoreMeta(score);
   const circumference = 2 * Math.PI * 40;
-  const offset = circumference - (score / 100) * circumference;
+  const offset = circumference - ((score ?? 0) / 100) * circumference;
 
   // Map risk history to chart format
   const chartData = history.map((h) => ({
@@ -73,7 +75,7 @@ export default function RiskScoreWidget({ score, history }: RiskScoreWidgetProps
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-xl font-bold font-display text-white">{Math.round(score)}</span>
+            <span className="text-xl font-bold font-display text-white">{score === null ? "n/a" : Math.round(score)}</span>
             <span className="text-[8px] text-white/40 uppercase tracking-widest">Risk</span>
           </div>
         </div>

@@ -16,8 +16,8 @@ interface DecoyStatusCardProps {
  */
 export default function DecoyStatusCard({ data }: DecoyStatusCardProps) {
   const endpoints = data?.fakeEndpoints ?? [];
-  const activeCount = data?.activeDecoys ?? 0;
-  const captured = data?.capturedInteractions ?? 0;
+  const activeCount = data?.activeDecoys ?? "n/a";
+  const captured = data?.capturedInteractions ?? "n/a";
   const lastTrigger = data?.lastDecoyTrigger
     ? new Date(data.lastDecoyTrigger).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : null;

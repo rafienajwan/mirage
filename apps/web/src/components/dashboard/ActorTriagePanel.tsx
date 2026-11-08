@@ -50,7 +50,7 @@ export default function ActorTriagePanel({
         <div className="flex flex-wrap items-center gap-2 text-[9px] font-mono text-white/40">
           <span className="flex items-center gap-1.5">
             <FolderSearch className="h-3.5 w-3.5 text-brand-cyan/80" />
-            {cases?.totalCases ?? 0} cases
+            {cases?.totalCases ?? "n/a"} cases
           </span>
           <span className="flex items-center gap-1.5">
             <CheckCircle2 className="h-3.5 w-3.5 text-brand-emerald/80" />
@@ -58,7 +58,7 @@ export default function ActorTriagePanel({
           </span>
           <span className="flex items-center gap-1.5">
             <GitBranch className="h-3.5 w-3.5 text-brand-emerald/80" />
-            {clusters?.totalClusters ?? 0} clusters
+            {clusters?.totalClusters ?? "n/a"} clusters
           </span>
         </div>
       </div>
