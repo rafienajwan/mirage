@@ -329,7 +329,9 @@ curl -X POST \
 
 The endpoint stores the artifact in `MIRAGE_RETRAINING_ARTIFACT_DIR`, returns
 the training metrics, and includes the same artifact review result used before
-shadow-mode activation. It does not update `MIRAGE_MODEL_ARTIFACT`.
+shadow-mode activation. It does not update `MIRAGE_MODEL_ARTIFACT`. Its
+internal holdout keeps identical feature vectors on one side; when a class has
+fewer than two distinct feature vectors the endpoint returns `409`.
 
 After each successful run only the five newest `risk_model_*.joblib` files in
 that directory are kept. The file configured as `MIRAGE_MODEL_ARTIFACT` is never

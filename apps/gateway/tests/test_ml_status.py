@@ -59,7 +59,7 @@ def test_ml_shadow_status_ready_artifact(monkeypatch, tmp_path):
     assert status["mode"] == "shadow_ready"
     assert status["artifact"] == "risk_model.joblib"
     assert status["shadow_ready"] is True
-    assert status["metrics"]["training_rows"] == 105
+    assert status["metrics"]["training_rows"] == 104
 
 
 def test_ml_shadow_status_reuses_review_of_unchanged_artifact(monkeypatch, tmp_path):

@@ -163,7 +163,9 @@ python scripts/train_model.py \
 
 With `--manifest`, the model fits on the whole train split and the artifact
 metrics come from the prepared `test.jsonl`. Without it, the trainer holds out
-25% of the input itself.
+about 25% of the input itself, grouping rows with identical feature vectors the
+same way dataset preparation does, so a duplicate never lands on both sides.
+Training fails if a class has fewer than two distinct feature vectors.
 
 Review `data/prepared/runtime-v1/manifest.json` before training or enabling an
 artifact in shadow mode. It records row counts, label balance, split ratio,

@@ -10,8 +10,12 @@ from app.ml.artifact_integrity import sha256_file
 from app.services import retraining
 
 
-async def _create_labeled_event(client, index: int, label: str) -> None:
+async def _create_labeled_event(
+    client, index: int, label: str, *, distinct: bool = True
+) -> None:
     suspicious = label == "suspicious"
+    # Vary the request count so each event has its own feature vector.
+    extra = index if distinct else 0
     response = await client.post(
         "/api/v1/inspect",
         json={
@@ -19,7 +23,7 @@ async def _create_labeled_event(client, index: int, label: str) -> None:
             "method": "POST" if suspicious else "GET",
             "path": f"/.env/{index}" if suspicious else f"/api/v1/products/{index}",
             "user_agent": "sqlmap/1.8" if suspicious else "Mozilla/5.0",
-            "request_count": 90 if suspicious else 2,
+            "request_count": (90 if suspicious else 2) + extra,
             "payload_indicators": (
                 ["sql-like", "path-traversal"] if suspicious else []
             ),
@@ -73,11 +77,28 @@ async def test_retraining_trains_and_reviews_local_artifact(client, tmp_path, mo
     assert len(list(tmp_path.glob("risk_model_*.joblib"))) == 5
     assert artifact.parent == tmp_path
     assert data["training_summary"]["ready_for_training"] is True
-    assert data["metrics"]["training_rows"] == 15
-    assert data["metrics"]["test_rows"] == 5
+    assert data["metrics"]["training_rows"] == 14
+    assert data["metrics"]["test_rows"] == 6
     assert data["review"]["artifact_version"] == 1
     assert data["artifact_sha256"] == sha256_file(artifact)
     assert "live routing heuristic" in data["next_steps"][2]
+
+
+@pytest.mark.asyncio
+async def test_retraining_rejects_identical_rows_clearly(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        retraining,
+        "settings",
+        SimpleNamespace(retraining_artifact_dir=str(tmp_path), ml_model_artifact=None),
+    )
+    for index in range(10):
+        await _create_labeled_event(client, index, "normal", distinct=False)
+        await _create_labeled_event(client, index + 10, "suspicious")
+
+    response = await client.post("/api/v1/dashboard/training-data/retrain")
+
+    assert response.status_code == 409
+    assert "distinct feature groups" in response.json()["detail"]["message"]
 
 
 @pytest.mark.asyncio

@@ -13,6 +13,7 @@ from starlette.concurrency import run_in_threadpool
 from app.core.config import settings
 from app.ml.artifact_integrity import sha256_file
 from app.ml.artifacts import file_stamp, review_model_artifact
+from app.ml.errors import DatasetValidationError
 from app.ml.training import LabeledFeatures, train_risk_classifier
 from app.schemas.retraining import RetrainingRun
 from app.services.training_export import event_to_training_row, training_data_summary
@@ -90,7 +91,13 @@ async def train_from_labeled_events(limit: int = 10000) -> RetrainingRun:
         return result
 
     # Training takes seconds; keep the event loop serving traffic meanwhile.
-    metrics, review, artifact_sha256 = await run_in_threadpool(train_and_review)
+    try:
+        metrics, review, artifact_sha256 = await run_in_threadpool(train_and_review)
+    except DatasetValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"message": str(exc), "training_summary": summary},
+        ) from exc
     metrics_dict = metrics.__dict__
 
     return RetrainingRun(

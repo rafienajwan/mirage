@@ -28,8 +28,8 @@ def test_review_model_artifact_marks_valid_shadow_ready(tmp_path):
     assert review.artifact_version == 1
     assert review.feature_contract_version == 3
     assert review.blockers == []
-    assert review.metrics["training_rows"] == 105
-    assert review.metrics["test_rows"] == 35
+    assert review.metrics["training_rows"] == 104
+    assert review.metrics["test_rows"] == 36
 
 
 def test_review_model_artifact_rejects_feature_contract_mismatch(tmp_path):

@@ -166,3 +166,41 @@ def test_train_script_rejects_rows_without_features(tmp_path, monkeypatch):
 
     with pytest.raises(DatasetValidationError, match="line 1"):
         train_model.main()
+
+
+def test_internal_split_keeps_identical_rows_on_one_side(tmp_path, monkeypatch):
+    from sklearn.ensemble import RandomForestClassifier
+
+    from app.ml import training
+
+    seen = {}
+
+    class Spy(RandomForestClassifier):
+        def fit(self, x, y, *args, **kwargs):
+            seen["train"] = {tuple(row) for row in x}
+            return super().fit(x, y, *args, **kwargs)
+
+        def predict(self, x):
+            seen["test"] = {tuple(row) for row in x}
+            return super().predict(x)
+
+    monkeypatch.setattr(training, "RandomForestClassifier", Spy)
+    monkeypatch.setattr(training.joblib, "dump", lambda *_args: None)
+    rows = [
+        _row(label, float(index + 1))
+        for label in (0, 1)
+        for index in range(8)
+        for _ in range(4)
+    ]
+
+    train_risk_classifier(rows, tmp_path / "model.joblib")
+
+    assert seen["train"] and seen["test"]
+    assert not seen["train"] & seen["test"]
+
+
+def test_internal_split_fails_when_a_class_has_one_distinct_vector(tmp_path):
+    rows = [_row(0, 1.0)] * 20 + [_row(1, float(i + 1)) for i in range(20)]
+
+    with pytest.raises(ValueError, match="distinct feature groups"):
+        train_risk_classifier(rows, tmp_path / "model.joblib")
