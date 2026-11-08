@@ -311,6 +311,31 @@ async def test_forward_request_keeps_repeated_response_headers(monkeypatch):
     assert response.headers["location"] == "/api/v1/proxy/next"
 
 
+@pytest.mark.parametrize(
+    "path",
+    ["/files/a%2541", "/files/a%2Fb", "/files/report%20final.pdf"],
+)
+async def test_proxy_forwards_the_raw_encoded_path(client, monkeypatch, path):
+    seen = {}
+
+    async def upstream_handler(request: httpx.Request) -> httpx.Response:
+        seen["raw_path"] = request.url.raw_path
+        return httpx.Response(200)
+
+    transport = httpx.MockTransport(upstream_handler)
+    original_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        proxy_client.httpx,
+        "AsyncClient",
+        lambda **kwargs: original_client(transport=transport, **kwargs),
+    )
+
+    response = await client.get(f"/api/v1/proxy{path}?page=2", headers={"user-agent": BROWSER_UA})
+
+    assert response.status_code == 200
+    assert seen["raw_path"] == f"{path}?page=2".encode()
+
+
 @pytest.mark.asyncio
 async def test_traffic_tracker_bounds_distinct_sources():
     tracker = TrafficTracker(max_sources=2)
