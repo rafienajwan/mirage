@@ -52,6 +52,9 @@ class DashboardStreamManager:
     def disconnect(self, websocket: WebSocket) -> None:
         self._clients.discard(websocket)
 
+    def has_clients(self) -> bool:
+        return bool(self._clients)
+
     async def broadcast(self, message: dict[str, Any]) -> None:
         stale: list[WebSocket] = []
         for client in list(self._clients):
@@ -231,10 +234,12 @@ class DashboardSnapshotRefreshCoordinator:
         build_snapshot: SnapshotBuilder = build_dashboard_snapshot,
         broadcast_update: DashboardBroadcaster = broadcast_dashboard_update,
         debounce_seconds: float = 0.1,
+        has_clients: Callable[[], bool] = dashboard_stream.has_clients,
     ) -> None:
         self._build_snapshot = build_snapshot
         self._broadcast_update = broadcast_update
         self._debounce_seconds = debounce_seconds
+        self._has_clients = has_clients
         self._pending = False
         self._task: asyncio.Task[None] | None = None
 
@@ -250,6 +255,10 @@ class DashboardSnapshotRefreshCoordinator:
             await asyncio.sleep(self._debounce_seconds)
             while self._pending:
                 self._pending = False
+                if not self._has_clients():
+                    # Nobody would receive it; a new dashboard gets a fresh
+                    # snapshot when it connects.
+                    return
                 try:
                     snapshot = await self._build_snapshot()
                     await self._broadcast_update("snapshot", snapshot)

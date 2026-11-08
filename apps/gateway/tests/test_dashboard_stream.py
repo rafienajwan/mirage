@@ -355,6 +355,7 @@ async def test_snapshot_refresh_coalesces_while_build_is_running():
         build_snapshot=build_snapshot,
         broadcast_update=broadcast_update,
         debounce_seconds=0,
+        has_clients=lambda: True,
     )
     task = coordinator.schedule()
     await started.wait()
@@ -387,6 +388,7 @@ async def test_snapshot_refresh_recovers_after_build_failure():
         build_snapshot=build_snapshot,
         broadcast_update=broadcast_update,
         debounce_seconds=0,
+        has_clients=lambda: True,
     )
 
     await coordinator.schedule()
@@ -394,3 +396,27 @@ async def test_snapshot_refresh_recovers_after_build_failure():
 
     assert attempts == 2
     assert messages == [{"type": "snapshot", "payload": {"attempt": 2}}]
+
+
+@pytest.mark.asyncio
+async def test_snapshot_refresh_skips_build_without_connected_dashboards():
+    builds = 0
+
+    async def build_snapshot() -> dict:
+        nonlocal builds
+        builds += 1
+        return {}
+
+    async def broadcast_update(kind: str, payload: dict) -> None:
+        pass
+
+    coordinator = dashboard_stream.DashboardSnapshotRefreshCoordinator(
+        build_snapshot=build_snapshot,
+        broadcast_update=broadcast_update,
+        debounce_seconds=0,
+        has_clients=lambda: False,
+    )
+
+    await coordinator.schedule()
+
+    assert builds == 0
