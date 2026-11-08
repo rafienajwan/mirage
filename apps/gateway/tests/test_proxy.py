@@ -420,3 +420,31 @@ async def test_oversized_user_agent_and_path_are_routed_and_logged(client, monke
     alert = (await store.get_alerts(limit=1))[0]
     assert alert.title.startswith("Decoy redirect: /.env/")
     assert len(alert.title) <= 256
+
+
+async def test_concurrent_requests_from_one_actor_are_all_logged(client, monkeypatch):
+    import asyncio
+
+    from app.services.actor_profiles import get_actor_profiles
+    from app.storage import store
+
+    async def fake_forward(_request, **_kwargs):
+        await asyncio.sleep(0.05)  # upstream latency lines the requests up
+        return JSONResponse({"secret_key": "mirage-issued-service-canary-0123456789ab"})
+
+    monkeypatch.setattr(proxy_route, "forward_request", fake_forward)
+    responses = await asyncio.gather(
+        *(
+            client.get(
+                f"/api/v1/proxy/.env/{index}",
+                headers={"user-agent": "sqlmap/1.8"},
+            )
+            for index in range(20)
+        )
+    )
+
+    assert [response.status_code for response in responses] == [200] * 20
+    assert await store.get_total_requests() == 20
+    profiles = (await get_actor_profiles(limit=5)).profiles
+    assert [profile.request_count for profile in profiles] == [20]
+    assert len(await store.get_canary_assignments()) == 1
