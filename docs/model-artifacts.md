@@ -373,6 +373,11 @@ manifest configured through `MIRAGE_MODEL_DATASET_MANIFEST`. It reports:
   shadow events, the model's precision or recall is below the heuristic's;
 - `eligible` when every configured gate passes.
 
+The labeled comparison only passes when the labels include at least one
+suspicious and one normal event and the model caught at least one suspicious
+event. A rate with nothing to divide by (for example precision for a model that
+never redirects) is undefined and never counts as matching the heuristic.
+
 Only sanitized file names are returned. The report never changes the active
 artifact or heuristic routing policy. Agreement with the heuristic is shown for
 information only and never blocks promotion: a model that copies the heuristic

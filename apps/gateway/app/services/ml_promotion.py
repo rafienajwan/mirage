@@ -98,9 +98,11 @@ def _artifact_matches_dataset(
 
 @dataclass(frozen=True)
 class ClassifierRates:
-    precision: float
-    recall: float
-    false_positive_rate: float
+    """Rates are None when their denominator is zero (undefined, not 0)."""
+
+    precision: float | None
+    recall: float | None
+    false_positive_rate: float | None
 
 
 @dataclass(frozen=True)
@@ -108,10 +110,12 @@ class LabeledComparison:
     events: int
     model: ClassifierRates
     heuristic: ClassifierRates
+    positives: int = 0
+    negatives: int = 0
 
 
-def _rate(numerator: int, denominator: int) -> float:
-    return round(numerator / denominator, 6) if denominator else 0.0
+def _rate(numerator: int, denominator: int) -> float | None:
+    return round(numerator / denominator, 6) if denominator else None
 
 
 def _rates(pairs: list[tuple[bool, bool]]) -> ClassifierRates:
@@ -139,24 +143,47 @@ def labeled_shadow_comparison(events: Iterable[EventRecord]) -> LabeledCompariso
         heuristic_decision = event.ml_shadow.heuristic_decision or event.decision.value
         model.append((truth, event.ml_shadow.shadow_decision == redirect))
         heuristic.append((truth, heuristic_decision == redirect))
+    positives = sum(truth for truth, _ in model)
     return LabeledComparison(
-        events=len(model), model=_rates(model), heuristic=_rates(heuristic)
+        events=len(model),
+        model=_rates(model),
+        heuristic=_rates(heuristic),
+        positives=positives,
+        negatives=len(model) - positives,
     )
 
 
 def _labeled_gate(comparison: LabeledComparison, minimum: int) -> MLPromotionGate:
     model, heuristic = comparison.model, comparison.heuristic
-    passed = (
-        comparison.events >= minimum
-        and model.precision >= heuristic.precision
-        and model.recall >= heuristic.recall
-    )
+    on_events = f"on {comparison.events} analyst-labeled events"
+    if not (comparison.positives and comparison.negatives):
+        passed = False
+        message = (
+            "Analyst labels must include at least one suspicious and one normal "
+            f"event; found {comparison.positives} suspicious and "
+            f"{comparison.negatives} normal {on_events}"
+        )
+    elif not model.recall:
+        # Recall is defined (positives exist), so 0 means no true positive.
+        passed = False
+        message = f"Model redirected none of the suspicious events {on_events}"
+    else:
+        # Model precision is defined here; an undefined heuristic precision
+        # (it never redirected) counts as 0.
+        passed = (
+            comparison.events >= minimum
+            and (model.precision or 0.0) >= (heuristic.precision or 0.0)
+            and model.recall >= (heuristic.recall or 0.0)
+        )
+        message = (
+            f"Model precision {model.precision} vs heuristic {heuristic.precision}, "
+            f"model recall {model.recall} vs heuristic {heuristic.recall} "
+            f"{on_events}"
+        )
     return _gate(
         "labeled_model_vs_heuristic",
         passed,
-        f"Model precision {model.precision} vs heuristic {heuristic.precision}, "
-        f"model recall {model.recall} vs heuristic {heuristic.recall} "
-        f"on {comparison.events} analyst-labeled events",
+        message,
         actual=comparison.events,
         required=minimum,
     )

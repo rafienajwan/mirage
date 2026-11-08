@@ -401,3 +401,35 @@ def test_low_agreement_no_longer_blocks_promotion():
     gate = next(g for g in report.gates if g.code == "shadow_agreement_rate")
     assert gate.actual == 0.5
     assert report.status == "eligible"
+
+
+def test_labeled_gate_fails_without_any_suspicious_label():
+    events = [_event("normal", "allow", "allow")] * 60 + [
+        _event("false_positive", "allow", "redirect_to_decoy")
+    ] * 60
+
+    report, gate = _labeled_gate(events, ml_promotion_min_labeled_events=100)
+
+    assert gate.passed is False
+    assert "suspicious and one normal" in gate.message
+    assert report.status != "eligible"
+
+
+def test_labeled_gate_fails_when_model_never_redirects():
+    events = [_event("suspicious", "allow", "allow")] * 60 + [
+        _event("normal", "allow", "allow")
+    ] * 60
+
+    report, gate = _labeled_gate(events, ml_promotion_min_labeled_events=100)
+
+    assert gate.passed is False
+    assert "redirected none" in gate.message
+    assert report.status != "eligible"
+
+
+def test_rates_with_empty_denominator_are_none():
+    comparison = labeled_shadow_comparison([_event("normal", "allow", "allow")])
+
+    assert comparison.model == ClassifierRates(
+        precision=None, recall=None, false_positive_rate=0.0
+    )
