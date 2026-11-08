@@ -285,6 +285,10 @@ def _event(label: str, model: str, heuristic: str | None, final: str = "allow"):
     )
 
 
+def _compare(events):
+    return labeled_shadow_comparison(events, artifact="risk-model.joblib")
+
+
 def _four_events():
     # Model: TP, FN, TN, TN -> precision 1.0, recall 0.5, FPR 0.0.
     # Heuristic: TP, FN, FP, TN -> precision 0.5, recall 0.5, FPR 0.5.
@@ -297,7 +301,7 @@ def _four_events():
 
 
 def test_labeled_comparison_rates():
-    comparison = labeled_shadow_comparison(_four_events())
+    comparison = _compare(_four_events())
 
     assert comparison.events == 4
     assert comparison.model == ClassifierRates(
@@ -314,7 +318,7 @@ def test_labeled_comparison_skips_events_without_label_or_shadow():
     )
     unscored = _event("normal", "allow", "allow").model_copy(update={"ml_shadow": None})
 
-    assert labeled_shadow_comparison([unlabeled, unscored]).events == 0
+    assert _compare([unlabeled, unscored]).events == 0
 
 
 def test_labeled_comparison_falls_back_to_final_decision():
@@ -323,7 +327,7 @@ def test_labeled_comparison_falls_back_to_final_decision():
         _event("normal", "allow", None, final="redirect_to_decoy"),
     ]
 
-    comparison = labeled_shadow_comparison(events)
+    comparison = _compare(events)
 
     assert comparison.heuristic == ClassifierRates(
         precision=0.5, recall=1.0, false_positive_rate=1.0
@@ -428,8 +432,22 @@ def test_labeled_gate_fails_when_model_never_redirects():
 
 
 def test_rates_with_empty_denominator_are_none():
-    comparison = labeled_shadow_comparison([_event("normal", "allow", "allow")])
+    comparison = _compare([_event("normal", "allow", "allow")])
 
     assert comparison.model == ClassifierRates(
         precision=None, recall=None, false_positive_rate=0.0
     )
+
+
+def test_labeled_comparison_ignores_events_scored_by_another_artifact():
+    other = _event("suspicious", "allow", "redirect_to_decoy")
+    other = other.model_copy(
+        update={"ml_shadow": other.ml_shadow.model_copy(update={"artifact": "a.joblib"})}
+    )
+
+    comparison = labeled_shadow_comparison(
+        [*_four_events(), other], artifact="risk-model.joblib"
+    )
+
+    assert comparison.events == 4
+    assert comparison.model.recall == 0.5

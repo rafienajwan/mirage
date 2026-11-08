@@ -144,7 +144,7 @@ async def ml_promotion_readiness(
     summary = await get_ml_shadow_summary(limit=limit)
     return evaluate_ml_promotion(
         shadow_summary=summary,
-        labeled_events=await store.get_labeled_events(limit=10000),
+        labeled_events=await store.get_labeled_events(limit=10000, newest_first=True),
     )
 
 

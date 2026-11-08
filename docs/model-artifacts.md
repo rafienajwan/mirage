@@ -377,6 +377,9 @@ The labeled comparison only passes when the labels include at least one
 suspicious and one normal event and the model caught at least one suspicious
 event. A rate with nothing to divide by (for example precision for a model that
 never redirects) is undefined and never counts as matching the heuristic.
+It uses the newest 10,000 analyst-labeled events and counts only those
+shadow-scored by the configured artifact (matched by file name), so labels on
+events scored by an earlier artifact do not vouch for the current one.
 
 Only sanitized file names are returned. The report never changes the active
 artifact or heuristic routing policy. Agreement with the heuristic is shown for

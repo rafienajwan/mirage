@@ -131,13 +131,23 @@ def _rates(pairs: list[tuple[bool, bool]]) -> ClassifierRates:
     )
 
 
-def labeled_shadow_comparison(events: Iterable[EventRecord]) -> LabeledComparison:
-    """Compare model and heuristic redirects against analyst labels."""
+def labeled_shadow_comparison(
+    events: Iterable[EventRecord], *, artifact: str
+) -> LabeledComparison:
+    """Compare model and heuristic redirects against analyst labels.
+
+    Only events shadow-scored by ``artifact`` (the configured artifact's file
+    name, as ``ml_shadow`` records it) count.
+    """
     redirect = Decision.REDIRECT_TO_DECOY.value
     model: list[tuple[bool, bool]] = []
     heuristic: list[tuple[bool, bool]] = []
     for event in events:
-        if event.analyst_label is None or event.ml_shadow is None:
+        if (
+            event.analyst_label is None
+            or event.ml_shadow is None
+            or event.ml_shadow.artifact != artifact
+        ):
             continue
         truth = LABEL_TO_BINARY[event.analyst_label] == 1
         heuristic_decision = event.ml_shadow.heuristic_decision or event.decision.value
@@ -376,7 +386,7 @@ def evaluate_ml_promotion(
                 actual=agreement_rate,
             ),
             _labeled_gate(
-                labeled_shadow_comparison(labeled_events),
+                labeled_shadow_comparison(labeled_events, artifact=artifact_path.name),
                 settings.ml_promotion_min_labeled_events,
             ),
         ]
