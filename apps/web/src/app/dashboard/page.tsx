@@ -440,6 +440,14 @@ export default function DashboardPage() {
       ? `${latestHoneytoken.tokenLabel} on ${latestHoneytoken.method} ${latestHoneytoken.path}`
       : "no decoy token use observed";
 
+  const footerStatus = error
+    ? { label: "LAST REFRESH FAILED", tone: "text-amber-400/70" }
+    : connectionStatus === "connected"
+      ? { label: "LIVE STREAM CONNECTED", tone: "text-brand-emerald/60" }
+      : connectionStatus === "connecting"
+        ? { label: "STREAM CONNECTING", tone: "text-white/40" }
+        : { label: `STREAM OFFLINE, POLLING EVERY ${pollIntervalFor("disconnected") / 1000}S`, tone: "text-amber-400/70" };
+
   return (
     <div className="min-h-screen flex flex-col bg-bg-dark-navy text-white relative">
       <Header showLogout />
@@ -681,6 +689,7 @@ export default function DashboardPage() {
             events={events}
             labelingEventId={labelingEventId}
             onLabel={handleLabelEvent}
+            connectionStatus={connectionStatus}
           />
         </div>
 
@@ -748,8 +757,8 @@ export default function DashboardPage() {
       {/* Footer */}
       <footer className="border-t border-white/5 py-6">
         <div className="max-w-350 mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[9px] text-white/20 font-mono">
-          <span>PROJECT MIRAGE // SECURITY DASHBOARD v1.0</span>
-          <span className="text-brand-emerald/60">ALL SYSTEMS NOMINAL</span>
+          <span>PROJECT MIRAGE // SECURITY DASHBOARD</span>
+          <span className={footerStatus.tone}>{footerStatus.label}</span>
         </div>
       </footer>
     </div>

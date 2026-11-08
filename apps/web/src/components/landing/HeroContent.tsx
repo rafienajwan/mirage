@@ -16,7 +16,7 @@ export default function HeroContent() {
         transition={{ duration: 0.6, delay: 0.2 }}
         className="font-display text-[9px] sm:text-[10px] md:text-xs font-bold tracking-[0.25em] sm:tracking-[0.3em] text-[#5ed29c] uppercase mb-3"
       >
-        AI-DRIVEN CYBER DECEPTION PLATFORM
+        CYBER DECEPTION PLATFORM FOR APIS
       </motion.span>
 
       {/* Main Headline */}
@@ -63,7 +63,7 @@ export default function HeroContent() {
 
         {/* Secondary CTA */}
         <Link
-          href="/dashboard"
+          href="/features#demo"
           className="relative w-full sm:w-auto px-8 py-3.5 rounded-full border border-white/5 hover:border-brand-cyan/20 bg-white/[0.01] hover:bg-brand-cyan/[0.02] backdrop-blur-sm font-display text-[10px] font-bold tracking-widest text-white/60 hover:text-brand-cyan uppercase flex items-center justify-center space-x-2 transition-all duration-300 hover:shadow-[0_0_15px_rgba(0,240,255,0.1)]"
         >
           <Compass className="w-4 h-4 text-white/40" />
