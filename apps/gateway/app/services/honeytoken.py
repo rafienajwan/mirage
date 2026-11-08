@@ -50,6 +50,7 @@ def _request_text(request: InspectRequest) -> str:
         [
             request.path,
             request.user_agent,
+            request.header_text,
             request.payload_excerpt,
             " ".join(request.payload_indicators),
         ]

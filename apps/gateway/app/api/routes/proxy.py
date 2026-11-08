@@ -75,6 +75,9 @@ async def proxy_request(target_path: str, request: Request) -> Response:
         payload_indicators=indicators,
         exempted_indicators=exempted,
         payload_excerpt=payload_excerpt,
+        header_text=" ".join(
+            request.headers.get(name, "") for name in ("authorization", "cookie", "referer")
+        )[:8192],
     )
     inspection = await inspect_and_log(metadata, event_type="proxy")
     is_decoy = inspection.decision == Decision.REDIRECT_TO_DECOY

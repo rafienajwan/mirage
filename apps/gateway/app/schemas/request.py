@@ -51,6 +51,13 @@ class InspectRequest(BaseModel):
         max_length=4096,
         description="Small bounded request excerpt used for decoy/honeytoken matching",
     )
+    header_text: str = Field(
+        default="",
+        max_length=8192,
+        # Holds credentials (Authorization, Cookie): matched, never serialized.
+        exclude=True,
+        description="Authorization, Cookie and Referer values for honeytoken matching",
+    )
     timestamp: Optional[datetime] = Field(
         default=None, description="Request timestamp (auto-filled if omitted)"
     )

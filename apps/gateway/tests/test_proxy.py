@@ -149,6 +149,21 @@ async def test_proxy_body_is_available_for_honeytoken_detection(client, monkeypa
     assert honeytokens.json()["hits"][0]["token_kind"] == "service_token"
 
 
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {"authorization": "Bearer mirage-issued-oauth-canary-0123456789ab"},
+        {"cookie": "theme=dark; session=mirage-issued-oauth-canary-0123456789ab"},
+    ],
+)
+async def test_proxy_detects_honeytokens_in_request_headers(client, monkeypatch, headers):
+    await _route(client, monkeypatch, "GET", "/api/v1/proxy/api/profile", headers=headers)
+    honeytokens = await client.get("/api/v1/dashboard/honeytokens")
+
+    assert honeytokens.json()["total_hits"] == 1
+    assert honeytokens.json()["hits"][0]["token_kind"] == "oauth_token"
+
+
 @pytest.mark.asyncio
 async def test_proxy_rejects_oversized_body_before_forwarding(client, monkeypatch):
     called = False
