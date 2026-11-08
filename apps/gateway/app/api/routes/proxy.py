@@ -64,11 +64,13 @@ async def proxy_request(target_path: str, request: Request) -> Response:
         request.url.query,
         body[: settings.proxy_max_body_bytes].decode("utf-8", errors="ignore"),
     )
+    # Logged values are truncated to the stored column sizes; detection above
+    # and the forwarded request use the complete path.
     metadata = InspectRequest(
         ip_address=source_ip,
         method=request.method,
-        path=path,
-        user_agent=request.headers.get("user-agent", ""),
+        path=path[:512],
+        user_agent=request.headers.get("user-agent", "")[:512],
         request_count=request_count,
         payload_indicators=indicators,
         exempted_indicators=exempted,
@@ -99,6 +101,6 @@ async def proxy_request(target_path: str, request: Request) -> Response:
         await record_canary_assignments(
             actor_hint=inspection.fingerprint_hash,
             decoy_type=inspection.decoy_type or "auto",
-            source_path=path,
+            source_path=metadata.path,
         )
     return response

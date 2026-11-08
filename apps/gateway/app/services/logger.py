@@ -94,7 +94,7 @@ async def log_inspection(
     if decision == Decision.REDIRECT_TO_DECOY:
         await store.add_alert(
             severity=AlertSeverity.CRITICAL,
-            title=f"Decoy redirect: {request.path}",
+            title=f"Decoy redirect: {request.path}"[:256],
             description=(
                 f"Suspicious request from {_mask_ip(request.ip_address)} "
                 f"with risk score {risk_score} was redirected to decoy."
@@ -105,7 +105,7 @@ async def log_inspection(
     elif decision == Decision.MONITOR:
         await store.add_alert(
             severity=AlertSeverity.WARNING,
-            title=f"Monitoring: {request.path}",
+            title=f"Monitoring: {request.path}"[:256],
             description=(
                 f"Request from {_mask_ip(request.ip_address)} flagged for monitoring "
                 f"(risk score: {risk_score})."

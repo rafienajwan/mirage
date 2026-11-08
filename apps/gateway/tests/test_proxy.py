@@ -390,3 +390,33 @@ async def test_exempt_route_reaches_real_app_and_records_exemption(client, monke
         client, monkeypatch, "POST", "/api/v1/proxy/api/comments", content=body
     )
     assert captured["is_decoy"] is True
+
+
+async def test_oversized_user_agent_and_path_are_routed_and_logged(client, monkeypatch):
+    from app.storage import store
+
+    long_path = "/api/products/" + "a" * 3000
+    captured = await _route(
+        client,
+        monkeypatch,
+        "GET",
+        "/api/v1/proxy" + long_path,
+        headers={"user-agent": "Mozilla/5.0 " + "x" * 600},
+    )
+    assert captured["is_decoy"] is False
+    # The upstream still receives the complete path.
+    assert captured["target_path"] == long_path.lstrip("/")
+    event = (await store.get_recent_events(limit=1))[0]
+    assert event.path == long_path[:512]
+
+    captured = await _route(
+        client,
+        monkeypatch,
+        "GET",
+        "/api/v1/proxy/.env/" + "b" * 3000,
+        headers={"user-agent": "sqlmap/1.8 " + "x" * 600},
+    )
+    assert captured["is_decoy"] is True
+    alert = (await store.get_alerts(limit=1))[0]
+    assert alert.title.startswith("Decoy redirect: /.env/")
+    assert len(alert.title) <= 256
