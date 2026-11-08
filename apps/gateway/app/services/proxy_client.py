@@ -81,18 +81,18 @@ def _request_headers(
     return headers
 
 
-def _response_headers(headers: httpx.Headers, upstream_url: str) -> dict[str, str]:
-    safe = {
-        key: value
-        for key, value in headers.items()
-        if key.lower() not in _HOP_BY_HOP_HEADERS
-        and key.lower() not in {"server", "x-powered-by"}
+def _response_headers(headers: httpx.Headers, upstream_url: str) -> list[tuple[str, str]]:
+    """Filter upstream headers, keeping repeated ones (Set-Cookie) separate."""
+    upstream = upstream_url.rstrip("/")
+    safe = []
+    for key, value in headers.multi_items():
+        name = key.lower()
         # The body is read decoded (aiter_bytes), so its encoding no longer applies.
-        and key.lower() != "content-encoding"
-    }
-    location = safe.get("location")
-    if location and location.startswith(upstream_url.rstrip("/")):
-        safe["location"] = "/api/v1/proxy" + location[len(upstream_url.rstrip("/")) :]
+        if name in _HOP_BY_HOP_HEADERS or name in {"server", "x-powered-by", "content-encoding"}:
+            continue
+        if name == "location" and value.startswith(upstream):
+            value = "/api/v1/proxy" + value[len(upstream) :]
+        safe.append((key, value))
     return safe
 
 
@@ -147,8 +147,7 @@ async def _send(
     finally:
         await upstream.aclose()
 
-    return Response(
-        content=bytes(content),
-        status_code=upstream.status_code,
-        headers=_response_headers(upstream.headers, upstream_url),
-    )
+    response = Response(content=bytes(content), status_code=upstream.status_code)
+    for key, value in _response_headers(upstream.headers, upstream_url):
+        response.headers.append(key, value)
+    return response

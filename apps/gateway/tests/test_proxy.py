@@ -257,6 +257,45 @@ async def test_forward_request_preserves_http_semantics(monkeypatch):
     }
 
 
+async def test_forward_request_keeps_repeated_response_headers(monkeypatch):
+    async def upstream_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers=[
+                ("set-cookie", "session=abc; Path=/; HttpOnly"),
+                ("set-cookie", "theme=dark; Path=/"),
+                ("server", "hidden"),
+                ("location", "http://real-app:8001/next"),
+            ],
+        )
+
+    transport = httpx.MockTransport(upstream_handler)
+    original_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        proxy_client.httpx,
+        "AsyncClient",
+        lambda **kwargs: original_client(transport=transport, **kwargs),
+    )
+    request = Request(
+        {"type": "http", "method": "GET", "path": "/api/v1/proxy/x", "query_string": b"", "headers": []}
+    )
+
+    response = await forward_request(
+        request,
+        upstream_url="http://real-app:8001",
+        target_path="x",
+        body=b"",
+        is_decoy=False,
+    )
+
+    assert response.headers.getlist("set-cookie") == [
+        "session=abc; Path=/; HttpOnly",
+        "theme=dark; Path=/",
+    ]
+    assert "server" not in response.headers
+    assert response.headers["location"] == "/api/v1/proxy/next"
+
+
 @pytest.mark.asyncio
 async def test_traffic_tracker_bounds_distinct_sources():
     tracker = TrafficTracker(max_sources=2)
