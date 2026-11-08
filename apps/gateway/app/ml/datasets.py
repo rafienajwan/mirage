@@ -850,7 +850,6 @@ def prepare_dataset(
     if csic_source is not None:
         input_sha256 = csic_source.input_sha256
         duplicate_rows_removed = csic_source.duplicate_rows_removed
-        rejected_rows = csic_source.rejected_rows
     elif api_log_source_review is not None:
         input_sha256 = {
             input_path.name: str(api_log_source_review["input_sha256"])

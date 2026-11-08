@@ -156,7 +156,6 @@ def test_directory_loader_records_hashes_and_removes_same_label_duplicates(tmp_p
 
     assert len(loaded.records) == 20
     assert loaded.duplicate_rows_removed == 1
-    assert loaded.rejected_rows == 0
     assert set(loaded.input_sha256) == {
         "normalTrafficTraining.txt",
         "normalTrafficTest.txt",
