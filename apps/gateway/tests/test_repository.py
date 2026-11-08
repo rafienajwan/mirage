@@ -1,8 +1,9 @@
 """DatabaseStore aggregates: actor path counts and the traffic chart."""
 
-
+from datetime import timedelta
 from uuid import uuid4
 
+import pytest
 from sqlalchemy import select
 
 from app.schemas.decision import Decision
@@ -10,6 +11,7 @@ from app.schemas.event import EventRecord
 from app.storage import store
 from app.storage.db.database import get_session
 from app.storage.db.models import ActorProfileModel
+from app.storage.memory_store import MemoryStore
 from app.utils.time import utcnow
 
 
@@ -40,3 +42,14 @@ async def test_actor_path_counts_stop_adding_paths_at_fifty():
     assert profile.path_counts["/scan/0"] == 2
     assert "/scan/55" not in profile.path_counts
     assert profile.request_count == 61
+
+
+@pytest.mark.parametrize("backend", [store, MemoryStore()], ids=["database", "memory"])
+async def test_traffic_breakdown_only_counts_the_last_twelve_hours(backend):
+    now = utcnow()
+    await backend.add_event(_event(timestamp=now))
+    await backend.add_event(_event(timestamp=now - timedelta(days=1)))
+
+    breakdown = await backend.get_traffic_breakdown()
+
+    assert sum(row["normal"] + row["suspicious"] for row in breakdown) == 1

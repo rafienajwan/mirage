@@ -7,7 +7,7 @@ All methods are async.
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import TypeVar
 from uuid import uuid4
 
@@ -548,6 +548,7 @@ class DatabaseStore:
                     func.sum(case((~is_suspicious, 1), else_=0)).label("normal"),
                     func.sum(case((is_suspicious, 1), else_=0)).label("suspicious"),
                 )
+                .where(EventModel.timestamp >= datetime.now(timezone.utc) - timedelta(hours=12))
                 .group_by("hour")
                 .order_by("hour")
             )
