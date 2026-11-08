@@ -81,3 +81,13 @@ def test_parse_trusted_proxies():
     assert parse_trusted_proxies("   ") == ()
     with pytest.raises(ValueError):
         parse_trusted_proxies("nope")
+
+
+def test_invalid_trusted_proxies_falls_back_to_peer(trust):
+    trust("nginx")
+    assert client_ip(_request("10.0.0.2", "203.0.113.9")) == "10.0.0.2"
+
+
+def test_ipv4_mapped_peer_matches_ipv4_proxy(trust):
+    trust("10.0.0.0/8")
+    assert client_ip(_request("::ffff:10.0.0.2", "203.0.113.9")) == "203.0.113.9"

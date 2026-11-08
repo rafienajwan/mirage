@@ -146,3 +146,18 @@ async def test_without_lifespan_uses_temporary_client(monkeypatch):
     monkeypatch.setattr(proxy_client.httpx, "AsyncClient", factory)
     response = await _forward()
     assert response.body == b"ok"
+
+
+async def test_decoded_body_drops_content_encoding(upstream):
+    import gzip
+
+    upstream(
+        lambda request: httpx.Response(
+            200,
+            content=gzip.compress(b"plain body"),
+            headers={"content-encoding": "gzip"},
+        )
+    )
+    response = await _forward()
+    assert response.body == b"plain body"
+    assert "content-encoding" not in response.headers

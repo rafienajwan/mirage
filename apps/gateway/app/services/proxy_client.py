@@ -87,6 +87,8 @@ def _response_headers(headers: httpx.Headers, upstream_url: str) -> dict[str, st
         for key, value in headers.items()
         if key.lower() not in _HOP_BY_HOP_HEADERS
         and key.lower() not in {"server", "x-powered-by"}
+        # The body is read decoded (aiter_bytes), so its encoding no longer applies.
+        and key.lower() != "content-encoding"
     }
     location = safe.get("location")
     if location and location.startswith(upstream_url.rstrip("/")):
