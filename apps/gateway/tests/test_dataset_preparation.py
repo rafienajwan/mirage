@@ -672,6 +672,26 @@ def test_load_cicids_csv_accepts_headers_with_extra_spaces(tmp_path):
     assert rows[1].features["syn_flag_count"] == 4.0
 
 
+def test_load_cicids_csv_accepts_cse_cic_ids2018_aliases(tmp_path):
+    source = tmp_path / "cicids.csv"
+    source.write_text(
+        "\n".join(
+            [
+                "Dst Port,Flow Duration,Avg Packet Size,label",
+                "443,1200,64.0,Benign",
+                "8080,5000,256.0,DDoS",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    rows = load_cicids_csv(source)
+
+    assert [row.label for row in rows] == [0, 1]
+    assert rows[0].features["destination_port"] == 443.0
+    assert rows[1].features["average_packet_size"] == 256.0
+
+
 def test_load_cicids_csv_zeroes_non_finite_values(tmp_path):
     source = tmp_path / "cicids.csv"
     source.write_text(

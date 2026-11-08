@@ -177,7 +177,7 @@ def _first_present(row: dict[str, str], *names: str) -> str | None:
     normalized_row = {key.strip(): value for key, value in row.items()}
     for name in names:
         value = normalized_row.get(name)
-        if value != "":
+        if value not in (None, ""):
             return value
     return None
 
