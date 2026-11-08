@@ -6,6 +6,7 @@ import asyncio
 import base64
 import binascii
 from collections.abc import Awaitable, Callable
+import contextlib
 import hashlib
 import hmac
 import json
@@ -39,6 +40,15 @@ DashboardBroadcaster = Callable[[str, dict[str, Any]], Awaitable[None]]
 _SEND_TIMEOUT_SECONDS = 1.0
 
 
+# Strong references so pending close tasks are not garbage-collected.
+_closing: set[asyncio.Task] = set()
+
+
+async def _close_quietly(client: WebSocket) -> None:
+    with contextlib.suppress(Exception):
+        await asyncio.wait_for(client.close(), _SEND_TIMEOUT_SECONDS)
+
+
 class DashboardStreamManager:
     """Track connected dashboard WebSocket clients."""
 
@@ -65,6 +75,11 @@ class DashboardStreamManager:
                 stale.append(client)
         for client in stale:
             self.disconnect(client)
+            # Close it so the browser sees onclose and reconnects; a client
+            # dropped for being slow would otherwise stay open and silent.
+            task = asyncio.create_task(_close_quietly(client))
+            _closing.add(task)
+            task.add_done_callback(_closing.discard)
 
 
 dashboard_stream = DashboardStreamManager()

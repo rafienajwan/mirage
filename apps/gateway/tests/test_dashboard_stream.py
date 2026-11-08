@@ -52,9 +52,13 @@ class FakeWebSocket:
         self.messages: list[dict] = []
         self.fail = fail
         self.delay = delay
+        self.closed = False
 
     async def accept(self) -> None:
         self.accepted = True
+
+    async def close(self, code: int = 1000) -> None:
+        self.closed = True
 
     async def send_json(self, message: dict) -> None:
         if self.fail:
@@ -244,6 +248,10 @@ async def test_dashboard_stream_drops_slow_clients_without_stalling(monkeypatch)
 
     assert live.messages == [{"type": "event"}]
     assert manager._clients == {live}
+    # Closing makes the browser reconnect instead of silently missing updates.
+    await asyncio.sleep(0)
+    assert slow.closed is True
+    assert live.closed is False
 
 
 @pytest.mark.asyncio
