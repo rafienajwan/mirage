@@ -124,8 +124,6 @@ test before marking the cloud deployment complete.
 | --- | --- | --- |
 | `APP_NAME` | `Project MIRAGE Gateway` | OpenAPI service name |
 | `API_VERSION` | `0.1.0` | Reported API version |
-| `HOST` | `0.0.0.0` | Uvicorn bind host |
-| `PORT` | `8000` | Uvicorn port |
 | `REAL_APP_URL` | `http://localhost:8001` | Allowed/monitored upstream |
 | `DECOY_SERVICE_URL` | `http://localhost:8002` | Redirected upstream |
 
