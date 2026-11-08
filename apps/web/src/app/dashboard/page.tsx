@@ -16,6 +16,7 @@ import { mapDashboardAlert, mapDashboardEvent, mapDashboardSnapshot } from "@/li
 import type { ActorCaseSummary, ActorCaseWorkflow, ActorCaseWorkflowSummary, ActorClusterSummary, ActorProfileSummary, AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, MLShadowSummaryData, MLPromotionReadinessData, HoneytokenSummary, CanaryAssignmentSummary, RetrainingRun, DashboardStreamMessage } from "@/lib/api-types";
 import { useDashboardStream } from "@/hooks/useDashboardStream";
 import { pollIntervalFor } from "@/lib/dashboard-stream";
+import { selectNewAlerts } from "@/lib/alert-toasts";
 import { Globe, ShieldAlert, ArrowRightLeft, Bell, BrainCircuit, Database, Download, KeyRound, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -44,6 +45,12 @@ function playAlertSound(severity: string) {
     const AudioCtx = window.AudioContext;
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
+    // One context per sound; release it once the last oscillator stops.
+    const closeWhenDone = (last: OscillatorNode) => {
+      last.onended = () => {
+        void ctx.close();
+      };
+    };
     
     // Create nodes
     const osc = ctx.createOscillator();
@@ -60,6 +67,7 @@ function playAlertSound(severity: string) {
       gain.gain.setValueAtTime(0.12, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
       
+      closeWhenDone(osc);
       osc.start();
       osc.stop(ctx.currentTime + 0.4);
     } else if (severity === "warning") {
@@ -78,6 +86,7 @@ function playAlertSound(severity: string) {
       gain2.gain.setValueAtTime(0.08, ctx.currentTime + 0.12);
       gain2.gain.setValueAtTime(0.001, ctx.currentTime + 0.2);
       
+      closeWhenDone(osc2);
       osc.start();
       osc.stop(ctx.currentTime + 0.08);
       osc2.start(ctx.currentTime + 0.12);
@@ -89,6 +98,7 @@ function playAlertSound(severity: string) {
       gain.gain.setValueAtTime(0.04, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
       
+      closeWhenDone(osc);
       osc.start();
       osc.stop(ctx.currentTime + 0.15);
     }
@@ -127,8 +137,7 @@ export default function DashboardPage() {
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const soundEnabledRef = useRef(false);
-  const alertsInitializedRef = useRef(false);
-  const prevAlertIdsRef = useRef<Set<string>>(new Set());
+  const alertWatermarkRef = useRef<number | null>(null);
   const alertsRef = useRef<FeedAlert[]>([]);
 
   useEffect(() => {
@@ -144,37 +153,32 @@ export default function DashboardPage() {
   }, []);
 
   const handleAlertsUpdate = useCallback((newAlerts: FeedAlert[]) => {
-    // Only alert for events triggered AFTER mount
-    if (alertsInitializedRef.current) {
-      const newItems = newAlerts.filter((a) => !prevAlertIdsRef.current.has(a.id));
-      newItems.forEach((alert) => {
-        const toastId = `${alert.id}-${Date.now()}`;
-        setToasts((prev) => [
-          {
-            id: toastId,
-            title: alert.message || "Threat Event Triggered",
-            description: alert.description,
-            severity: alert.severity,
-            timestamp: alert.timestamp,
-          },
-          ...prev,
-        ].slice(0, 5));
+    const { fresh, watermark } = selectNewAlerts(newAlerts, alertWatermarkRef.current);
+    alertWatermarkRef.current = watermark;
+    fresh.forEach((alert) => {
+      const toastId = `${alert.id}-${Date.now()}`;
+      setToasts((prev) => [
+        {
+          id: toastId,
+          title: alert.message || "Threat Event Triggered",
+          description: alert.description,
+          severity: alert.severity,
+          timestamp: alert.timestamp,
+        },
+        ...prev,
+      ].slice(0, 5));
 
-        // Auto remove toast after 6s
-        setTimeout(() => {
-          removeToast(toastId);
-        }, 6000);
+      // Auto remove toast after 6s
+      setTimeout(() => {
+        removeToast(toastId);
+      }, 6000);
 
-        // Play synth alert sound
-        if (soundEnabledRef.current && (alert.severity === "critical" || alert.severity === "warning")) {
-          playAlertSound(alert.severity);
-        }
-      });
-    }
+      // Play synth alert sound
+      if (soundEnabledRef.current && (alert.severity === "critical" || alert.severity === "warning")) {
+        playAlertSound(alert.severity);
+      }
+    });
 
-    const ids = new Set(newAlerts.map((a) => a.id));
-    prevAlertIdsRef.current = ids;
-    alertsInitializedRef.current = true;
     setAlerts(newAlerts);
   }, [removeToast]);
 
@@ -375,7 +379,7 @@ export default function DashboardPage() {
         [
           alert,
           ...alertsRef.current.filter((item) => item.id !== alert.id),
-        ].slice(0, 100),
+        ].slice(0, 20),
       );
     },
     [handleAlertsUpdate],

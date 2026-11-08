@@ -157,7 +157,7 @@ export async function fetchMLShadowStatus(): Promise<MLShadowStatusData> {
 /** Fetch recent model-only shadow scoring agreement summary. */
 export async function fetchMLShadowSummary(): Promise<MLShadowSummaryData> {
   return mapMLShadowSummary(
-    await apiFetch<BackendMLShadowSummary>("/dashboard/ml-shadow/summary"),
+    await apiFetch<BackendMLShadowSummary>("/dashboard/ml-shadow/summary?limit=1000"),
   );
 }
 
@@ -247,7 +247,7 @@ export async function updateActorCase(
 
 /** Fetch active alerts. */
 export async function fetchAlerts(): Promise<FeedAlert[]> {
-  const { alerts } = await apiFetch<{ alerts: BackendAlert[] }>("/dashboard/alerts");
+  const { alerts } = await apiFetch<{ alerts: BackendAlert[] }>("/dashboard/alerts?limit=20");
   return alerts.map(mapDashboardAlert);
 }
 

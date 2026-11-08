@@ -25,6 +25,8 @@
     "src/lib/gateway-bridge.test.ts",
     "src/lib/api-types.ts",
     "src/lib/api-map.ts",
-    "src/lib/api-map.test.ts"
+    "src/lib/api-map.test.ts",
+    "src/lib/alert-toasts.ts",
+    "src/lib/alert-toasts.test.ts"
   ]
 }
