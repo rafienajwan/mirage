@@ -40,6 +40,7 @@ export default function ActorTriagePanel({
   const caseItems = cases?.cases ?? [];
   const workflowItems = workflows?.cases ?? [];
   const openCaseIds = new Set(workflowItems.map((item) => item.id));
+  const openWorkflowCount = workflowItems.filter((item) => item.status !== "closed").length;
 
   return (
     <GlassPanel className="p-5">
@@ -54,7 +55,7 @@ export default function ActorTriagePanel({
           </span>
           <span className="flex items-center gap-1.5">
             <CheckCircle2 className="h-3.5 w-3.5 text-brand-emerald/80" />
-            {workflows?.totalCases ?? 0} open
+            {workflows ? openWorkflowCount : "n/a"} open
           </span>
           <span className="flex items-center gap-1.5">
             <GitBranch className="h-3.5 w-3.5 text-brand-emerald/80" />
