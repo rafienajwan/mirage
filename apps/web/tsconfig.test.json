@@ -16,6 +16,8 @@
     "src/lib/operator-auth.ts",
     "src/lib/operator-auth.test.ts",
     "src/lib/login-throttle.ts",
-    "src/lib/login-throttle.test.ts"
+    "src/lib/login-throttle.test.ts",
+    "src/lib/safe-next-path.ts",
+    "src/lib/safe-next-path.test.ts"
   ]
 }

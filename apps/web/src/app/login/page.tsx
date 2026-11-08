@@ -4,12 +4,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { KeyRound, Loader2, ShieldCheck } from "lucide-react";
 
-function safeNextPath() {
-  const target = new URLSearchParams(window.location.search).get("next");
-  return target?.startsWith("/") && !target.startsWith("//")
-    ? target
-    : "/dashboard";
-}
+import { safeNextPath } from "@/lib/safe-next-path";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,7 +27,12 @@ export default function LoginPage() {
         setError(body.detail ?? "Unable to authenticate");
         return;
       }
-      router.replace(safeNextPath());
+      router.replace(
+        safeNextPath(
+          new URLSearchParams(window.location.search).get("next"),
+          window.location.origin,
+        ),
+      );
       router.refresh();
     } catch {
       setError("Authentication service is unavailable");
