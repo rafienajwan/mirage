@@ -2,6 +2,7 @@
 
 import asyncio
 import base64
+import dataclasses
 import hashlib
 import hmac
 import json
@@ -9,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.core import security
+from app.core import config
 from app.schemas.decision import Decision
 from app.schemas.event import EventRecord
 from app.services import actor_clusters, actor_profiles, dashboard_stream
@@ -193,9 +194,7 @@ def test_dashboard_stream_origin_requires_configured_frontend(monkeypatch):
 @pytest.mark.asyncio
 async def test_dashboard_http_reads_require_operator_api_key(client, monkeypatch):
     monkeypatch.setattr(
-        security,
-        "settings",
-        SimpleNamespace(api_key="operator-key"),
+        config, "settings", dataclasses.replace(config.settings, api_key="operator-key")
     )
 
     denied = await client.get("/api/v1/dashboard/overview")

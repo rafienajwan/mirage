@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import dataclasses
 from types import SimpleNamespace
 
 import pytest
 
-from app.core import security
+from app.core import config
 from app.schemas.dashboard import MLPromotionReadiness
 from app.services.ml_promotion import evaluate_ml_promotion
 
@@ -181,7 +182,9 @@ def test_promotion_caches_unchanged_artifact_and_dataset_reviews(tmp_path):
 
 @pytest.mark.asyncio
 async def test_promotion_endpoint_requires_operator_api_key(client, monkeypatch):
-    monkeypatch.setattr(security, "settings", SimpleNamespace(api_key="operator-key"))
+    monkeypatch.setattr(
+        config, "settings", dataclasses.replace(config.settings, api_key="operator-key")
+    )
 
     denied = await client.get("/api/v1/dashboard/ml-promotion/readiness")
     allowed = await client.get(
