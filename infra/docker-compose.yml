@@ -2,6 +2,8 @@ services:
   web:
     build:
       context: ../apps/web
+    security_opt: ["no-new-privileges:true"]
+    networks: [edge]
     ports:
       - "${WEB_PORT:-3000}:3000"
     environment:
@@ -12,6 +14,7 @@ services:
       MIRAGE_DASHBOARD_TICKET_SECRET: ${MIRAGE_DASHBOARD_TICKET_SECRET:?MIRAGE_DASHBOARD_TICKET_SECRET is required}
       MIRAGE_DASHBOARD_WS_URL: ${MIRAGE_DASHBOARD_WS_URL:-ws://localhost:8000/api/v1/dashboard/ws}
       MIRAGE_SECURE_COOKIES: ${MIRAGE_SECURE_COOKIES:-false}
+      MIRAGE_TRUST_PROXY_HEADERS: ${MIRAGE_TRUST_PROXY_HEADERS:-false}
     depends_on:
       gateway:
         condition: service_healthy
@@ -19,6 +22,8 @@ services:
   gateway:
     build:
       context: ../apps/gateway
+    security_opt: ["no-new-privileges:true"]
+    networks: [edge, apps, data]
     ports:
       - "8000:8000"
     volumes:
@@ -31,13 +36,18 @@ services:
       MIRAGE_API_KEY: ${MIRAGE_API_KEY:?MIRAGE_API_KEY is required}
       MIRAGE_DASHBOARD_TICKET_SECRET: ${MIRAGE_DASHBOARD_TICKET_SECRET:?MIRAGE_DASHBOARD_TICKET_SECRET is required}
       RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-120}
+      RATE_LIMIT_MAX_CLIENTS: ${RATE_LIMIT_MAX_CLIENTS:-10000}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      PAYLOAD_EXEMPTIONS: ${PAYLOAD_EXEMPTIONS:-}
       RISK_THRESHOLD: ${RISK_THRESHOLD:-60}
       ANOMALY_REDIRECT_CONFIDENCE: ${ANOMALY_REDIRECT_CONFIDENCE:-0.5}
       REAL_APP_URL: http://real-app:8001
       DECOY_SERVICE_URL: http://decoy:8002
       PROXY_TIMEOUT_SECONDS: ${PROXY_TIMEOUT_SECONDS:-10}
       PROXY_MAX_BODY_BYTES: ${PROXY_MAX_BODY_BYTES:-1048576}
+      PROXY_MAX_RESPONSE_BYTES: ${PROXY_MAX_RESPONSE_BYTES:-10485760}
       MIRAGE_MODEL_ARTIFACT: ${MIRAGE_MODEL_ARTIFACT:-}
+      MIRAGE_MODEL_ARTIFACT_SHA256: ${MIRAGE_MODEL_ARTIFACT_SHA256:-}
       MIRAGE_MODEL_DATASET_MANIFEST: ${MIRAGE_MODEL_DATASET_MANIFEST:-}
       ML_SHADOW_MONITOR_THRESHOLD: ${ML_SHADOW_MONITOR_THRESHOLD:-0.35}
       ML_SHADOW_REDIRECT_THRESHOLD: ${ML_SHADOW_REDIRECT_THRESHOLD:-0.65}
@@ -67,6 +77,8 @@ services:
 
   db:
     image: postgres:16-alpine
+    security_opt: ["no-new-privileges:true"]
+    networks: [data]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-mirage}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
@@ -82,6 +94,8 @@ services:
   real-app:
     build:
       context: ../apps/real-app-demo
+    security_opt: ["no-new-privileges:true"]
+    networks: [apps]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
       interval: 5s
@@ -91,6 +105,8 @@ services:
   decoy:
     build:
       context: ../apps/decoy
+    security_opt: ["no-new-privileges:true"]
+    networks: [apps]
     environment:
       DECOY_LOGIN_TOKEN: ${DECOY_LOGIN_TOKEN:?DECOY_LOGIN_TOKEN is required}
       DECOY_OAUTH_TOKEN: ${DECOY_OAUTH_TOKEN:?DECOY_OAUTH_TOKEN is required}
@@ -102,6 +118,17 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+networks:
+  # Public side: the dashboard and the gateway's proxy/API port.
+  edge: {}
+  # Gateway to upstreams. The decoy is attacker-facing by design, so it sits
+  # here only: it cannot reach the database or anything on edge.
+  apps:
+    internal: true
+  # Gateway to Postgres only.
+  data:
+    internal: true
 
 volumes:
   pgdata:
