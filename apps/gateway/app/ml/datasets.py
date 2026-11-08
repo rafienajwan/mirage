@@ -106,18 +106,28 @@ class DatasetReview:
 
 
 def normalize_features(features: object, *, line_number: int | None = None) -> FeatureVector:
-    """Return a numeric feature vector with exactly MIRAGE's known feature names."""
+    """Return the numeric feature vector in MIRAGE's feature order.
+
+    The keys must be exactly FEATURE_NAMES: a missing feature silently set to 0
+    or an unknown one silently dropped would train on a different contract.
+    """
+    location = f" on line {line_number}" if line_number else ""
     if not isinstance(features, dict):
-        location = f" on line {line_number}" if line_number else ""
         raise DatasetValidationError(f"features must be an object{location}")
+    if set(features) != set(FEATURE_NAMES):
+        missing = sorted(set(FEATURE_NAMES) - set(features))
+        unknown = sorted(set(features) - set(FEATURE_NAMES))
+        raise DatasetValidationError(
+            f"feature names do not match the feature contract{location} "
+            f"(missing: {missing}, unknown: {unknown})"
+        )
 
     normalized: FeatureVector = {}
     for name in FEATURE_NAMES:
-        value = features.get(name, 0.0)
+        value = features[name]
         try:
             numeric_value = float(value)
         except (TypeError, ValueError) as exc:
-            location = f" on line {line_number}" if line_number else ""
             raise DatasetValidationError(
                 f"feature {name!r} must be numeric{location}"
             ) from exc
@@ -536,8 +546,8 @@ def _load_cicids_csv_rows(
 ) -> list[PreparedTrainingRow]:
     """Load CICIDS-style CSV rows into the MIRAGE feature schema.
 
-    Columns that do not exist in a given CICIDS export are filled with zero so
-    the resulting rows remain compatible with the current model feature order.
+    CICIDS has no HTTP request data, so every request and payload feature is
+    explicitly 0; only the flow features come from the CSV.
     """
     rows: list[PreparedTrainingRow] = []
     with path.open(newline="", encoding="utf-8-sig") as source:
@@ -545,16 +555,7 @@ def _load_cicids_csv_rows(
         for line_number, record in enumerate(reader, start=2):
             label = _label_from_cicids(_first_present(record, "Label", "label"))
             features: FeatureVector = {
-                "request_count_log": 0.0,
-                "path_length": 0.0,
-                "path_depth": 0.0,
-                "sensitive_path": 0.0,
-                "suspicious_user_agent": 0.0,
-                "high_risk_indicator_count": 0.0,
-                "medium_risk_indicator_count": 0.0,
-                "method_get": 0.0,
-                "method_post": 0.0,
-                "method_write": 0.0,
+                **dict.fromkeys(FEATURE_NAMES, 0.0),
                 "flow_duration_ms": _float_field(
                     record,
                     "Flow Duration",

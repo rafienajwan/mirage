@@ -26,16 +26,18 @@ been explicitly approved for publication.
 Prepared JSONL records use the model's stable feature schema:
 
 ```json
-{"label": 0, "features": {"request_count_log": 0.0, "path_length": 0.0}}
+{"label": 0, "features": {"request_count_log": 0.0, "path_length": 0.0, "...": 0.0}}
 ```
 
-Labels are binary:
+Labels are binary, written as `0`/`1` or `"0"`/`"1"`:
 
 - `0`: normal or false positive;
 - `1`: suspicious or false negative.
 
-Missing known features are filled with `0.0`. Unknown features are ignored so
-training and inference keep the same feature order. Prepared manifests and
+`features` must contain exactly the current feature names (`FEATURE_NAMES` in
+`app/services/feature_extraction.py`). A row with a missing or unknown feature
+is rejected with its line number instead of being zero-filled, so training and
+inference always use the same feature contract. Prepared manifests and
 trained artifacts record `feature_contract_version`. A dataset or artifact from
 an older contract must be regenerated instead of being mixed with runtime
 features from the current contract.

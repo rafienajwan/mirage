@@ -43,27 +43,34 @@ def _write_jsonl(path, rows: list[dict]) -> None:
 
 def test_load_mirage_jsonl_normalizes_feature_order(tmp_path):
     source = tmp_path / "training_events.jsonl"
-    _write_jsonl(
-        source,
-        [
-            {
-                "event_id": "evt-1",
-                "label": 1,
-                "features": {
-                    "request_count_log": "3.5",
-                    "unknown_feature": 999,
-                },
-            }
-        ],
-    )
+    features = {name: 0.0 for name in reversed(FEATURE_NAMES)}
+    features["request_count_log"] = "3.5"
+    _write_jsonl(source, [{"event_id": "evt-1", "label": 1, "features": features}])
 
     rows = load_mirage_jsonl(source)
 
     assert len(rows) == 1
     assert rows[0].label == 1
-    assert set(rows[0].features) == set(FEATURE_NAMES)
+    assert tuple(rows[0].features) == FEATURE_NAMES
     assert rows[0].features["request_count_log"] == 3.5
-    assert "unknown_feature" not in rows[0].features
+
+
+@pytest.mark.parametrize(
+    "features",
+    [
+        {"request_count_log": 3.5},
+        {**{name: 0.0 for name in FEATURE_NAMES}, "unknown_feature": 999},
+    ],
+)
+def test_load_mirage_jsonl_rejects_feature_contract_mismatch(tmp_path, features):
+    source = tmp_path / "training_events.jsonl"
+    _write_jsonl(
+        source,
+        [{"label": 0, "features": _features()}, {"label": 1, "features": features}],
+    )
+
+    with pytest.raises(DatasetValidationError, match="feature names .* on line 2"):
+        load_mirage_jsonl(source)
 
 
 def test_load_mirage_jsonl_rejects_bad_label(tmp_path):

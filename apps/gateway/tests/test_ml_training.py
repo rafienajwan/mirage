@@ -1,5 +1,6 @@
 """Smoke tests for the real ML training and inference path."""
 
+import json
 from pathlib import Path
 import sys
 
@@ -62,7 +63,8 @@ def test_training_artifact_embeds_dataset_lineage(tmp_path):
     source = tmp_path / "source.jsonl"
     source.write_text(
         "".join(
-            f'{{"label": {label}, "features": {{"request_count_log": {index}}}}}\n'
+            json.dumps({"label": label, "features": _row(label, index + 1).features})
+            + "\n"
             for label in (0, 1)
             for index in range(14)
         ),
@@ -115,7 +117,8 @@ def test_train_script_binds_reviewed_manifest(tmp_path, monkeypatch):
     source = tmp_path / "source.jsonl"
     source.write_text(
         "".join(
-            f'{{"label": {label}, "features": {{"request_count_log": {index}}}}}\n'
+            json.dumps({"label": label, "features": _row(label, index + 1).features})
+            + "\n"
             for label in (0, 1)
             for index in range(20)
         ),
