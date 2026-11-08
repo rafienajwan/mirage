@@ -157,6 +157,10 @@ def calculate_risk(request: InspectRequest) -> RiskResult:
     )
     total += payload_score
     reasons.extend(payload_reasons)
+    # Exempted labels never score; they stay visible to analysts.
+    reasons.extend(
+        f"Exempted payload indicator: {label}" for label in request.exempted_indicators
+    )
 
     # Clamp to 0–100
     total = max(0.0, min(100.0, total))

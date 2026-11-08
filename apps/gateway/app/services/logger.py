@@ -27,6 +27,14 @@ def _mask_ip(ip: str) -> str:
     return ip[:8] + "..."
 
 
+def _summary(request: InspectRequest, decision: Decision, risk_score: float) -> str:
+    summary = f"{request.method} {request.path} → {decision.value} (score: {risk_score})"
+    if request.exempted_indicators:
+        # Events do not persist risk reasons; keep exemptions visible to analysts.
+        summary += f"; exempted: {', '.join(request.exempted_indicators)}"
+    return summary
+
+
 async def log_inspection(
     request: InspectRequest,
     risk_score: float,
@@ -51,7 +59,7 @@ async def log_inspection(
         event_type=event_type,
         feature_vector=feature_vector or {},
         ml_shadow=ml_shadow,
-        summary=f"{request.method} {request.path} → {decision.value} (score: {risk_score})",
+        summary=_summary(request, decision, risk_score),
     )
     await store.add_event(event)
     await broadcast_dashboard_update("event", event.model_dump(mode="json"))

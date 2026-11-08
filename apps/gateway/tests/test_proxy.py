@@ -365,3 +365,28 @@ async def test_proxy_logs_forwarded_client_ip(client, monkeypatch):
 
     assert response.status_code == 200
     assert captured["ip"] == "203.0.113.9"
+
+
+async def test_exempt_route_reaches_real_app_and_records_exemption(client, monkeypatch):
+    import dataclasses
+
+    from app.core import config
+    from app.storage import store
+
+    monkeypatch.setattr(
+        config,
+        "settings",
+        dataclasses.replace(config.settings, payload_exemptions="POST /api/posts:xss"),
+    )
+    body = "<script>alert(1)</script>"
+
+    captured = await _route(client, monkeypatch, "POST", "/api/v1/proxy/api/posts", content=body)
+    assert captured["is_decoy"] is False
+    event = (await store.get_recent_events(limit=1))[0]
+    assert event.summary.endswith("; exempted: xss")
+    assert event.feature_vector["high_risk_indicator_count"] == 0
+
+    captured = await _route(
+        client, monkeypatch, "POST", "/api/v1/proxy/api/comments", content=body
+    )
+    assert captured["is_decoy"] is True

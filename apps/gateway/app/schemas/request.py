@@ -41,6 +41,11 @@ class InspectRequest(BaseModel):
         max_length=20,
         description="Labels describing payload characteristics (e.g. 'sql-like', 'encoded')",
     )
+    exempted_indicators: list[Indicator] = Field(
+        default_factory=list,
+        max_length=20,
+        description="Labels removed from routing by a PAYLOAD_EXEMPTIONS rule",
+    )
     payload_excerpt: str = Field(
         default="",
         max_length=4096,

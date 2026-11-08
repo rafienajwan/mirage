@@ -12,6 +12,7 @@ from app.schemas.decision import Decision
 from app.schemas.request import InspectRequest
 from app.services.canary_assignments import record_canary_assignments
 from app.services.inspection import inspect_and_log
+from app.services.payload_exemptions import apply_exemptions
 from app.services.payload_signals import (
     build_payload_excerpt,
     detect_payload_indicators,
@@ -58,6 +59,7 @@ async def proxy_request(target_path: str, request: Request) -> Response:
         body,
         content_type=request.headers.get("content-type"),
     )
+    indicators, exempted = apply_exemptions(request.method, path, indicators)
     payload_excerpt = build_payload_excerpt(
         request.url.query,
         body[: settings.proxy_max_body_bytes].decode("utf-8", errors="ignore"),
@@ -69,6 +71,7 @@ async def proxy_request(target_path: str, request: Request) -> Response:
         user_agent=request.headers.get("user-agent", ""),
         request_count=request_count,
         payload_indicators=indicators,
+        exempted_indicators=exempted,
         payload_excerpt=payload_excerpt,
     )
     inspection = await inspect_and_log(metadata, event_type="proxy")
