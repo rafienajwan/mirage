@@ -451,3 +451,41 @@ def test_labeled_comparison_ignores_events_scored_by_another_artifact():
 
     assert comparison.events == 4
     assert comparison.model.recall == 0.5
+
+
+def test_model_worse_than_heuristic_on_enough_labels_is_blocked():
+    events = [
+        _event("suspicious", "redirect_to_decoy", "redirect_to_decoy"),
+        _event("false_negative", "allow", "allow"),
+        _event("normal", "redirect_to_decoy", "allow"),
+        _event("false_positive", "allow", "allow"),
+    ]
+
+    report, gate = _labeled_gate(events)
+
+    assert gate.passed is False
+    assert report.status == "blocked"
+
+
+def test_model_that_never_redirects_on_enough_labels_is_blocked():
+    events = [_event("suspicious", "allow", "allow")] * 60 + [
+        _event("normal", "allow", "allow")
+    ] * 60
+
+    report, _gate = _labeled_gate(events, ml_promotion_min_labeled_events=100)
+
+    assert report.status == "blocked"
+
+
+def test_too_few_labels_still_needs_observation():
+    report, _gate = _labeled_gate(_four_events(), ml_promotion_min_labeled_events=5)
+
+    assert report.status == "needs_observation"
+
+
+def test_labels_missing_a_class_still_need_observation():
+    events = [_event("normal", "allow", "allow")] * 120
+
+    report, _gate = _labeled_gate(events, ml_promotion_min_labeled_events=100)
+
+    assert report.status == "needs_observation"

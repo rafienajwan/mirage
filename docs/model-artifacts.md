@@ -369,10 +369,12 @@ The promotion endpoint requires `X-Mirage-API-Key` and also needs a prepared
 manifest configured through `MIRAGE_MODEL_DATASET_MANIFEST`. It reports:
 
 - `unavailable` when required paths are not configured;
-- `blocked` when configuration, artifact, or dataset review fails;
-- `needs_observation` when runtime shadow evidence is insufficient, or when,
-  on at least `ML_PROMOTION_MIN_LABELED_EVENTS` (default 100) analyst-labeled
-  shadow events, the model's precision or recall is below the heuristic's;
+- `blocked` when configuration, artifact, or dataset review fails, or when, on
+  at least `ML_PROMOTION_MIN_LABELED_EVENTS` (default 100) analyst-labeled
+  shadow events covering both classes, the model caught no suspicious event or
+  its precision or recall is below the heuristic's;
+- `needs_observation` when runtime shadow evidence is insufficient: too few
+  shadow events, too few labeled events, or labels missing a class;
 - `eligible` when every configured gate passes.
 
 The labeled comparison only passes when the labels include at least one

@@ -365,6 +365,16 @@ def evaluate_ml_promotion(
         )
     )
 
+    comparison = labeled_shadow_comparison(labeled_events, artifact=artifact_path.name)
+    labeled_gate = _labeled_gate(comparison, settings.ml_promotion_min_labeled_events)
+    # Enough labels of both classes and the model still loses: more watching
+    # will not fix it.
+    comparison_failed = (
+        not labeled_gate.passed
+        and comparison.events >= settings.ml_promotion_min_labeled_events
+        and comparison.positives > 0
+        and comparison.negatives > 0
+    )
     shadow_events = shadow_summary.shadow_events
     agreement_rate = shadow_summary.agreement_rate
     gates.extend(
@@ -385,10 +395,7 @@ def evaluate_ml_promotion(
                 "Shadow agreement with the heuristic (informational only)",
                 actual=agreement_rate,
             ),
-            _labeled_gate(
-                labeled_shadow_comparison(labeled_events, artifact=artifact_path.name),
-                settings.ml_promotion_min_labeled_events,
-            ),
+            labeled_gate,
         ]
     )
 
@@ -402,7 +409,7 @@ def evaluate_ml_promotion(
         for gate in gates
         if gate.code in {"shadow_event_count", "labeled_model_vs_heuristic"}
     )
-    if review_failed:
+    if review_failed or comparison_failed:
         status = "blocked"
     elif observation_failed:
         status = "needs_observation"
