@@ -13,7 +13,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--min-total-rows", type=int, default=20)
-    parser.add_argument("--min-train-rows", type=int, default=15)
+    parser.add_argument("--min-train-rows", type=int, default=20)
     parser.add_argument("--min-test-rows", type=int, default=5)
     parser.add_argument("--min-rows-per-class", type=int, default=2)
     return parser.parse_args()

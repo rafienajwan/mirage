@@ -218,7 +218,7 @@ def test_prepare_reviewed_api_logs_binds_safe_provenance_and_hashes_ids(tmp_path
             "path": f"/api/orders/{index}",
             "user_agent": "private-client/1.0",
         }
-        for index in range(12)
+        for index in range(14)
     ] + [
         {
             "request_id": f"private-attack-{index}",
@@ -229,7 +229,7 @@ def test_prepare_reviewed_api_logs_binds_safe_provenance_and_hashes_ids(tmp_path
             "payload_excerpt": f"password=private-{index}&query=' or 1=1",
             "payload_indicators": ["sql-like"],
         }
-        for index in range(12)
+        for index in range(14)
     ]
     _write_jsonl(source, [*rows, rows[0]])
     source_review = review_api_log_source(
@@ -268,7 +268,7 @@ def test_prepare_reviewed_api_logs_binds_safe_provenance_and_hashes_ids(tmp_path
     ]
 
     assert manifest.source_kind == "reviewed-api-log-jsonl"
-    assert manifest.total_rows == 24
+    assert manifest.total_rows == 28
     assert manifest.duplicate_rows_removed == 1
     assert manifest.rejected_rows == 0
     assert manifest.input_sha256 == {source.name: source_review.input_sha256}
@@ -475,7 +475,7 @@ def test_review_prepared_dataset_marks_valid_split_ready(tmp_path):
     rows = [
         {"label": label, "features": _features(float(index))}
         for label in (0, 1)
-        for index in range(12)
+        for index in range(14)
     ]
     _write_jsonl(source, rows)
     prepare_dataset(
@@ -494,9 +494,47 @@ def test_review_prepared_dataset_marks_valid_split_ready(tmp_path):
 
     assert review.ready_for_training is True
     assert review.blockers == []
-    assert review.total_rows == 24
+    assert review.total_rows == 28
     assert review.train_label_counts["0"] >= 1
     assert review.test_label_counts["1"] >= 1
+
+
+def _prepare_counts(tmp_path, normal: int, suspicious: int):
+    source = tmp_path / "training_events.jsonl"
+    rows = [
+        {"label": label, "features": _features(float(index))}
+        for label, count in ((0, normal), (1, suspicious))
+        for index in range(count)
+    ]
+    _write_jsonl(source, rows)
+    output_dir = tmp_path / "prepared" / "runtime-v1"
+    prepare_dataset(
+        source,
+        output_dir,
+        source_kind="mirage-jsonl",
+        dataset_name="runtime-export",
+        dataset_version="v1",
+        train_ratio=0.75,
+        random_seed=7,
+    )
+    return review_prepared_dataset(output_dir / "manifest.json")
+
+
+def test_review_prepared_dataset_requires_two_train_rows_per_class(tmp_path):
+    review = _prepare_counts(tmp_path, normal=26, suspicious=2)
+
+    assert review.train_rows >= 20
+    assert review.train_label_counts["1"] == 1
+    assert review.ready_for_training is False
+    assert "Train split has fewer than 2 rows of label 1" in review.blockers
+
+
+def test_review_prepared_dataset_requires_trainer_minimum_train_rows(tmp_path):
+    review = _prepare_counts(tmp_path, normal=12, suspicious=12)
+
+    assert review.train_rows == 18
+    assert review.ready_for_training is False
+    assert "Train rows 18 is below 20" in review.blockers
 
 
 def test_review_prepared_dataset_blocks_manifest_row_mismatch(tmp_path):
@@ -586,7 +624,7 @@ def test_build_dataset_lineage_rejects_unrelated_training_file(tmp_path):
     rows = [
         {"label": label, "features": _features(float(index))}
         for label in (0, 1)
-        for index in range(12)
+        for index in range(14)
     ]
     _write_jsonl(source, rows)
     output_dir = tmp_path / "prepared" / "runtime-v1"

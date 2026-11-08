@@ -452,11 +452,12 @@ cd apps/gateway
 python scripts/review_dataset.py \
   --manifest data/prepared/runtime-v1/manifest.json \
   --min-total-rows 20 \
-  --min-train-rows 15 \
+  --min-train-rows 20 \
   --min-test-rows 5
 ```
 
 The command checks manifest integrity, train/test file hashes and row counts,
-label presence in both splits, and the feature contract. It exits with code `1`
+label presence in both splits (at least two rows of each label in the train
+split, matching what the trainer needs), and the feature contract. It exits with code `1`
 when blockers are found. Passing this review means the split is ready for local
 training review, not that the resulting model should control live routing.

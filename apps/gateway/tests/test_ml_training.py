@@ -50,7 +50,7 @@ def test_training_artifact_embeds_dataset_lineage(tmp_path):
         "".join(
             f'{{"label": {label}, "features": {{"request_count_log": {index}}}}}\n'
             for label in (0, 1)
-            for index in range(12)
+            for index in range(14)
         ),
         encoding="utf-8",
     )

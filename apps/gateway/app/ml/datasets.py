@@ -1052,7 +1052,7 @@ def review_prepared_dataset(
     manifest_path: Path,
     *,
     min_total_rows: int = 20,
-    min_train_rows: int = 15,
+    min_train_rows: int = 20,
     min_test_rows: int = 5,
     min_rows_per_class: int = 2,
 ) -> DatasetReview:
@@ -1147,8 +1147,9 @@ def review_prepared_dataset(
     for label in ("0", "1"):
         if label_counts.get(label, 0) < min_rows_per_class:
             blockers.append(f"Label {label} has fewer than {min_rows_per_class} rows")
-        if train_label_counts.get(label, 0) < 1:
-            blockers.append(f"Train split is missing label {label}")
+        # The trainer refuses fewer than 2 rows per class (stratified split).
+        if train_label_counts.get(label, 0) < 2:
+            blockers.append(f"Train split has fewer than 2 rows of label {label}")
         if test_label_counts.get(label, 0) < 1:
             blockers.append(f"Test split is missing label {label}")
 
