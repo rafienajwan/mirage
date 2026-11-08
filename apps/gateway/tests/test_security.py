@@ -40,8 +40,18 @@ async def test_development_without_key_is_open(client, env):
     assert response.status_code == 200
 
 
-async def test_wrong_key_is_rejected(client, env):
+async def test_wrong_key_looks_like_unknown_route_outside_development(client, env):
     env("production", "k" * 32)
+    response = await client.post(
+        "/api/v1/inspect", json=BODY, headers={"X-Mirage-API-Key": "wrong"}
+    )
+    unknown = await client.post("/api/v1/no-such-route", json=BODY)
+    assert response.status_code == 404
+    assert response.json() == unknown.json() == {"detail": "Not Found"}
+
+
+async def test_wrong_key_is_401_in_development(client, env):
+    env("development", "k" * 32)
     response = await client.post(
         "/api/v1/inspect", json=BODY, headers={"X-Mirage-API-Key": "wrong"}
     )

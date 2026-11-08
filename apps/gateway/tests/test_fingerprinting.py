@@ -30,7 +30,10 @@ async def test_production_hides_docs_and_root(production, path):
 
 
 async def test_production_decoy_status_requires_key(production):
-    assert (await _get(production, "/api/v1/decoy/status")).status_code == 401
+    denied = await _get(production, "/api/v1/decoy/status")
+    assert denied.status_code == 404
+    assert denied.json() == {"detail": "Not Found"}
+    assert "mirage" not in denied.text.lower()
     response = await _get(production, "/api/v1/decoy/status", {"X-Mirage-API-Key": KEY})
     assert response.status_code == 200
 
