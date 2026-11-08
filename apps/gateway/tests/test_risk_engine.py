@@ -67,3 +67,37 @@ def test_score_clamped_to_100():
     )
     result = calculate_risk(req)
     assert result.score <= 100
+
+
+def test_single_high_indicator_is_high():
+    result = calculate_risk(_make_request(payload_indicators=["sql-like"]))
+    assert result.score == 60.0
+    assert result.level == RiskLevel.HIGH
+
+
+def test_additional_high_indicators_add_ten():
+    result = calculate_risk(_make_request(payload_indicators=["sql-like", "xss"]))
+    assert result.score == 70.0
+
+
+def test_payload_score_capped_at_80():
+    indicators = [
+        "sql-like",
+        "xss",
+        "path-traversal",
+        "rce-indicator",
+        "encoded",
+        "large-payload",
+    ]
+    assert calculate_risk(_make_request(payload_indicators=indicators)).score == 80.0
+
+
+def test_new_high_labels_scored():
+    for label in ("header-injection", "null-byte"):
+        assert calculate_risk(_make_request(payload_indicators=[label])).score == 60.0
+
+
+def test_medium_only_stays_low():
+    result = calculate_risk(_make_request(payload_indicators=["encoded"]))
+    assert result.score == 8.0
+    assert result.level == RiskLevel.LOW

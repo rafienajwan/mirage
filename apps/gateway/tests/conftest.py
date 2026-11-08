@@ -13,6 +13,10 @@ import pytest
 _TEST_DB = Path(tempfile.mkdtemp(prefix="mirage-tests-")) / "test.db"
 os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{_TEST_DB.as_posix()}"
 os.environ["MIRAGE_API_KEY"] = ""
+# The rate limiter's per-IP window is process-global, so request-heavy tests
+# would throttle each other depending on order. Tests that exercise rate
+# limiting configure their own limit.
+os.environ["RATE_LIMIT_PER_MINUTE"] = "0"
 
 from app.main import app  # noqa: E402
 from app.storage.db.database import Base, engine  # noqa: E402
