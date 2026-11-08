@@ -13,8 +13,16 @@ import random
 import re
 import shutil
 from typing import Iterable, Literal
-from urllib.parse import urlsplit
 
+from app.ml.api_log_review import (
+    API_LOG_LABEL_FIELDS,
+    _api_log_request,
+    _first_object_value,
+    _label_from_api_log,
+    api_log_source_review_errors,
+    load_reviewed_api_log_rows,
+    validate_api_log_source_review,
+)
 from app.ml.artifact_integrity import sha256_file
 from app.ml.csic_http import (
     CSIC_DISTRIBUTION_URL,
@@ -209,284 +217,6 @@ def _label_from_cicids(value: str | None) -> int:
     return 0 if value.strip().upper() == "BENIGN" else 1
 
 
-API_LOG_LABELS = {
-    "0": 0,
-    "normal": 0,
-    "benign": 0,
-    "allow": 0,
-    "allowed": 0,
-    "clean": 0,
-    "ok": 0,
-    "pass": 0,
-    "false_positive": 0,
-    "1": 1,
-    "suspicious": 1,
-    "malicious": 1,
-    "attack": 1,
-    "monitor": 1,
-    "redirect_to_decoy": 1,
-    "false_negative": 1,
-    "true_positive": 1,
-    "deny": 1,
-    "denied": 1,
-    "blocked": 1,
-    "redirected": 1,
-    "decoy": 1,
-    "threat": 1,
-}
-
-API_LOG_LABEL_FIELDS = (
-    "label",
-    "analyst_label",
-    "class",
-    "decision",
-    "outcome",
-    "verdict",
-    "classification",
-)
-
-
-def _label_from_api_log(value: object, *, line_number: int) -> int:
-    if isinstance(value, bool):
-        return int(value)
-    if isinstance(value, int) and value in {0, 1}:
-        return value
-    if isinstance(value, str):
-        normalized = API_LOG_LABELS.get(value.strip().lower())
-        if normalized is not None:
-            return normalized
-    raise DatasetValidationError(
-        f"API log label must be normal/suspicious or 0/1 on line {line_number}"
-    )
-
-
-def _first_object_value(record: dict, *names: str) -> object:
-    for name in names:
-        value = record.get(name)
-        if value not in (None, ""):
-            return value
-    return None
-
-
-def _headers_value(record: dict, *names: str) -> object:
-    headers = record.get("headers")
-    if not isinstance(headers, dict):
-        return None
-
-    normalized_headers = {str(key).lower(): value for key, value in headers.items()}
-    for name in names:
-        value = normalized_headers.get(name.lower())
-        if value not in (None, ""):
-            return value
-    return None
-
-
-def _request_object(record: dict) -> dict:
-    for name in ("request", "http_request", "httpRequest", "http"):
-        value = record.get(name)
-        if isinstance(value, dict):
-            return value
-    return record
-
-
-def _path_from_value(value: object) -> str:
-    if value in (None, ""):
-        return ""
-    raw_path = str(value)
-    parsed = urlsplit(raw_path)
-    if parsed.scheme and parsed.netloc:
-        return parsed.path or "/"
-    if "?" in raw_path:
-        return raw_path.split("?", 1)[0] or "/"
-    return raw_path
-
-
-def _query_from_value(value: object) -> str:
-    if value in (None, ""):
-        return ""
-    return urlsplit(str(value)).query
-
-
-def _payload_excerpt(request_data: dict) -> str:
-    explicit_excerpt = _first_object_value(request_data, "payload_excerpt")
-    if explicit_excerpt not in (None, ""):
-        return str(explicit_excerpt)[:4096]
-
-    target = _first_object_value(
-        request_data,
-        "path",
-        "endpoint",
-        "url_path",
-        "route",
-        "uri",
-        "url",
-        "request_uri",
-    )
-    query = _first_object_value(request_data, "query", "query_string")
-    body = _first_object_value(
-        request_data,
-        "body_excerpt",
-        "request_body",
-        "body",
-        "payload",
-    )
-    return build_payload_excerpt(
-        str(query or _query_from_value(target)),
-        str(body or ""),
-    )
-
-
-def _api_payload_indicators(value: object, *, line_number: int) -> list[str]:
-    if value is None:
-        return []
-    if isinstance(value, str):
-        return [item.strip() for item in value.split(",") if item.strip()]
-    if isinstance(value, list) and all(isinstance(item, str) for item in value):
-        return value
-    raise DatasetValidationError(
-        f"payload_indicators must be a list of strings on line {line_number}"
-    )
-
-
-def _optional_float(value: object) -> float | None:
-    if value in (None, ""):
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _optional_int(value: object) -> int | None:
-    if value in (None, ""):
-        return None
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
-
-
-def _api_log_request(record: dict, *, line_number: int) -> InspectRequest:
-    request_data = _request_object(record)
-    user_agent = _first_object_value(
-        request_data,
-        "user_agent",
-        "userAgent",
-        "ua",
-        "user-agent",
-    ) or _headers_value(request_data, "user-agent")
-    try:
-        return InspectRequest(
-            ip_address=str(
-                _first_object_value(
-                    request_data,
-                    "ip_address",
-                    "source_ip",
-                    "client_ip",
-                    "src_ip",
-                    "remote_addr",
-                    "remoteAddress",
-                    "clientIp",
-                )
-                or ""
-            ),
-            method=str(
-                _first_object_value(
-                    request_data,
-                    "method",
-                    "http_method",
-                    "httpMethod",
-                    "request_method",
-                )
-                or ""
-            ),
-            path=_path_from_value(
-                _first_object_value(
-                    request_data,
-                    "path",
-                    "endpoint",
-                    "url_path",
-                    "route",
-                    "uri",
-                    "url",
-                    "request_uri",
-                )
-            ),
-            user_agent=str(user_agent or ""),
-            request_count=_optional_int(
-                _first_object_value(
-                    request_data,
-                    "request_count",
-                    "source_request_count",
-                    "count",
-                    "hits",
-                )
-            )
-            or 1,
-            payload_indicators=_api_payload_indicators(
-                _first_object_value(
-                    request_data,
-                    "payload_indicators",
-                    "indicators",
-                    "signals",
-                    "tags",
-                ),
-                line_number=line_number,
-            ),
-            payload_excerpt=_payload_excerpt(request_data),
-            timestamp=request_data.get("timestamp"),
-            flow_duration_ms=_optional_float(
-                _first_object_value(
-                    request_data,
-                    "flow_duration_ms",
-                    "duration_ms",
-                    "durationMs",
-                    "latency_ms",
-                )
-            ),
-            flow_packets_per_second=_optional_float(
-                _first_object_value(
-                    request_data,
-                    "flow_packets_per_second",
-                    "flowPacketsPerSecond",
-                    "packets_per_second",
-                )
-            ),
-            packet_length_mean=_optional_float(
-                _first_object_value(
-                    request_data,
-                    "packet_length_mean",
-                    "packetLengthMean",
-                    "avg_packet_length",
-                )
-            ),
-            syn_flag_count=_optional_int(
-                _first_object_value(request_data, "syn_flag_count", "synFlagCount")
-            ),
-            destination_port=_optional_int(
-                _first_object_value(
-                    request_data,
-                    "destination_port",
-                    "destinationPort",
-                    "dst_port",
-                    "port",
-                )
-            ),
-            average_packet_size=_optional_float(
-                _first_object_value(
-                    request_data,
-                    "average_packet_size",
-                    "averagePacketSize",
-                    "avg_packet_size",
-                )
-            ),
-        )
-    except ValueError as exc:
-        raise DatasetValidationError(
-            f"invalid API log request fields on line {line_number}"
-        ) from exc
-
-
 def load_api_log_jsonl(path: Path) -> list[PreparedTrainingRow]:
     """Load labeled custom API logs and extract MIRAGE production features."""
     rows: list[PreparedTrainingRow] = []
@@ -526,8 +256,6 @@ def load_api_log_jsonl(path: Path) -> list[PreparedTrainingRow]:
 
 def load_reviewed_api_log_jsonl(path: Path) -> list[PreparedTrainingRow]:
     """Load deduplicated reviewed logs with privacy-safe record identifiers."""
-    from app.ml.api_log_review import load_reviewed_api_log_rows
-
     return [
         PreparedTrainingRow(
             features=row.features,
@@ -790,8 +518,6 @@ def prepare_dataset(
             raise DatasetValidationError(
                 "API log source review is required for reviewed-api-log-jsonl"
             )
-        from app.ml.api_log_review import validate_api_log_source_review
-
         api_log_source_review = validate_api_log_source_review(
             source_review_path,
             input_path,
@@ -1014,8 +740,6 @@ def _review_api_log_provenance(
     if not isinstance(review, dict):
         blockers.append("Reviewed API log source review must be an object")
         return
-
-    from app.ml.api_log_review import api_log_source_review_errors
 
     blockers.extend(
         f"Reviewed API log {error}"
