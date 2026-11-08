@@ -8,6 +8,7 @@ import {
   OPERATOR_SESSION_COOKIE,
   OPERATOR_SESSION_MAX_AGE,
 } from "@/lib/operator-auth";
+import { loginClientKey, loginThrottle } from "@/lib/login-throttle";
 
 function passwordMatches(candidate: string, expected: string) {
   const candidateDigest = createHash("sha256").update(candidate).digest();
@@ -38,6 +39,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ detail: "Invalid request origin" }, { status: 403 });
   }
 
+  const clientKey = loginClientKey(
+    request.headers,
+    process.env.MIRAGE_TRUST_PROXY_HEADERS === "true",
+  );
+  const throttle = loginThrottle.check(clientKey);
+  if (!throttle.allowed) {
+    return NextResponse.json(
+      { detail: "Too many login attempts" },
+      {
+        status: 429,
+        headers: { "Retry-After": String(throttle.retryAfterSeconds) },
+      },
+    );
+  }
+
   let candidate: unknown;
   try {
     candidate = (await request.json() as { password?: unknown }).password;
@@ -45,8 +61,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ detail: "Invalid request body" }, { status: 400 });
   }
   if (typeof candidate !== "string" || !passwordMatches(candidate, password)) {
+    loginThrottle.recordFailure(clientKey);
     return NextResponse.json({ detail: "Invalid credentials" }, { status: 401 });
   }
+  loginThrottle.recordSuccess(clientKey);
 
   try {
     const now = Math.floor(Date.now() / 1000);

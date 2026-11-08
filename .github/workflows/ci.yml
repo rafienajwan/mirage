@@ -107,7 +107,7 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
       # Dependency install scripts are not needed to lint, test or build.
       - run: npm ci --ignore-scripts
-      - run: npm run lint
+      - run: npm run lint -- --max-warnings 0
       - run: npx tsc --noEmit
       - run: npm test
       - run: npm run build

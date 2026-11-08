@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, Menu, X, LayoutDashboard, LogOut } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 const NAV_ITEMS = [
   { name: "Overview", href: "/" },
@@ -15,10 +16,12 @@ const NAV_ITEMS = [
 export default function Header({ showLogout = false }: { showLogout?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const router = useRouter();
 
   async function signOut() {
     await fetch("/api/auth/logout", { method: "POST" });
-    window.location.assign("/login");
+    router.push("/login");
+    router.refresh();
   }
 
   return (
