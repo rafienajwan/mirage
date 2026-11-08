@@ -6,7 +6,11 @@ import sys
 import joblib
 import pytest
 
-from app.ml.datasets import build_dataset_lineage, prepare_dataset
+from app.ml.datasets import (
+    DatasetValidationError,
+    build_dataset_lineage,
+    prepare_dataset,
+)
 from app.ml.inference import RiskClassifier
 from app.ml.training import LabeledFeatures, train_risk_classifier
 from app.services.feature_extraction import FEATURE_NAMES
@@ -34,6 +38,16 @@ def test_train_and_load_classifier():
         assert classifier.suspicious_probability(_row(1, 20).features) > 0.5
     finally:
         artifact.unlink(missing_ok=True)
+
+
+def test_training_with_held_out_rows_fits_all_training_rows(tmp_path):
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(20)]
+    held_out = [_row(label, float(index + 1)) for label in (0, 1) for index in range(5)]
+
+    metrics = train_risk_classifier(rows, tmp_path / "model.joblib", test_rows=held_out)
+
+    assert metrics.training_rows == 40
+    assert metrics.test_rows == 10
 
 
 def test_classifier_scores_single_rows_without_a_thread_pool(tmp_path):
@@ -136,3 +150,19 @@ def test_train_script_binds_reviewed_manifest(tmp_path, monkeypatch):
     assert payload["feature_contract_version"] == 2
     assert payload["artifact_version"] == 2
     assert payload["dataset_lineage"]["dataset_name"] == "runtime-export"
+    # Fits on the whole prepared train split and scores on the prepared test split.
+    assert payload["metrics"]["training_rows"] == 30
+    assert payload["metrics"]["test_rows"] == 10
+
+
+def test_train_script_rejects_rows_without_features(tmp_path, monkeypatch):
+    source = tmp_path / "train.jsonl"
+    source.write_text('{"label": 1, "features": null}\n', encoding="utf-8")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["train_model.py", "--input", str(source), "--output", str(tmp_path / "m")],
+    )
+
+    with pytest.raises(DatasetValidationError, match="line 1"):
+        train_model.main()

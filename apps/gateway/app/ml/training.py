@@ -50,22 +50,34 @@ def train_risk_classifier(
     *,
     random_state: int = 42,
     dataset_lineage: dict[str, str] | None = None,
+    test_rows: Iterable[LabeledFeatures] | None = None,
 ) -> TrainingMetrics:
-    """Train a deterministic binary classifier and save a versioned artifact."""
+    """Train a deterministic binary classifier and save a versioned artifact.
+
+    With ``test_rows`` (a prepared held-out split) the model fits on every
+    training row and is scored on those rows; otherwise 25% is held out here.
+    """
     records = list(rows)
     if len(records) < 20:
         raise ValueError("At least 20 labeled rows are required")
     if {row.label for row in records} != {0, 1}:
         raise ValueError("Training data must contain both normal and suspicious labels")
 
-    x, y = _matrix(records)
-    x_train, x_test, y_train, y_test = train_test_split(
-        x,
-        y,
-        test_size=0.25,
-        stratify=y,
-        random_state=random_state,
-    )
+    if test_rows is None:
+        x, y = _matrix(records)
+        x_train, x_test, y_train, y_test = train_test_split(
+            x,
+            y,
+            test_size=0.25,
+            stratify=y,
+            random_state=random_state,
+        )
+    else:
+        held_out = list(test_rows)
+        if {row.label for row in held_out} != {0, 1}:
+            raise ValueError("Test data must contain both normal and suspicious labels")
+        x_train, y_train = _matrix(records)
+        x_test, y_test = _matrix(held_out)
     model = RandomForestClassifier(
         n_estimators=200,
         class_weight="balanced",

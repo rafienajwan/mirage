@@ -151,8 +151,13 @@ Only continue when the dataset review reports `ready_for_training: true`.
 ```bash
 python scripts/train_model.py \
   --input data/prepared/runtime-v1/train.jsonl \
-  --output artifacts/risk_model.joblib
+  --output artifacts/risk_model.joblib \
+  --manifest data/prepared/runtime-v1/manifest.json
 ```
+
+With `--manifest`, the model fits on the whole train split and the artifact
+metrics come from the prepared `test.jsonl`. Without it, the trainer holds out
+25% of the input itself.
 
 Review `data/prepared/runtime-v1/manifest.json` before training or enabling an
 artifact in shadow mode. It records row counts, label balance, split ratio,
