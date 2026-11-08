@@ -49,13 +49,11 @@ shadow mode:
 ```bash
 python scripts/evaluate_model_artifact.py \
   --artifact artifacts/risk_model.joblib \
-  --input data/prepared/runtime-v1/test.jsonl \
-  --min-precision 0.9 \
-  --min-recall 0.6 \
-  --min-f1-score 0.7 \
-  --max-false-positive-rate 0.02
+  --input data/prepared/runtime-v1/test.jsonl
 ```
 
+Its thresholds default to the artifact review's (precision `0.90`, recall
+`0.60`, F1 `0.70`, false-positive rate at most `0.02`; `--help` shows them).
 The command exits with code `1` when holdout thresholds fail. This is separate
 from the training script's internal validation and should be treated as the
 operator-facing check for a prepared dataset split.

@@ -9,6 +9,10 @@ from typing import Any
 import numpy as np
 
 from app.ml.artifacts import (
+    REVIEW_MAX_FALSE_POSITIVE_RATE,
+    REVIEW_MIN_F1_SCORE,
+    REVIEW_MIN_PRECISION,
+    REVIEW_MIN_RECALL,
     classification_metrics,
     load_checked_artifact,
     threshold_blockers,
@@ -35,10 +39,10 @@ def evaluate_model_artifact(
     artifact_path: Path,
     input_path: Path,
     *,
-    min_precision: float = 0.5,
-    min_recall: float = 0.5,
-    min_f1_score: float = 0.5,
-    max_false_positive_rate: float = 0.5,
+    min_precision: float = REVIEW_MIN_PRECISION,
+    min_recall: float = REVIEW_MIN_RECALL,
+    min_f1_score: float = REVIEW_MIN_F1_SCORE,
+    max_false_positive_rate: float = REVIEW_MAX_FALSE_POSITIVE_RATE,
     min_rows: int = 5,
 ) -> HoldoutEvaluation:
     """Evaluate a trained artifact on a prepared holdout JSONL split."""
