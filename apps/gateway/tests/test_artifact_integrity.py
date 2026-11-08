@@ -183,7 +183,7 @@ def test_promotion_does_not_load_unpinned_artifact_outside_development(booby_tra
         ml_promotion_min_total_rows=1,
         ml_promotion_min_rows_per_class=1,
         ml_promotion_min_shadow_events=1,
-        ml_promotion_min_agreement_rate=0.5,
+        ml_promotion_min_labeled_events=1,
     )
     readiness = evaluate_ml_promotion(
         shadow_summary=SimpleNamespace(shadow_events=0, agreement_rate=0.0),

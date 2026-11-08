@@ -216,7 +216,8 @@ async def build_dashboard_snapshot() -> dict[str, Any]:
         "ml_shadow_status": get_ml_shadow_status(),
         "ml_shadow_summary": shadow_summary.model_dump(mode="json"),
         "ml_promotion_readiness": evaluate_ml_promotion(
-            shadow_summary=shadow_summary
+            shadow_summary=shadow_summary,
+            labeled_events=labeled_events,
         ).model_dump(mode="json"),
         "honeytokens": {
             "total_hits": await store.get_honeytoken_hit_count(),

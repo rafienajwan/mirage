@@ -75,4 +75,5 @@ def score_ml_shadow(
         prediction="suspicious" if probability >= 0.5 else "normal",
         shadow_decision=shadow_decision.value,
         agrees_with_decision=shadow_decision == heuristic_decision,
+        heuristic_decision=heuristic_decision.value,
     )

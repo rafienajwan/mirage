@@ -72,7 +72,9 @@ be labeled as pipeline validation, not model-quality evidence.
    and borderline traffic as well as suspicious requests. Use the hash-verified
    multi-batch workflow and do not treat scenario categories as labels.
 2. Retrain with a representative holdout and collect at least 500 shadow events
-   with acceptable false-positive impact and the configured agreement gate.
+   with acceptable false-positive impact, and at least 100 analyst-labeled
+   shadow events on which the model matches or beats the heuristic's precision
+   and recall.
 3. Approve active hybrid routing only after dataset, artifact, false-positive,
    and shadow-observation gates pass; keep `ml_only` experimental.
 4. Provision Vercel, Railway, and Supabase, run migrations, verify private and

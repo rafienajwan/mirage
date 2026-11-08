@@ -133,3 +133,31 @@ async def test_v2_artifact_disables_shadow_scoring(client, monkeypatch):
     finally:
         ml_shadow._load_classifier.cache_clear()
         artifact.unlink(missing_ok=True)
+
+
+def test_shadow_score_records_heuristic_decision(monkeypatch):
+    artifact = Path(".test-heuristic-shadow-risk-model.joblib")
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(20)]
+    try:
+        train_risk_classifier(rows, artifact)
+        monkeypatch.setattr(
+            ml_shadow,
+            "settings",
+            SimpleNamespace(
+                ml_model_artifact_sha256=None,
+                ml_model_artifact=str(artifact),
+                ml_shadow_monitor_threshold=0.35,
+                ml_shadow_redirect_threshold=0.65,
+            ),
+        )
+        ml_shadow._load_classifier.cache_clear()
+
+        score = ml_shadow.score_ml_shadow(
+            _row(0, 1).features, heuristic_decision=Decision.MONITOR
+        )
+
+        assert score is not None
+        assert score.heuristic_decision == "monitor"
+    finally:
+        ml_shadow._load_classifier.cache_clear()
+        artifact.unlink(missing_ok=True)

@@ -381,12 +381,16 @@ manifest configured through `MIRAGE_MODEL_DATASET_MANIFEST`. It reports:
 
 - `unavailable` when required paths are not configured;
 - `blocked` when configuration, artifact, or dataset review fails;
-- `needs_observation` when runtime shadow evidence is insufficient;
+- `needs_observation` when runtime shadow evidence is insufficient, or when,
+  on at least `ML_PROMOTION_MIN_LABELED_EVENTS` (default 100) analyst-labeled
+  shadow events, the model's precision or recall is below the heuristic's;
 - `eligible` when every configured gate passes.
 
 Only sanitized file names are returned. The report never changes the active
-artifact or heuristic routing policy. Agreement is a compatibility signal
-against current heuristics, not proof of real-world model accuracy.
+artifact or heuristic routing policy. Agreement with the heuristic is shown for
+information only and never blocks promotion: a model that copies the heuristic
+adds nothing, and one that catches what the heuristic misses must disagree.
+Analyst labels are the yardstick.
 
 ## Experimental Live Routing
 

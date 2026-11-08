@@ -110,9 +110,9 @@ class Settings:
             os.getenv("ML_PROMOTION_MIN_SHADOW_EVENTS", "500")
         )
     )
-    ml_promotion_min_agreement_rate: float = field(
-        default_factory=lambda: float(
-            os.getenv("ML_PROMOTION_MIN_AGREEMENT_RATE", "0.8")
+    ml_promotion_min_labeled_events: int = field(
+        default_factory=lambda: int(
+            os.getenv("ML_PROMOTION_MIN_LABELED_EVENTS", "100")
         )
     )
     retraining_artifact_dir: str = field(

@@ -16,3 +16,5 @@ class MLShadowScore(BaseModel):
     prediction: str
     shadow_decision: Literal["allow", "monitor", "redirect_to_decoy"]
     agrees_with_decision: bool
+    # Heuristic-only decision at scoring time; None on rows stored before it existed.
+    heuristic_decision: Literal["allow", "monitor", "redirect_to_decoy"] | None = None
