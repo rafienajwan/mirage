@@ -6,18 +6,29 @@ import argparse
 import json
 from pathlib import Path
 
-from app.ml.artifacts import review_model_artifact
+from app.ml.artifacts import (
+    REVIEW_MAX_FALSE_POSITIVE_RATE,
+    REVIEW_MIN_F1_SCORE,
+    REVIEW_MIN_PRECISION,
+    REVIEW_MIN_RECALL,
+    REVIEW_MIN_TEST_ROWS,
+    REVIEW_MIN_TRAINING_ROWS,
+    review_model_artifact,
+)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--artifact", type=Path, required=True)
-    parser.add_argument("--min-precision", type=float, default=0.5)
-    parser.add_argument("--min-recall", type=float, default=0.5)
-    parser.add_argument("--min-f1-score", type=float, default=0.5)
-    parser.add_argument("--max-false-positive-rate", type=float, default=0.5)
-    parser.add_argument("--min-training-rows", type=int, default=15)
-    parser.add_argument("--min-test-rows", type=int, default=5)
+    for flag, kind, default in (
+        ("--min-precision", float, REVIEW_MIN_PRECISION),
+        ("--min-recall", float, REVIEW_MIN_RECALL),
+        ("--min-f1-score", float, REVIEW_MIN_F1_SCORE),
+        ("--max-false-positive-rate", float, REVIEW_MAX_FALSE_POSITIVE_RATE),
+        ("--min-training-rows", int, REVIEW_MIN_TRAINING_ROWS),
+        ("--min-test-rows", int, REVIEW_MIN_TEST_ROWS),
+    ):
+        parser.add_argument(flag, type=kind, default=default, help="default: %(default)s")
     return parser.parse_args()
 
 

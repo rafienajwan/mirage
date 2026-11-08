@@ -29,7 +29,7 @@ def blob(tmp_path):
 @pytest.fixture
 def trained(tmp_path):
     path = tmp_path / "risk.joblib"
-    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(20)]
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(70)]
     train_risk_classifier(rows, path)
     return path
 

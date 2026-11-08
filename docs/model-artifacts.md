@@ -50,10 +50,10 @@ shadow mode:
 python scripts/evaluate_model_artifact.py \
   --artifact artifacts/risk_model.joblib \
   --input data/prepared/runtime-v1/test.jsonl \
-  --min-precision 0.5 \
-  --min-recall 0.5 \
-  --min-f1-score 0.5 \
-  --max-false-positive-rate 0.5
+  --min-precision 0.9 \
+  --min-recall 0.6 \
+  --min-f1-score 0.7 \
+  --max-false-positive-rate 0.02
 ```
 
 The command exits with code `1` when holdout thresholds fail. This is separate
@@ -67,11 +67,7 @@ Review the artifact payload before enabling it:
 ```bash
 cd apps/gateway
 python scripts/review_model_artifact.py \
-  --artifact artifacts/risk_model.joblib \
-  --min-precision 0.5 \
-  --min-recall 0.5 \
-  --min-f1-score 0.5 \
-  --max-false-positive-rate 0.5
+  --artifact artifacts/risk_model.joblib
 ```
 
 The command exits with code `1` when blockers are found. It checks that the
@@ -79,9 +75,13 @@ artifact can be loaded, the feature contract matches the gateway, required
 metrics exist, dataset lineage is structurally valid when present, and the
 selected metric thresholds are satisfied.
 
-The default thresholds are intentionally modest for local prototypes. For a
-real demonstration or deployment, raise them and review dataset provenance,
-holdout behavior, label quality, and false-positive tradeoffs manually.
+The default thresholds are strict because a false positive sends a real user
+to the decoy: precision at least `0.90`, recall at least `0.60`, F1 at least
+`0.70`, false-positive rate at most `0.02`, at least `100` training rows and
+`30` test rows (`--help` shows them). A test split without negatives has no
+false-positive rate and is blocked. Gateway shadow loading and dashboard
+retraining use the same defaults. Still review dataset provenance, holdout
+behavior, label quality, and false-positive tradeoffs manually.
 
 ## Local HTTP CSIC 2010 Review
 

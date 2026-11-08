@@ -50,7 +50,7 @@ def test_ml_shadow_status_missing_artifact(monkeypatch, tmp_path):
 
 def test_ml_shadow_status_ready_artifact(monkeypatch, tmp_path):
     artifact = Path(tmp_path / "risk_model.joblib")
-    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(20)]
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(70)]
     train_risk_classifier(rows, artifact)
     monkeypatch.setattr(ml_status, "settings", _settings(str(artifact)))
 
@@ -59,12 +59,12 @@ def test_ml_shadow_status_ready_artifact(monkeypatch, tmp_path):
     assert status["mode"] == "shadow_ready"
     assert status["artifact"] == "risk_model.joblib"
     assert status["shadow_ready"] is True
-    assert status["metrics"]["training_rows"] == 30
+    assert status["metrics"]["training_rows"] == 105
 
 
 def test_ml_shadow_status_reuses_review_of_unchanged_artifact(monkeypatch, tmp_path):
     artifact = Path(tmp_path / "risk_model.joblib")
-    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(20)]
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(70)]
     train_risk_classifier(rows, artifact)
     monkeypatch.setattr(ml_status, "settings", _settings(str(artifact)))
     loads = []

@@ -24,6 +24,13 @@ REQUIRED_METRICS = (
     "training_rows",
     "test_rows",
 )
+# A false positive sends a real user to the decoy, so the bar is strict.
+REVIEW_MIN_PRECISION = 0.90
+REVIEW_MIN_RECALL = 0.60
+REVIEW_MIN_F1_SCORE = 0.70
+REVIEW_MAX_FALSE_POSITIVE_RATE = 0.02
+REVIEW_MIN_TRAINING_ROWS = 100
+REVIEW_MIN_TEST_ROWS = 30
 DATASET_LINEAGE_FIELDS = (
     "dataset_name",
     "dataset_version",
@@ -119,14 +126,17 @@ def load_checked_artifact(
     return artifact, blockers
 
 
-def classification_metrics(y_true: Any, predictions: Any) -> dict[str, float]:
-    """Precision, recall, F1 and false-positive rate for binary labels."""
+def classification_metrics(y_true: Any, predictions: Any) -> dict[str, float | None]:
+    """Precision, recall, F1 and false-positive rate for binary labels.
+
+    The false-positive rate is None when there are no negatives to measure it on.
+    """
     tn, fp, _, _ = confusion_matrix(y_true, predictions, labels=[0, 1]).ravel()
     return {
         "precision": float(precision_score(y_true, predictions, zero_division=0)),
         "recall": float(recall_score(y_true, predictions, zero_division=0)),
         "f1_score": float(f1_score(y_true, predictions, zero_division=0)),
-        "false_positive_rate": float(fp / (fp + tn)) if fp + tn else 0.0,
+        "false_positive_rate": float(fp / (fp + tn)) if fp + tn else None,
     }
 
 
@@ -138,7 +148,11 @@ def threshold_blockers(
     min_f1_score: float,
     max_false_positive_rate: float,
 ) -> list[str]:
-    """Blockers for metrics outside the thresholds; absent metrics are skipped."""
+    """Blockers for metrics outside the thresholds.
+
+    Absent precision, recall or F1 are skipped; an absent false-positive rate
+    blocks, because without negatives nothing shows the decoy spares real users.
+    """
     blockers: list[str] = []
     for key, name, minimum in (
         ("precision", "Precision", min_precision),
@@ -148,7 +162,9 @@ def threshold_blockers(
         if key in metrics and metrics[key] < minimum:
             blockers.append(f"{name} {metrics[key]:.3f} is below {minimum:.3f}")
     rate = metrics.get("false_positive_rate")
-    if rate is not None and rate > max_false_positive_rate:
+    if rate is None:
+        blockers.append("False-positive rate is unavailable")
+    elif rate > max_false_positive_rate:
         blockers.append(
             f"False-positive rate {rate:.3f} is above {max_false_positive_rate:.3f}"
         )
@@ -159,12 +175,12 @@ def review_model_artifact(
     artifact_path: Path,
     *,
     expected_sha256: str | None = None,
-    min_precision: float = 0.5,
-    min_recall: float = 0.5,
-    min_f1_score: float = 0.5,
-    max_false_positive_rate: float = 0.5,
-    min_training_rows: int = 15,
-    min_test_rows: int = 5,
+    min_precision: float = REVIEW_MIN_PRECISION,
+    min_recall: float = REVIEW_MIN_RECALL,
+    min_f1_score: float = REVIEW_MIN_F1_SCORE,
+    max_false_positive_rate: float = REVIEW_MAX_FALSE_POSITIVE_RATE,
+    min_training_rows: int = REVIEW_MIN_TRAINING_ROWS,
+    min_test_rows: int = REVIEW_MIN_TEST_ROWS,
 ) -> ArtifactReview:
     """Validate an artifact before enabling model-only shadow scoring."""
     warnings: list[str] = []

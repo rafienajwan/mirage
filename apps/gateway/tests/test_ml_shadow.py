@@ -39,7 +39,7 @@ def test_ml_shadow_is_disabled_without_artifact(monkeypatch):
 
 def test_ml_shadow_scores_with_valid_artifact(monkeypatch):
     artifact = Path(".test-shadow-risk-model.joblib")
-    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(20)]
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(70)]
     try:
         train_risk_classifier(rows, artifact)
         monkeypatch.setattr(
@@ -70,7 +70,7 @@ def test_ml_shadow_scores_with_valid_artifact(monkeypatch):
 
 def test_ml_shadow_rejects_artifact_that_fails_review(monkeypatch):
     artifact = Path(".test-invalid-shadow-risk-model.joblib")
-    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(20)]
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(70)]
     try:
         train_risk_classifier(rows, artifact)
         payload = joblib.load(artifact)
@@ -101,7 +101,7 @@ def test_ml_shadow_rejects_artifact_that_fails_review(monkeypatch):
 
 async def test_v2_artifact_disables_shadow_scoring(client, monkeypatch):
     artifact = Path(".test-v2-shadow-risk-model.joblib")
-    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(20)]
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(70)]
     try:
         train_risk_classifier(rows, artifact)
         payload = joblib.load(artifact)
@@ -137,7 +137,7 @@ async def test_v2_artifact_disables_shadow_scoring(client, monkeypatch):
 
 def test_shadow_score_records_heuristic_decision(monkeypatch):
     artifact = Path(".test-heuristic-shadow-risk-model.joblib")
-    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(20)]
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(70)]
     try:
         train_risk_classifier(rows, artifact)
         monkeypatch.setattr(
