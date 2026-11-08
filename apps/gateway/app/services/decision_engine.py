@@ -7,14 +7,6 @@ from app.schemas.decision import Decision, RiskLevel
 from app.schemas.ml import MLShadowScore
 from app.services.risk_engine import RiskResult
 
-# Known malicious fingerprints (demo only)
-_KNOWN_MALICIOUS_FINGERPRINTS: set[str] = set()
-
-
-def register_malicious_fingerprint(fingerprint: str) -> None:
-    """Mark a fingerprint as known-malicious for future requests."""
-    _KNOWN_MALICIOUS_FINGERPRINTS.add(fingerprint)
-
 
 def make_decision(
     risk: RiskResult,
@@ -40,9 +32,6 @@ def make_decision(
     if mode != "heuristic" and not approved:
         mode = "heuristic"
     threshold = settings.risk_threshold
-
-    if fingerprint_hash in _KNOWN_MALICIOUS_FINGERPRINTS:
-        return Decision.REDIRECT_TO_DECOY
 
     # Mode: ml_only (if ML shadow score is available, use ML prediction)
     if mode == "ml_only" and ml_shadow is not None:
