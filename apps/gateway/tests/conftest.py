@@ -34,6 +34,9 @@ async def setup_db():
     yield
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+    # Each test runs on its own event loop; a pool that once had to queue for
+    # a connection stays bound to the loop of the test that filled it.
+    await engine.dispose()
 
 
 @pytest.fixture

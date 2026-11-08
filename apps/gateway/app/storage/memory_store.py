@@ -69,7 +69,7 @@ class MemoryStore:
         title: str,
         description: str,
         recommended_action: str,
-    ) -> None:
+    ) -> AlertRecord:
         self._alert_counter += 1
         alert = AlertRecord(
             alert_id=f"alert-{self._alert_counter:04d}",
@@ -80,6 +80,7 @@ class MemoryStore:
             created_at=datetime.now(timezone.utc),
         )
         self.alerts.append(alert)
+        return alert
 
     async def get_alerts(self, limit: int = 100) -> list[AlertRecord]:
         return list(reversed(self.alerts[-limit:]))

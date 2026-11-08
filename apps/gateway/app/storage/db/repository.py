@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
 from typing import TypeVar
+from uuid import uuid4
 
 from sqlalchemy import case, extract, func, select
 from sqlalchemy.exc import IntegrityError, OperationalError
@@ -195,22 +196,27 @@ class DatabaseStore:
         title: str,
         description: str,
         recommended_action: str,
-    ) -> None:
+    ) -> AlertRecord:
+        alert = AlertRecord(
+            alert_id=uuid4().hex,
+            severity=severity,
+            title=title,
+            description=description,
+            recommended_action=recommended_action,
+            created_at=datetime.now(timezone.utc),
+        )
         async with get_session() as session:
-            # Get the next alert ID
-            count_stmt = select(func.count()).select_from(AlertModel)
-            count_result = await session.execute(count_stmt)
-            count = count_result.scalar() or 0
-
-            alert = AlertModel(
-                alert_id=f"alert-{count + 1:04d}",
-                severity=severity.value,
-                title=title,
-                description=description,
-                recommended_action=recommended_action,
-                created_at=datetime.now(timezone.utc),
+            session.add(
+                AlertModel(
+                    alert_id=alert.alert_id,
+                    severity=severity.value,
+                    title=title,
+                    description=description,
+                    recommended_action=recommended_action,
+                    created_at=alert.created_at,
+                )
             )
-            session.add(alert)
+        return alert
 
     async def get_alerts(self, limit: int = 100) -> list[AlertRecord]:
         async with get_session() as session:
