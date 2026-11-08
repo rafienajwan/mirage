@@ -48,7 +48,7 @@ describe("decideProxyAccess", () => {
       decideProxyAccess(
         facts({
           method: "POST",
-          pathname: "/api/simulate/suspicious",
+          pathname: "/api/gateway/simulate/suspicious",
           origin: "https://evil.mirage.example",
         }),
       ),
@@ -59,7 +59,7 @@ describe("decideProxyAccess", () => {
   it("rejects a POST that carries no Origin header", () => {
     assert.equal(
       decideProxyAccess(
-        facts({ method: "POST", pathname: "/api/training-data/retrain" }),
+        facts({ method: "POST", pathname: "/api/gateway/dashboard/training-data/retrain" }),
       ),
       "forbidden",
     );
@@ -70,7 +70,7 @@ describe("decideProxyAccess", () => {
       decideProxyAccess(
         facts({
           method: "PATCH",
-          pathname: "/api/actor-case-workflows/case-1",
+          pathname: "/api/gateway/dashboard/actor-case-workflows/case-1",
           origin: "https://mirage.example",
         }),
       ),

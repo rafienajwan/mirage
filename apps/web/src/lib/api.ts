@@ -642,23 +642,29 @@ export function mapDashboardAlert(a: BackendAlert): FeedAlert {
 
 // ─── Fetcher functions ──────────────────────────────────────────
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_PREFIX}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...init,
-  });
+/** Every gateway call goes through the server-side bridge, which adds the API key. */
+async function gatewayRequest(path: string, init?: RequestInit): Promise<Response> {
+  const res = await fetch(`${API_PREFIX}${path}`, { cache: "no-store", ...init });
   if (!res.ok) {
     throw new Error(`API error: ${res.status} ${res.statusText}`);
   }
-  return res.json();
+  return res;
+}
+
+async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  return (await gatewayRequest(path, init)).json();
+}
+
+function sendJson(method: "POST" | "PATCH", body?: unknown): RequestInit {
+  return {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body ?? {}),
+  };
 }
 
 async function simulationFetch<T>(kind: "normal" | "suspicious"): Promise<T> {
-  const res = await fetch(`/api/simulate/${kind}`, { method: "POST" });
-  if (!res.ok) {
-    throw new Error(`Simulation error: ${res.status} ${res.statusText}`);
-  }
-  return res.json();
+  return apiFetch<T>(`/simulate/${kind}`, sendJson("POST"));
 }
 
 /** Fetch dashboard overview metrics. */
@@ -689,33 +695,22 @@ export async function labelEvent(
   label: AnalystLabel,
   note = "",
 ): Promise<FeedEvent> {
-  const res = await fetch(`/api/events/${encodeURIComponent(eventId)}/label`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ label, note }),
-  });
-  if (!res.ok) {
-    throw new Error(`Labeling error: ${res.status} ${res.statusText}`);
-  }
-  return mapDashboardEvent(await res.json());
+  return mapDashboardEvent(
+    await apiFetch<BackendEvent>(
+      `/dashboard/events/${encodeURIComponent(eventId)}/label`,
+      sendJson("PATCH", { label, note }),
+    ),
+  );
 }
 
 /** Download analyst-labeled feature vectors as JSON Lines. */
 export async function downloadTrainingData(): Promise<Blob> {
-  const res = await fetch("/api/training-data/export", { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Training export error: ${res.status} ${res.statusText}`);
-  }
-  return res.blob();
+  return (await gatewayRequest("/dashboard/training-data/export")).blob();
 }
 
 /** Fetch analyst-labeled training data readiness. */
 export async function fetchTrainingDataSummary(): Promise<TrainingDataSummary> {
-  const res = await fetch("/api/training-data/summary", { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Training summary error: ${res.status} ${res.statusText}`);
-  }
-  const data = (await res.json()) as BackendTrainingDataSummary;
+  const data = await apiFetch<BackendTrainingDataSummary>("/dashboard/training-data/summary");
   return {
     labeledRows: data.labeled_rows,
     exportableRows: data.exportable_rows,
@@ -747,14 +742,10 @@ export function mapTrainingSummary(data: BackendTrainingDataSummary): TrainingDa
 
 /** Train a local shadow-mode candidate from analyst-labeled events. */
 export async function runRetraining(): Promise<RetrainingRun> {
-  const res = await fetch("/api/training-data/retrain", {
-    method: "POST",
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    throw new Error(`Retraining error: ${res.status} ${res.statusText}`);
-  }
-  const data = (await res.json()) as BackendRetrainingRun;
+  const data = await apiFetch<BackendRetrainingRun>(
+    "/dashboard/training-data/retrain",
+    sendJson("POST"),
+  );
   return {
     artifactPath: data.artifact_path,
     trainingSummary: mapTrainingSummary(data.training_summary),
@@ -840,11 +831,9 @@ export function mapMLPromotionReadiness(
 }
 
 export async function fetchMLPromotionReadiness(): Promise<MLPromotionReadinessData> {
-  const res = await fetch("/api/ml-promotion/readiness", { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`ML promotion readiness error: ${res.status} ${res.statusText}`);
-  }
-  return mapMLPromotionReadiness(await res.json());
+  return mapMLPromotionReadiness(
+    await apiFetch<BackendMLPromotionReadiness>("/dashboard/ml-promotion/readiness"),
+  );
 }
 
 /** Fetch recent honeytoken interactions. */
@@ -910,15 +899,12 @@ export async function revokeCanaryAssignment(
   assignmentId: string,
   reason = "",
 ): Promise<CanaryAssignment> {
-  const res = await fetch(`/api/canary-assignments/${encodeURIComponent(assignmentId)}/revoke`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ reason }),
-  });
-  if (!res.ok) {
-    throw new Error(`Canary revoke error: ${res.status} ${res.statusText}`);
-  }
-  return mapCanaryAssignment(await res.json());
+  return mapCanaryAssignment(
+    await apiFetch<BackendCanaryAssignment>(
+      `/dashboard/canary-assignments/${encodeURIComponent(assignmentId)}/revoke`,
+      sendJson("POST", { reason }),
+    ),
+  );
 }
 
 /** Fetch recent actor profiles from threat fingerprints. */
@@ -1050,15 +1036,12 @@ export async function openActorCase(
   note = "",
   assignedTo = "",
 ): Promise<ActorCaseWorkflow> {
-  const res = await fetch(`/api/actor-cases/${encodeURIComponent(caseId)}/open`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ note, assigned_to: assignedTo }),
-  });
-  if (!res.ok) {
-    throw new Error(`Open actor case error: ${res.status} ${res.statusText}`);
-  }
-  return mapActorCaseWorkflow(await res.json());
+  return mapActorCaseWorkflow(
+    await apiFetch<BackendActorCaseWorkflow>(
+      `/dashboard/actor-cases/${encodeURIComponent(caseId)}/open`,
+      sendJson("POST", { note, assigned_to: assignedTo }),
+    ),
+  );
 }
 
 /** Update a persisted actor case through the server-side API bridge. */
@@ -1068,15 +1051,12 @@ export async function updateActorCase(
   note = "",
   assignedTo?: string,
 ): Promise<ActorCaseWorkflow> {
-  const res = await fetch(`/api/actor-case-workflows/${encodeURIComponent(caseId)}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status, note, assigned_to: assignedTo }),
-  });
-  if (!res.ok) {
-    throw new Error(`Update actor case error: ${res.status} ${res.statusText}`);
-  }
-  return mapActorCaseWorkflow(await res.json());
+  return mapActorCaseWorkflow(
+    await apiFetch<BackendActorCaseWorkflow>(
+      `/dashboard/actor-case-workflows/${encodeURIComponent(caseId)}`,
+      sendJson("PATCH", { status, note, assigned_to: assignedTo }),
+    ),
+  );
 }
 
 /** Fetch active alerts. */
