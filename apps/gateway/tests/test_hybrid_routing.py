@@ -135,3 +135,33 @@ def test_unknown_routing_mode_falls_back_to_heuristic():
     )
 
     assert decision == Decision.ALLOW
+
+
+def _route(level: RiskLevel, score: float, mode: str, shadow_decision: str) -> Decision:
+    return make_decision(
+        RiskResult(score=score, level=level, reasons=["signature"]),
+        fingerprint_hash="abc",
+        is_anomalous=False,
+        ml_shadow=_mock_ml_shadow(probability=0.05, shadow_decision=shadow_decision),
+        routing_mode=mode,
+        live_routing_approved=True,
+    )
+
+
+def test_ml_only_redirects_high_risk_even_when_model_allows():
+    assert _route(RiskLevel.HIGH, 70.0, "ml_only", "allow") == Decision.REDIRECT_TO_DECOY
+
+
+def test_ml_only_redirects_critical_risk_even_when_model_allows():
+    assert (
+        _route(RiskLevel.CRITICAL, 95.0, "ml_only", "allow")
+        == Decision.REDIRECT_TO_DECOY
+    )
+
+
+def test_ml_only_follows_model_below_high():
+    assert _route(RiskLevel.MEDIUM, 45.0, "ml_only", "allow") == Decision.ALLOW
+
+
+def test_hybrid_redirects_high_risk_even_when_model_allows():
+    assert _route(RiskLevel.HIGH, 70.0, "hybrid", "allow") == Decision.REDIRECT_TO_DECOY

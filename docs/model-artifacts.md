@@ -398,7 +398,9 @@ must also be set deliberately. The default remains `heuristic`.
 Only consider that approval after the promotion report is `eligible`, the
 artifact has representative API-domain holdout results, and the shadow
 observation has an acceptable false-positive impact. Keep `ml_only` limited to
-controlled experiments because it can override explainable heuristic signals.
+controlled experiments because it can override explainable heuristic signals
+below HIGH. In every mode, a HIGH or CRITICAL heuristic risk (an attack
+signature) still redirects to the decoy, whatever the model decides.
 
 ## Safe Claims
 
