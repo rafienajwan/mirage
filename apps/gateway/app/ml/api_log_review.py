@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterator
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 import hashlib
@@ -213,6 +214,50 @@ def _parse_record(record: dict, *, line_number: int) -> tuple[int, InspectReques
     return label, _api_log_request(record, line_number=line_number)
 
 
+@dataclass(frozen=True)
+class _ParsedLine:
+    """One non-blank API-log line: a parsed request, or why it was rejected."""
+
+    line_number: int
+    record: dict = field(default_factory=dict)
+    label: int = 0
+    request: InspectRequest | None = None
+    rejection: str | None = None
+    error: Exception | None = None
+
+
+def _parse_api_log_line(raw_line: bytes, line_number: int) -> _ParsedLine:
+    def rejected(reason: str, message: str) -> _ParsedLine:
+        error = DatasetValidationError(f"{message} on line {line_number}")
+        return _ParsedLine(line_number, rejection=reason, error=error)
+
+    if len(raw_line) > MAX_API_LOG_LINE_BYTES:
+        return rejected(
+            "line_too_large", f"API log row exceeds {MAX_API_LOG_LINE_BYTES} bytes"
+        )
+    try:
+        record = json.loads(raw_line.decode("utf-8"))
+    except UnicodeDecodeError:
+        return rejected("invalid_utf8", "API log row is not UTF-8")
+    except json.JSONDecodeError:
+        return rejected("invalid_json", "invalid JSON")
+    if not isinstance(record, dict):
+        return rejected("row_not_object", "API log row must be an object")
+    try:
+        label, request = _parse_record(record, line_number=line_number)
+    except (DatasetValidationError, ValueError) as exc:
+        return _ParsedLine(line_number, rejection="invalid_request_or_label", error=exc)
+    return _ParsedLine(line_number, record, label, request)
+
+
+def _parse_api_log_lines(path: Path) -> Iterator[_ParsedLine]:
+    """Parse every non-blank line; rejected lines carry a reason and an error."""
+    with path.open("rb") as source:
+        for line_number, raw_line in enumerate(source, start=1):
+            if raw_line.strip():
+                yield _parse_api_log_line(raw_line, line_number)
+
+
 def _request_identity(request: InspectRequest) -> str:
     identity = request.model_dump(
         mode="json",
@@ -239,59 +284,35 @@ def load_reviewed_api_log_rows(path: Path) -> list[ReviewedAPILogRow]:
     labels_by_identity: dict[str, int] = {}
     rows_by_identity: dict[str, ReviewedAPILogRow] = {}
 
-    with path.open("rb") as source:
-        for line_number, raw_line in enumerate(source, start=1):
-            if not raw_line.strip():
-                continue
-            if len(raw_line) > MAX_API_LOG_LINE_BYTES:
+    for row in _parse_api_log_lines(path):
+        if row.error is not None:
+            raise row.error
+        identity = _request_identity(row.request)
+        previous_label = labels_by_identity.get(identity)
+        if previous_label is not None:
+            if previous_label != row.label:
                 raise DatasetValidationError(
-                    f"API log row exceeds {MAX_API_LOG_LINE_BYTES} bytes on line "
-                    f"{line_number}"
+                    "API log source contains conflicting labels for one "
+                    "request identity"
                 )
-            try:
-                line = raw_line.decode("utf-8")
-            except UnicodeDecodeError as exc:
-                raise DatasetValidationError(
-                    f"API log row is not UTF-8 on line {line_number}"
-                ) from exc
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError as exc:
-                raise DatasetValidationError(
-                    f"invalid JSON on line {line_number}"
-                ) from exc
-            if not isinstance(record, dict):
-                raise DatasetValidationError(
-                    f"API log row must be an object on line {line_number}"
-                )
+            continue
 
-            label, request = _parse_record(record, line_number=line_number)
-            identity = _request_identity(request)
-            previous_label = labels_by_identity.get(identity)
-            if previous_label is not None:
-                if previous_label != label:
-                    raise DatasetValidationError(
-                        "API log source contains conflicting labels for one "
-                        "request identity"
-                    )
-                continue
-
-            source_id = (
-                record.get("event_id")
-                or record.get("request_id")
-                or record.get("id")
-                or line_number
-            )
-            labels_by_identity[identity] = label
-            rows_by_identity[identity] = ReviewedAPILogRow(
-                features=extract_features(request),
-                label=label,
-                record_id=_hashed_record_id(
-                    input_sha256=input_sha256,
-                    source_id=source_id,
-                    identity=identity,
-                ),
-            )
+        source_id = (
+            row.record.get("event_id")
+            or row.record.get("request_id")
+            or row.record.get("id")
+            or row.line_number
+        )
+        labels_by_identity[identity] = row.label
+        rows_by_identity[identity] = ReviewedAPILogRow(
+            features=extract_features(row.request),
+            label=row.label,
+            record_id=_hashed_record_id(
+                input_sha256=input_sha256,
+                source_id=source_id,
+                identity=identity,
+            ),
+        )
 
     return list(rows_by_identity.values())
 
@@ -310,41 +331,20 @@ def review_api_log_source(
     labels_by_identity: dict[str, int] = {}
     conflicting_identities: set[str] = set()
 
-    with path.open("rb") as source:
-        for line_number, raw_line in enumerate(source, start=1):
-            if not raw_line.strip():
-                continue
-            total_rows += 1
-            if len(raw_line) > MAX_API_LOG_LINE_BYTES:
-                rejection_reasons["line_too_large"] += 1
-                continue
-            try:
-                line = raw_line.decode("utf-8")
-            except UnicodeDecodeError:
-                rejection_reasons["invalid_utf8"] += 1
-                continue
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError:
-                rejection_reasons["invalid_json"] += 1
-                continue
-            if not isinstance(record, dict):
-                rejection_reasons["row_not_object"] += 1
-                continue
-            try:
-                label, request = _parse_record(record, line_number=line_number)
-            except (DatasetValidationError, ValueError):
-                rejection_reasons["invalid_request_or_label"] += 1
-                continue
+    for row in _parse_api_log_lines(path):
+        total_rows += 1
+        if row.rejection is not None:
+            rejection_reasons[row.rejection] += 1
+            continue
 
-            identity = _request_identity(request)
-            previous_label = labels_by_identity.get(identity)
-            if previous_label is None:
-                labels_by_identity[identity] = label
-            elif previous_label == label:
-                duplicate_rows_removed += 1
-            else:
-                conflicting_identities.add(identity)
+        identity = _request_identity(row.request)
+        previous_label = labels_by_identity.get(identity)
+        if previous_label is None:
+            labels_by_identity[identity] = row.label
+        elif previous_label == row.label:
+            duplicate_rows_removed += 1
+        else:
+            conflicting_identities.add(identity)
 
     label_counts = Counter(labels_by_identity.values())
     accepted_rows = len(labels_by_identity)
