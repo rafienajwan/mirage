@@ -63,6 +63,9 @@ class Settings:
     rate_limit_per_minute: int = field(
         default_factory=lambda: int(os.getenv("RATE_LIMIT_PER_MINUTE", "120"))
     )
+    rate_limit_max_clients: int = field(
+        default_factory=lambda: int(os.getenv("RATE_LIMIT_MAX_CLIENTS", "10000"))
+    )
     real_app_url: str = field(
         default_factory=lambda: os.getenv("REAL_APP_URL", "http://localhost:8001")
     )
