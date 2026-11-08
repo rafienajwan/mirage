@@ -18,11 +18,8 @@ interface AlertPanelProps {
 
 /**
  * Alert panel with severity labels for the dashboard.
- * Accepts alerts as a prop — pass live data from the API or mock data.
  */
 export default function AlertPanel({ alerts }: AlertPanelProps) {
-  const unacknowledged = alerts.filter((a) => !a.acknowledged);
-
   return (
     <GlassPanel className="p-5">
       <div className="flex items-center justify-between mb-4">
@@ -31,7 +28,7 @@ export default function AlertPanel({ alerts }: AlertPanelProps) {
           Alerts
         </span>
         <span className="text-[9px] font-mono text-red-400/80">
-          {unacknowledged.length} Unacknowledged
+          {alerts.length} {alerts.length === 1 ? "alert" : "alerts"}
         </span>
       </div>
 
@@ -39,7 +36,7 @@ export default function AlertPanel({ alerts }: AlertPanelProps) {
         <div className="flex flex-col items-center justify-center py-10 gap-2 text-white/25">
           <Inbox className="w-6 h-6" />
           <span className="text-[10px] font-mono">
-            No active alerts — system is nominal
+            No alerts recorded
           </span>
         </div>
       ) : (
@@ -51,8 +48,7 @@ export default function AlertPanel({ alerts }: AlertPanelProps) {
               <div
                 key={alert.id}
                 className={cn(
-                  "flex items-start gap-3 p-3 rounded-lg border transition-opacity",
-                  alert.acknowledged ? "opacity-50" : "opacity-100",
+                  "flex items-start gap-3 p-3 rounded-lg border",
                   config.color
                 )}
               >

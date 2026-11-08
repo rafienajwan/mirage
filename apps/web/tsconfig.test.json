@@ -22,6 +22,9 @@
     "src/lib/proxy-policy.ts",
     "src/lib/proxy-policy.test.ts",
     "src/lib/gateway-bridge.ts",
-    "src/lib/gateway-bridge.test.ts"
+    "src/lib/gateway-bridge.test.ts",
+    "src/lib/api-types.ts",
+    "src/lib/api-map.ts",
+    "src/lib/api-map.test.ts"
   ]
 }

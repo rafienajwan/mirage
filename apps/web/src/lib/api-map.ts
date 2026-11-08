@@ -104,7 +104,6 @@ export function mapDashboardAlert(a: BackendAlert): FeedAlert {
     recommendedAction: a.recommended_action,
     severity: a.severity,
     timestamp: a.created_at,
-    acknowledged: false,
   };
 }
 

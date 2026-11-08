@@ -331,7 +331,6 @@ export interface FeedAlert {
   recommendedAction: string;
   severity: AlertSeverity;
   timestamp: string;
-  acknowledged: boolean;
 }
 
 export interface SimulationResult {
