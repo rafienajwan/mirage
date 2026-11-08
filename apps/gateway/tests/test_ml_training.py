@@ -7,11 +7,8 @@ import sys
 import joblib
 import pytest
 
-from app.ml.datasets import (
-    DatasetValidationError,
-    build_dataset_lineage,
-    prepare_dataset,
-)
+from app.ml.dataset_review import build_dataset_lineage
+from app.ml.datasets import DatasetValidationError, prepare_dataset
 from app.ml.inference import RiskClassifier
 from app.ml.training import LabeledFeatures, train_risk_classifier
 from app.services.feature_extraction import FEATURE_NAMES

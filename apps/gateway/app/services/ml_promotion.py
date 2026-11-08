@@ -16,11 +16,8 @@ from app.ml.artifacts import (
     file_stamp,
     review_model_artifact,
 )
-from app.ml.datasets import (
-    DatasetReview,
-    DatasetValidationError,
-    review_prepared_dataset,
-)
+from app.ml.dataset_review import DatasetReview, review_prepared_dataset
+from app.ml.errors import DatasetValidationError
 from app.schemas.dashboard import MLPromotionGate, MLPromotionReadiness, MLShadowSummary
 
 ArtifactReviewer = Callable[..., ArtifactReview]

@@ -19,11 +19,13 @@ from app.ml.api_log_review import (  # noqa: E402 - imported after the sys.path 
     write_api_log_source_review,
 )
 from app.ml.artifacts import review_model_artifact  # noqa: E402 - imported after the sys.path bootstrap so the script runs standalone
-from app.ml.datasets import (  # noqa: E402 - imported after the sys.path bootstrap so the script runs standalone
+from app.ml.dataset_review import (  # noqa: E402 - imported after the sys.path bootstrap so the script runs standalone
     build_dataset_lineage,
+    review_prepared_dataset,
+)
+from app.ml.datasets import (  # noqa: E402 - imported after the sys.path bootstrap so the script runs standalone
     load_mirage_jsonl,
     prepare_dataset,
-    review_prepared_dataset,
 )
 from app.ml.training import train_risk_classifier  # noqa: E402 - imported after the sys.path bootstrap so the script runs standalone
 from scripts.build_api_domain_fixture_dataset import (  # noqa: E402 - imported after the sys.path bootstrap so the script runs standalone

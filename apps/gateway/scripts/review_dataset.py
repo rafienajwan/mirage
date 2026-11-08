@@ -6,7 +6,7 @@ import argparse
 import json
 from pathlib import Path
 
-from app.ml.datasets import review_prepared_dataset
+from app.ml.dataset_review import review_prepared_dataset
 
 
 def parse_args() -> argparse.Namespace:

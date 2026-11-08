@@ -6,7 +6,8 @@ import argparse
 import json
 from pathlib import Path
 
-from app.ml.datasets import build_dataset_lineage, load_mirage_jsonl
+from app.ml.dataset_review import build_dataset_lineage
+from app.ml.datasets import load_mirage_jsonl
 from app.ml.training import train_risk_classifier
 
 

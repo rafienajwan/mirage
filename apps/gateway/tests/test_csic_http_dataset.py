@@ -12,12 +12,12 @@ from app.ml.csic_http import (
     load_csic_http_directory,
     parse_csic_http_requests,
 )
+from app.ml.dataset_review import review_prepared_dataset
 from app.ml.datasets import (
     DatasetValidationError,
     _csic_http_rows,
     load_csic_http_rows,
     prepare_dataset,
-    review_prepared_dataset,
 )
 from app.schemas.request import InspectRequest
 from app.services.feature_extraction import extract_features
