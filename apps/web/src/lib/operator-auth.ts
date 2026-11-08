@@ -211,15 +211,3 @@ export async function createDashboardStreamTicket({
     expiresAt,
   };
 }
-
-export function verifyDashboardStreamTicket(
-  token: string,
-  secret: string,
-  now: number,
-): Promise<boolean> {
-  return verifySignedToken(token, secret, {
-    audience: DASHBOARD_STREAM_AUDIENCE,
-    now,
-    maximumLifetime: 120,
-  });
-}
