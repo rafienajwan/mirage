@@ -10,6 +10,7 @@ from app.api.router import api_router, root_router
 from app.core.config import settings
 from app.core.cors import configure_cors
 from app.core.rate_limit import configure_rate_limit
+from app.services.proxy_client import close_upstream_client, open_upstream_client
 from app.storage.db.database import close_db, init_db
 
 
@@ -17,7 +18,9 @@ from app.storage.db.database import close_db, init_db
 async def lifespan(app: FastAPI):
     """Startup: create tables. Shutdown: dispose connections."""
     await init_db()
+    await open_upstream_client()
     yield
+    await close_upstream_client()
     await close_db()
 
 

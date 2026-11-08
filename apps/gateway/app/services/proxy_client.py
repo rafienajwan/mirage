@@ -8,7 +8,32 @@ from fastapi import HTTPException, Request
 from fastapi.responses import Response
 import httpx
 
-from app.core.config import settings
+from app.core import config
+
+_TOO_LARGE = "Upstream response too large"
+
+# One pooled client for the process, opened and closed by the app lifespan.
+_client: httpx.AsyncClient | None = None
+
+
+def _build_client() -> httpx.AsyncClient:
+    return httpx.AsyncClient(
+        timeout=config.settings.proxy_timeout_seconds,
+        follow_redirects=False,
+    )
+
+
+async def open_upstream_client() -> None:
+    global _client
+    if _client is None:
+        _client = _build_client()
+
+
+async def close_upstream_client() -> None:
+    global _client
+    if _client is not None:
+        await _client.aclose()
+        _client = None
 
 _HOP_BY_HOP_HEADERS = {
     "connection",
@@ -84,26 +109,44 @@ async def forward_request(
     if request.url.query:
         url += "?" + request.url.query
 
+    headers = _request_headers(request, is_decoy=is_decoy, decoy_context=decoy_context)
     try:
-        async with httpx.AsyncClient(
-            timeout=settings.proxy_timeout_seconds,
-            follow_redirects=False,
-        ) as client:
-            upstream = await client.request(
-                request.method,
-                url,
-                headers=_request_headers(
-                    request,
-                    is_decoy=is_decoy,
-                    decoy_context=decoy_context,
-                ),
-                content=body,
-            )
+        if _client is not None:
+            return await _send(_client, request.method, url, headers, body, upstream_url)
+        async with _build_client() as client:
+            return await _send(client, request.method, url, headers, body, upstream_url)
     except httpx.RequestError as exc:
         raise HTTPException(status_code=502, detail="Upstream service unavailable") from exc
 
+
+async def _send(
+    client: httpx.AsyncClient,
+    method: str,
+    url: str,
+    headers: dict[str, str],
+    body: bytes,
+    upstream_url: str,
+) -> Response:
+    """Stream the upstream response, refusing bodies above the configured cap."""
+    limit = config.settings.proxy_max_response_bytes
+    upstream = await client.send(
+        client.build_request(method, url, headers=headers, content=body),
+        stream=True,
+    )
+    try:
+        declared = upstream.headers.get("content-length", "")
+        if declared.isdigit() and int(declared) > limit:
+            raise HTTPException(status_code=502, detail=_TOO_LARGE)
+        content = bytearray()
+        async for chunk in upstream.aiter_bytes():
+            content += chunk
+            if len(content) > limit:
+                raise HTTPException(status_code=502, detail=_TOO_LARGE)
+    finally:
+        await upstream.aclose()
+
     return Response(
-        content=upstream.content,
+        content=bytes(content),
         status_code=upstream.status_code,
         headers=_response_headers(upstream.headers, upstream_url),
     )

@@ -78,6 +78,9 @@ class Settings:
     proxy_max_body_bytes: int = field(
         default_factory=lambda: int(os.getenv("PROXY_MAX_BODY_BYTES", "1048576"))
     )
+    proxy_max_response_bytes: int = field(
+        default_factory=lambda: int(os.getenv("PROXY_MAX_RESPONSE_BYTES", "10485760"))
+    )
     ml_model_artifact: str | None = field(
         default_factory=lambda: os.getenv("MIRAGE_MODEL_ARTIFACT") or None
     )
