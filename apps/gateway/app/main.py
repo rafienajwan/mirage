@@ -7,9 +7,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api.router import api_router, root_router
+from app.core import config
 from app.core.config import settings
 from app.core.cors import configure_cors
 from app.core.rate_limit import configure_rate_limit
+from app.core.settings_validation import validate_startup
 from app.services.proxy_client import close_upstream_client, open_upstream_client
 from app.storage.db.database import close_db, init_db
 
@@ -17,6 +19,7 @@ from app.storage.db.database import close_db, init_db
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: create tables. Shutdown: dispose connections."""
+    validate_startup(config.settings)
     await init_db()
     await open_upstream_client()
     yield

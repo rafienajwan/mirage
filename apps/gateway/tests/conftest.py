@@ -1,7 +1,9 @@
 """Shared test fixtures."""
 
+import atexit
 import os
 from pathlib import Path
+import shutil
 import tempfile
 
 from httpx import ASGITransport, AsyncClient
@@ -11,6 +13,8 @@ import pytest
 # database (not :memory:) gives each session its own connection, matching
 # production isolation.
 _TEST_DB = Path(tempfile.mkdtemp(prefix="mirage-tests-")) / "test.db"
+atexit.register(shutil.rmtree, _TEST_DB.parent, ignore_errors=True)
+os.environ["APP_ENV"] = "development"
 os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{_TEST_DB.as_posix()}"
 os.environ["MIRAGE_API_KEY"] = ""
 # The rate limiter's per-IP window is process-global, so request-heavy tests
