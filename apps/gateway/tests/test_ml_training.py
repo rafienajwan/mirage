@@ -85,7 +85,7 @@ def test_training_artifact_embeds_dataset_lineage(tmp_path):
     train_risk_classifier(rows, artifact, dataset_lineage=lineage)
 
     payload = joblib.load(artifact)
-    assert payload["feature_contract_version"] == 2
+    assert payload["feature_contract_version"] == 3
     assert payload["artifact_version"] == 2
     assert payload["dataset_lineage"] == lineage
     assert set(lineage) == {
@@ -147,7 +147,7 @@ def test_train_script_binds_reviewed_manifest(tmp_path, monkeypatch):
     train_model.main()
 
     payload = joblib.load(artifact)
-    assert payload["feature_contract_version"] == 2
+    assert payload["feature_contract_version"] == 3
     assert payload["artifact_version"] == 2
     assert payload["dataset_lineage"]["dataset_name"] == "runtime-export"
     # Fits on the whole prepared train split and scores on the prepared test split.

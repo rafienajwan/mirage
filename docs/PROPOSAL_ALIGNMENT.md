@@ -36,7 +36,7 @@ no additional analyst-reviewed rows have been claimed yet.
 | Honeytoken detection | Implemented for MVP | Configured decoy credentials and issued per-actor canaries are recorded, alerted, displayed, and revocable. |
 | PostgreSQL/Supabase storage | Partial | Async PostgreSQL and Alembic are implemented and Compose-tested. Supabase connection guidance exists, but no live Supabase deployment is verified. |
 | Feature-vector storage | Implemented | Versioned request and bounded payload-shape features are persisted with lineage and contract checks. |
-| CICIDS2017 dataset | Implemented as supporting benchmark | Local ignored CICIDS2017 splits have been prepared and evaluated. Their network-flow domain does not by itself validate API routing quality. |
+| CICIDS2017 dataset | Removed | The gateway works at the HTTP layer and never observes network-flow features, so CICIDS2017 rows (flow features only) cannot train an HTTP-layer model. The adapter was removed with feature contract v3. |
 | Custom API logs | Partial | JSONL adapters, analyst-label export, hash-bound manual runtime review, deterministic multi-batch aggregation, and synthetic fixtures exist. The first independently labeled 40-row batch has been trained and evaluated as a shadow-only pilot; collection still needs to reach 1,000 representative analyst-reviewed rows. |
 | Precision, recall, F1, and FPR | Implemented | Training and holdout tools calculate all four metrics. Results must be reported with their dataset and sample size. |
 | Real-time WebSocket dashboard | Implemented locally | Authenticated sessions, short-lived signed stream tickets, WebSocket snapshots, and polling reconciliation are implemented. |

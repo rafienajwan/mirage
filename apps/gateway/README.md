@@ -104,7 +104,6 @@ logs, run `scripts/review_api_log_source.py` first and prepare with
 `--source reviewed-api-log-jsonl --source-review <review.json>`. Raw identifiers
 and request content stay out of prepared splits; the source hash, sanitized
 review, deduplication counts, and hashed record IDs remain auditable. Use
-`--source cicids-csv` for compatible CICIDS-style CSV exports and
 `--source csic-http-dir` for the three HTTP CSIC files with a complete
 `--checksums` map. See `docs/dataset-preparation.md` for the full workflow.
 

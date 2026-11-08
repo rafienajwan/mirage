@@ -48,12 +48,6 @@ async def run_smoke() -> dict:
             path="/api/products",
             user_agent="Mozilla/5.0",
             request_count=1,
-            flow_duration_ms=1200,
-            flow_packets_per_second=3.0,
-            packet_length_mean=280,
-            syn_flag_count=1,
-            destination_port=443,
-            average_packet_size=300,
         ),
         InspectRequest(
             ip_address="10.10.0.66",
@@ -63,12 +57,6 @@ async def run_smoke() -> dict:
             request_count=80,
             payload_indicators=["sql-like", "path-traversal", "encoded"],
             payload_excerpt="union select ../../.env",
-            flow_duration_ms=450,
-            flow_packets_per_second=2500.0,
-            packet_length_mean=1200,
-            syn_flag_count=22,
-            destination_port=80,
-            average_packet_size=1280,
         ),
     ]
     responses = [

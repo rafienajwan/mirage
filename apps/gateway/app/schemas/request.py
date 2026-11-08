@@ -62,9 +62,3 @@ class InspectRequest(BaseModel):
     timestamp: Optional[datetime] = Field(
         default=None, description="Request timestamp (auto-filled if omitted)"
     )
-    flow_duration_ms: float | None = Field(default=None, ge=0, le=86_400_000)
-    flow_packets_per_second: float | None = Field(default=None, ge=0, le=10_000_000)
-    packet_length_mean: float | None = Field(default=None, ge=0, le=65_535)
-    syn_flag_count: int | None = Field(default=None, ge=0, le=1_000_000)
-    destination_port: int | None = Field(default=None, ge=1, le=65_535)
-    average_packet_size: float | None = Field(default=None, ge=0, le=65_535)

@@ -21,7 +21,7 @@ See `docs/PROPOSAL_ALIGNMENT.md` for the complete proposal capability matrix.
   honeytokens, canary assignments, and actor/case workflows;
 - versioned ML-ready request and bounded payload-shape features, ML shadow scoring,
   and offline/automated Random Forest training pipelines;
-- locally reviewed CICIDS2017 and CSIC 2010 benchmarks plus deterministic API-domain pipeline fixtures;
+- a locally reviewed CSIC 2010 benchmark plus deterministic API-domain pipeline fixtures;
 - cloud deployment scaffolding for Vercel, three Railway services, and Supabase;
 - analyst event labels for future training data curation;
 - JSONL export and readiness checks for analyst-labeled training records;

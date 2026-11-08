@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections import Counter
-import csv
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 import json
@@ -45,8 +44,6 @@ DatasetSource = Literal[
     "mirage-jsonl",
     "api-log-jsonl",
     "reviewed-api-log-jsonl",
-    "cicids-csv",
-    "cicids-csv-dir",
     "csic-http-dir",
 ]
 
@@ -167,31 +164,6 @@ def load_mirage_jsonl(path: Path) -> list[PreparedTrainingRow]:
     return rows
 
 
-def _first_present(row: dict[str, str], *names: str) -> str | None:
-    normalized_row = {key.strip(): value for key, value in row.items()}
-    for name in names:
-        value = normalized_row.get(name)
-        if value not in (None, ""):
-            return value
-    return None
-
-
-def _float_field(row: dict[str, str], *names: str) -> float:
-    value = _first_present(row, *names)
-    if value is None:
-        return 0.0
-    try:
-        return float(value)
-    except ValueError:
-        return 0.0
-
-
-def _label_from_cicids(value: str | None) -> int:
-    if value is None:
-        raise DatasetValidationError("CICIDS row is missing Label")
-    return 0 if value.strip().upper() == "BENIGN" else 1
-
-
 def load_api_log_jsonl(path: Path) -> list[PreparedTrainingRow]:
     """Load labeled custom API logs and extract MIRAGE production features."""
     rows: list[PreparedTrainingRow] = []
@@ -242,99 +214,6 @@ def load_reviewed_api_log_jsonl(path: Path) -> list[PreparedTrainingRow]:
     ]
 
 
-def _load_cicids_csv_rows(
-    path: Path,
-    *,
-    source_kind: DatasetSource,
-    record_prefix: str | None = None,
-) -> list[PreparedTrainingRow]:
-    """Load CICIDS-style CSV rows into the MIRAGE feature schema.
-
-    CICIDS has no HTTP request data, so every request and payload feature is
-    explicitly 0; only the flow features come from the CSV.
-    """
-    rows: list[PreparedTrainingRow] = []
-    with path.open(newline="", encoding="utf-8-sig") as source:
-        reader = csv.DictReader(source)
-        for line_number, record in enumerate(reader, start=2):
-            label = _label_from_cicids(_first_present(record, "Label", "label"))
-            features: FeatureVector = {
-                **dict.fromkeys(FEATURE_NAMES, 0.0),
-                "flow_duration_ms": _float_field(
-                    record,
-                    "Flow Duration",
-                    "Flow Duration_ms",
-                    "flow_duration_ms",
-                ),
-                "flow_packets_per_second": _float_field(
-                    record,
-                    "Flow Packets/s",
-                    "Flow Packets Per Second",
-                    "flow_packets_per_second",
-                ),
-                "packet_length_mean": _float_field(
-                    record,
-                    "Packet Length Mean",
-                    "packet_length_mean",
-                ),
-                "syn_flag_count": _float_field(
-                    record,
-                    "SYN Flag Count",
-                    "syn_flag_count",
-                ),
-                "destination_port": _float_field(
-                    record,
-                    "Destination Port",
-                    "Dst Port",
-                    "destination_port",
-                ),
-                "average_packet_size": _float_field(
-                    record,
-                    "Average Packet Size",
-                    "Avg Packet Size",
-                    "average_packet_size",
-                ),
-            }
-            rows.append(
-                PreparedTrainingRow(
-                    features=normalize_features(features, line_number=line_number),
-                    label=label,
-                    source=source_kind,
-                    record_id=(
-                        f"{record_prefix}:{line_number}"
-                        if record_prefix
-                        else str(line_number)
-                    ),
-                )
-            )
-    return rows
-
-
-def load_cicids_csv(path: Path) -> list[PreparedTrainingRow]:
-    """Load one CICIDS-style CSV into the MIRAGE feature schema."""
-    return _load_cicids_csv_rows(path, source_kind="cicids-csv")
-
-
-def load_cicids_csv_directory(path: Path) -> list[PreparedTrainingRow]:
-    """Load all CICIDS-style CSV files from a directory in stable name order."""
-    csv_files = sorted(
-        item for item in path.iterdir() if item.suffix.lower() == ".csv"
-    )
-    if not csv_files:
-        raise DatasetValidationError(f"no CSV files found in directory: {path}")
-
-    rows: list[PreparedTrainingRow] = []
-    for csv_file in csv_files:
-        rows.extend(
-            _load_cicids_csv_rows(
-                csv_file,
-                source_kind="cicids-csv-dir",
-                record_prefix=csv_file.name,
-            )
-        )
-    return rows
-
-
 def _csic_http_rows(loaded: LoadedCSICHTTP) -> list[PreparedTrainingRow]:
     rows: list[PreparedTrainingRow] = []
     for record in loaded.records:
@@ -354,7 +233,6 @@ def _csic_http_rows(loaded: LoadedCSICHTTP) -> list[PreparedTrainingRow]:
                 # Same decoding as the proxy, so train and serve features match.
                 record.body.decode("utf-8", errors="ignore"),
             ),
-            destination_port=record.destination_port,
         )
         rows.append(
             PreparedTrainingRow(
@@ -380,10 +258,6 @@ def load_dataset(path: Path, source_kind: DatasetSource) -> list[PreparedTrainin
         return load_api_log_jsonl(path)
     if source_kind == "reviewed-api-log-jsonl":
         return load_reviewed_api_log_jsonl(path)
-    if source_kind == "cicids-csv":
-        return load_cicids_csv(path)
-    if source_kind == "cicids-csv-dir":
-        return load_cicids_csv_directory(path)
     if source_kind == "csic-http-dir":
         return load_csic_http_rows(path)
     raise DatasetValidationError(f"Unsupported dataset source kind: {source_kind}")

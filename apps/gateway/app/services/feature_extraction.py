@@ -15,7 +15,7 @@ from app.services.risk_engine import (
 )
 
 FeatureVector = dict[str, float]
-FEATURE_CONTRACT_VERSION = 2
+FEATURE_CONTRACT_VERSION = 3
 
 FEATURE_NAMES = (
     "request_count_log",
@@ -33,12 +33,6 @@ FEATURE_NAMES = (
     "method_get",
     "method_post",
     "method_write",
-    "flow_duration_ms",
-    "flow_packets_per_second",
-    "packet_length_mean",
-    "syn_flag_count",
-    "destination_port",
-    "average_packet_size",
 )
 
 
@@ -97,10 +91,4 @@ def extract_features(request: InspectRequest) -> FeatureVector:
         "method_get": float(method == "GET"),
         "method_post": float(method == "POST"),
         "method_write": float(method in {"POST", "PUT", "PATCH", "DELETE"}),
-        "flow_duration_ms": float(request.flow_duration_ms or 0.0),
-        "flow_packets_per_second": float(request.flow_packets_per_second or 0.0),
-        "packet_length_mean": float(request.packet_length_mean or 0.0),
-        "syn_flag_count": float(request.syn_flag_count or 0),
-        "destination_port": float(request.destination_port or 0),
-        "average_packet_size": float(request.average_packet_size or 0.0),
     }
