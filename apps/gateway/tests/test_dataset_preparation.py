@@ -73,12 +73,21 @@ def test_load_mirage_jsonl_rejects_feature_contract_mismatch(tmp_path, features)
         load_mirage_jsonl(source)
 
 
-def test_load_mirage_jsonl_rejects_bad_label(tmp_path):
+@pytest.mark.parametrize("label", [3, 0.5, 1.9, True, False, None, "yes", " 1"])
+def test_load_mirage_jsonl_rejects_bad_label(tmp_path, label):
     source = tmp_path / "training_events.jsonl"
-    _write_jsonl(source, [{"label": 3, "features": _features()}])
+    _write_jsonl(source, [{"label": label, "features": _features()}])
 
     with pytest.raises(DatasetValidationError, match="label must be 0 or 1"):
         load_mirage_jsonl(source)
+
+
+@pytest.mark.parametrize("label, expected", [(0, 0), (1, 1), ("0", 0), ("1", 1)])
+def test_load_mirage_jsonl_accepts_binary_labels(tmp_path, label, expected):
+    source = tmp_path / "training_events.jsonl"
+    _write_jsonl(source, [{"label": label, "features": _features()}])
+
+    assert load_mirage_jsonl(source)[0].label == expected
 
 
 def test_load_api_log_jsonl_extracts_request_features(tmp_path):

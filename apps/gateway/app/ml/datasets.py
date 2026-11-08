@@ -136,16 +136,17 @@ def normalize_features(features: object, *, line_number: int | None = None) -> F
 
 
 def normalize_label(label: object, *, line_number: int | None = None) -> int:
-    """Normalize a binary label into 0 normal or 1 suspicious."""
-    try:
-        normalized = int(label)
-    except (TypeError, ValueError) as exc:
-        location = f" on line {line_number}" if line_number else ""
-        raise DatasetValidationError(f"label must be 0 or 1{location}") from exc
-    if normalized not in {0, 1}:
-        location = f" on line {line_number}" if line_number else ""
-        raise DatasetValidationError(f"label must be 0 or 1{location}")
-    return normalized
+    """Normalize a binary label into 0 normal or 1 suspicious.
+
+    Only 0, 1, "0" and "1" are accepted: int() would turn 0.5 into 0 and
+    True into 1, silently relabelling rows.
+    """
+    if type(label) is int and label in (0, 1):
+        return label
+    if label in ("0", "1"):
+        return int(label)
+    location = f" on line {line_number}" if line_number else ""
+    raise DatasetValidationError(f"label must be 0 or 1{location}")
 
 
 def load_mirage_jsonl(path: Path) -> list[PreparedTrainingRow]:
