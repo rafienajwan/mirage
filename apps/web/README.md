@@ -30,9 +30,12 @@ Open `http://localhost:3000` or `http://localhost:3000/dashboard`.
 Never rename `MIRAGE_API_KEY` with a `NEXT_PUBLIC_` prefix. That would expose it
 in the browser bundle.
 
-The server also uses `MIRAGE_API_KEY` for the promotion-readiness bridge. The
-dashboard receives sanitized readiness through that bridge and authenticated
-WebSocket snapshots; artifact and dataset filesystem paths remain server-only.
+Every dashboard call goes through one server-side bridge,
+`/api/gateway/[...path]`, which adds `MIRAGE_API_KEY` and forwards to
+`/api/v1/...` on the gateway. Reads pass through; writes are limited to an
+allowlist of the six operator actions (label, case open/update, canary revoke,
+simulate, retrain) and, like every non-GET `/api` call, need a same-origin
+`Origin` header. Artifact and dataset filesystem paths remain server-only.
 
 ## Scripts
 
@@ -40,7 +43,7 @@ WebSocket snapshots; artifact and dataset filesystem paths remain server-only.
 | --- | --- |
 | `npm run dev` | Start the development server |
 | `npm run lint` | Run ESLint |
-| `npm test` | Compile and run stream contract tests with Node |
+| `npm test` | Compile and run the unit tests with Node |
 | `npm run build` | Build production assets |
 | `npm start` | Serve a production build |
 
