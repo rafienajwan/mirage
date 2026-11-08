@@ -51,6 +51,14 @@ def render() -> dict:
     return json.loads(result.stdout)
 
 
+def _host_ip(port: dict | str) -> str | None:
+    """Host address of a published port, in rendered (dict) or short (str) form."""
+    if isinstance(port, dict):
+        return port.get("host_ip")
+    parts = str(port).split(":")
+    return parts[0] if len(parts) == 3 else None
+
+
 def problems(config: dict) -> list[str]:
     found: list[str] = []
     services = config.get("services", {})
@@ -65,6 +73,12 @@ def problems(config: dict) -> list[str]:
     for name, service in services.items():
         if "no-new-privileges:true" not in (service.get("security_opt") or []):
             found.append(f"{name} lacks security_opt no-new-privileges:true")
+    for port in (services.get("web") or {}).get("ports") or []:
+        if _host_ip(port) != "127.0.0.1":
+            found.append(
+                "web must publish on 127.0.0.1 by default; its login throttle "
+                "cannot tell clients apart without a trusted reverse proxy"
+            )
     networks = config.get("networks", {})
     for name in INTERNAL_NETWORKS:
         if not (networks.get(name) or {}).get("internal"):

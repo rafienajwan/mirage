@@ -120,9 +120,14 @@ artifact without `MIRAGE_MODEL_ARTIFACT_SHA256`. Optional hardening settings:
   reports the digest of each new artifact.
 - `PROXY_MAX_RESPONSE_BYTES` (10 MiB) and `RATE_LIMIT_MAX_CLIENTS` (10,000)
   bound gateway memory.
-- `MIRAGE_TRUST_PROXY_HEADERS=true` lets the dashboard throttle logins per
-  forwarded client (5 failures per 15 minutes); otherwise it throttles all
-  logins together. 50 failures in total also block logins for the window.
+- The dashboard is published on `127.0.0.1` by default
+  (`WEB_BIND_ADDRESS`). Its login allows 5 failures per client and 50 in total
+  per 15 minutes. Without a trusted reverse proxy every client shares one
+  budget, so anyone who can reach the login could lock operators out. Before
+  exposing it, put a TLS reverse proxy in front, set
+  `MIRAGE_TRUST_PROXY_HEADERS=true` (the proxy-appended `X-Forwarded-For` hop
+  identifies the client), and set `WEB_BIND_ADDRESS` to the proxy-facing
+  address.
 
 Networks are segmented: the decoy and the protected app are reachable only
 from the gateway, and Postgres only from the gateway. Containers run as
