@@ -6,9 +6,13 @@ All methods are async.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from collections.abc import Awaitable, Callable
+from datetime import datetime, timedelta, timezone
+from typing import TypeVar
+from uuid import uuid4
 
 from sqlalchemy import case, extract, func, select
+from sqlalchemy.exc import IntegrityError, OperationalError
 
 from app.schemas.actor import ActorCase, ActorCaseWorkflow, ActorProfile, CaseWorkflowStatus
 from app.schemas.canary import CanaryAssignment, CanaryAssignmentStatus
@@ -27,6 +31,24 @@ from app.storage.db.models import (
     HoneytokenHitModel,
 )
 
+T = TypeVar("T")
+
+_MAX_ACTOR_PATHS = 50
+
+
+async def _retry_once(operation: Callable[[], Awaitable[T]]) -> T:
+    """Run a select-then-write transaction again after losing a race.
+
+    Two requests from one new actor can both see "no row" and both insert
+    (IntegrityError on the unique key), and SQLite can report a busy database
+    (OperationalError). The retry runs in a fresh transaction, finds the row
+    the winner committed, and updates it.
+    """
+    try:
+        return await operation()
+    except (IntegrityError, OperationalError):
+        return await operation()
+
 
 class DatabaseStore:
     """Async persistent store backed by SQLAlchemy."""
@@ -34,6 +56,9 @@ class DatabaseStore:
     # ── Events ─────────────────────────────────────────────────
 
     async def add_event(self, event: EventRecord) -> None:
+        await _retry_once(lambda: self._add_event(event))
+
+    async def _add_event(self, event: EventRecord) -> None:
         async with get_session() as session:
             row = EventModel(
                 event_id=event.event_id,
@@ -173,22 +198,27 @@ class DatabaseStore:
         title: str,
         description: str,
         recommended_action: str,
-    ) -> None:
+    ) -> AlertRecord:
+        alert = AlertRecord(
+            alert_id=uuid4().hex,
+            severity=severity,
+            title=title,
+            description=description,
+            recommended_action=recommended_action,
+            created_at=datetime.now(timezone.utc),
+        )
         async with get_session() as session:
-            # Get the next alert ID
-            count_stmt = select(func.count()).select_from(AlertModel)
-            count_result = await session.execute(count_stmt)
-            count = count_result.scalar() or 0
-
-            alert = AlertModel(
-                alert_id=f"alert-{count + 1:04d}",
-                severity=severity.value,
-                title=title,
-                description=description,
-                recommended_action=recommended_action,
-                created_at=datetime.now(timezone.utc),
+            session.add(
+                AlertModel(
+                    alert_id=alert.alert_id,
+                    severity=severity.value,
+                    title=title,
+                    description=description,
+                    recommended_action=recommended_action,
+                    created_at=alert.created_at,
+                )
             )
-            session.add(alert)
+        return alert
 
     async def get_alerts(self, limit: int = 100) -> list[AlertRecord]:
         async with get_session() as session:
@@ -240,9 +270,9 @@ class DatabaseStore:
                 actor_key_value = event.fingerprint_hash or f"source:{event.ip_address}"
                 actor_id = actor_id_from_key(actor_key_value)
                 actor_result = await session.execute(
-                    select(ActorProfileModel).where(
-                        ActorProfileModel.actor_id == actor_id
-                    )
+                    select(ActorProfileModel)
+                    .where(ActorProfileModel.actor_id == actor_id)
+                    .with_for_update()
                 )
                 actor = actor_result.scalar_one_or_none()
                 if actor is not None:
@@ -287,11 +317,17 @@ class DatabaseStore:
         self,
         assignment: CanaryAssignment,
     ) -> CanaryAssignment:
+        return await _retry_once(lambda: self._upsert_canary_assignment(assignment))
+
+    async def _upsert_canary_assignment(
+        self,
+        assignment: CanaryAssignment,
+    ) -> CanaryAssignment:
         async with get_session() as session:
             result = await session.execute(
-                select(CanaryAssignmentModel).where(
-                    CanaryAssignmentModel.assignment_id == assignment.assignment_id
-                )
+                select(CanaryAssignmentModel)
+                .where(CanaryAssignmentModel.assignment_id == assignment.assignment_id)
+                .with_for_update()
             )
             row = result.scalar_one_or_none()
             if row is None:
@@ -512,6 +548,7 @@ class DatabaseStore:
                     func.sum(case((~is_suspicious, 1), else_=0)).label("normal"),
                     func.sum(case((is_suspicious, 1), else_=0)).label("suspicious"),
                 )
+                .where(EventModel.timestamp >= datetime.now(timezone.utc) - timedelta(hours=12))
                 .group_by("hour")
                 .order_by("hour")
             )
@@ -549,8 +586,13 @@ class DatabaseStore:
     async def _upsert_actor_event(self, session, event: EventRecord) -> None:
         key = actor_key(event)
         actor_id = actor_id_from_key(key)
+        # The row lock stops concurrent requests from losing increments on
+        # Postgres (SQLite already serializes: the event insert above holds
+        # the write lock).
         result = await session.execute(
-            select(ActorProfileModel).where(ActorProfileModel.actor_id == actor_id)
+            select(ActorProfileModel)
+            .where(ActorProfileModel.actor_id == actor_id)
+            .with_for_update()
         )
         profile = result.scalar_one_or_none()
         if profile is None:
@@ -579,8 +621,11 @@ class DatabaseStore:
         profile.max_risk_score = max(profile.max_risk_score, event.risk_score)
         profile.last_decision = event.decision.value
         path_counts = dict(profile.path_counts or {})
-        path_counts[event.path] = int(path_counts.get(event.path, 0)) + 1
-        profile.path_counts = path_counts
+        # A scanner hits thousands of paths; rewriting an unbounded JSON map
+        # on every request is quadratic. Known paths keep counting.
+        if event.path in path_counts or len(path_counts) < _MAX_ACTOR_PATHS:
+            path_counts[event.path] = int(path_counts.get(event.path, 0)) + 1
+            profile.path_counts = path_counts
         if event.decision != Decision.ALLOW:
             profile.suspicious_requests += 1
         if event.decision == Decision.REDIRECT_TO_DECOY:

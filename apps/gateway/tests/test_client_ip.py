@@ -40,6 +40,22 @@ def test_trusted_peer_returns_rightmost_untrusted_hop(trust):
     assert client_ip(request) == "203.0.113.9"
 
 
+def test_repeated_forwarded_for_lines_are_read_as_one_list(trust):
+    trust("10.0.0.0/8")
+    # The client wrote the first line; the trusted proxy appended the second.
+    request = Request(
+        {
+            "type": "http",
+            "client": ("10.0.0.2", 1234),
+            "headers": [
+                (b"x-forwarded-for", b"198.51.100.7"),
+                (b"x-forwarded-for", b"203.0.113.9"),
+            ],
+        }
+    )
+    assert client_ip(request) == "203.0.113.9"
+
+
 def test_all_hops_trusted_returns_leftmost(trust):
     trust("10.0.0.0/8")
     assert client_ip(_request("10.0.0.2", "10.0.0.9, 10.0.0.3")) == "10.0.0.9"

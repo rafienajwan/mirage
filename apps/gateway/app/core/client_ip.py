@@ -66,7 +66,8 @@ def client_ip(request: Request) -> str:
     if peer_address is None or not _is_trusted(peer_address, networks):
         return peer
 
-    forwarded = request.headers.get("x-forwarded-for")
+    # Proxies may append their own header line instead of extending the first.
+    forwarded = ",".join(request.headers.getlist("x-forwarded-for"))
     if not forwarded:
         return peer
 

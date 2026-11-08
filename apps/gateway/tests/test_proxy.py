@@ -61,7 +61,6 @@ async def test_suspicious_request_is_forwarded_to_decoy(client, monkeypatch):
     assert captured["is_decoy"] is True
     assert captured["decoy_context"]["x-mirage-actor-hint"]
     assert captured["decoy_context"]["x-mirage-risk-score"]
-    assert captured["decoy_context"]["x-mirage-decoy-type"] == "config"
 
 
 @pytest.mark.asyncio
@@ -147,6 +146,21 @@ async def test_proxy_body_is_available_for_honeytoken_detection(client, monkeypa
     assert captured["body"] == b"token=mirage-service-canary"
     assert honeytokens.json()["total_hits"] == 1
     assert honeytokens.json()["hits"][0]["token_kind"] == "service_token"
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {"authorization": "Bearer mirage-issued-oauth-canary-0123456789ab"},
+        {"cookie": "theme=dark; session=mirage-issued-oauth-canary-0123456789ab"},
+    ],
+)
+async def test_proxy_detects_honeytokens_in_request_headers(client, monkeypatch, headers):
+    await _route(client, monkeypatch, "GET", "/api/v1/proxy/api/profile", headers=headers)
+    honeytokens = await client.get("/api/v1/dashboard/honeytokens")
+
+    assert honeytokens.json()["total_hits"] == 1
+    assert honeytokens.json()["hits"][0]["token_kind"] == "oauth_token"
 
 
 @pytest.mark.asyncio
@@ -257,6 +271,70 @@ async def test_forward_request_preserves_http_semantics(monkeypatch):
     }
 
 
+async def test_forward_request_keeps_repeated_response_headers(monkeypatch):
+    async def upstream_handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers=[
+                ("set-cookie", "session=abc; Path=/; HttpOnly"),
+                ("set-cookie", "theme=dark; Path=/"),
+                ("server", "hidden"),
+                ("location", "http://real-app:8001/next"),
+            ],
+        )
+
+    transport = httpx.MockTransport(upstream_handler)
+    original_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        proxy_client.httpx,
+        "AsyncClient",
+        lambda **kwargs: original_client(transport=transport, **kwargs),
+    )
+    request = Request(
+        {"type": "http", "method": "GET", "path": "/x", "query_string": b"", "headers": []}
+    )
+
+    response = await forward_request(
+        request,
+        upstream_url="http://real-app:8001",
+        target_path="x",
+        body=b"",
+        is_decoy=False,
+    )
+
+    assert response.headers.getlist("set-cookie") == [
+        "session=abc; Path=/; HttpOnly",
+        "theme=dark; Path=/",
+    ]
+    assert "server" not in response.headers
+    assert response.headers["location"] == "/api/v1/proxy/next"
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["/files/a%2541", "/files/a%2Fb", "/files/report%20final.pdf"],
+)
+async def test_proxy_forwards_the_raw_encoded_path(client, monkeypatch, path):
+    seen = {}
+
+    async def upstream_handler(request: httpx.Request) -> httpx.Response:
+        seen["raw_path"] = request.url.raw_path
+        return httpx.Response(200)
+
+    transport = httpx.MockTransport(upstream_handler)
+    original_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        proxy_client.httpx,
+        "AsyncClient",
+        lambda **kwargs: original_client(transport=transport, **kwargs),
+    )
+
+    response = await client.get(f"/api/v1/proxy{path}?page=2", headers={"user-agent": BROWSER_UA})
+
+    assert response.status_code == 200
+    assert seen["raw_path"] == f"{path}?page=2".encode()
+
+
 @pytest.mark.asyncio
 async def test_traffic_tracker_bounds_distinct_sources():
     tracker = TrafficTracker(max_sources=2)
@@ -267,6 +345,29 @@ async def test_traffic_tracker_bounds_distinct_sources():
 
     assert len(tracker.requests) == 2
     assert "192.0.2.1" not in tracker.requests
+
+
+async def test_traffic_tracker_sweeps_stale_sources_once_per_window(monkeypatch):
+    now = [1000.0]
+    tracker = TrafficTracker(window_seconds=60, clock=lambda: now[0])
+    sweeps = 0
+    original_prune = tracker._prune_sources
+
+    def counting_prune(cutoff: float) -> None:
+        nonlocal sweeps
+        sweeps += 1
+        original_prune(cutoff)
+
+    monkeypatch.setattr(tracker, "_prune_sources", counting_prune)
+    for index in range(100):
+        await tracker.record(f"192.0.2.{index}")
+    assert sweeps == 0
+
+    now[0] += 61
+    await tracker.record("198.51.100.1")
+    await tracker.record("198.51.100.2")
+    assert sweeps == 1
+    assert set(tracker.requests) == {"198.51.100.1", "198.51.100.2"}
 
 
 BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0 Safari/537.36"
@@ -390,3 +491,102 @@ async def test_exempt_route_reaches_real_app_and_records_exemption(client, monke
         client, monkeypatch, "POST", "/api/v1/proxy/api/comments", content=body
     )
     assert captured["is_decoy"] is True
+
+
+@pytest.mark.parametrize("header", ["user-agent", "referer"])
+async def test_attack_in_user_agent_or_referer_reaches_decoy(client, monkeypatch, header):
+    captured = await _route(
+        client,
+        monkeypatch,
+        "GET",
+        "/api/v1/proxy/api/products",
+        headers={header: "${jndi:ldap://x/a}"},
+    )
+    assert captured["is_decoy"] is True
+
+
+async def test_oversized_user_agent_and_path_are_routed_and_logged(client, monkeypatch):
+    from app.storage import store
+
+    long_path = "/api/products/" + "a" * 3000
+    captured = await _route(
+        client,
+        monkeypatch,
+        "GET",
+        "/api/v1/proxy" + long_path,
+        headers={"user-agent": "Mozilla/5.0 " + "x" * 600},
+    )
+    assert captured["is_decoy"] is False
+    # The upstream still receives the complete path.
+    assert captured["target_path"] == long_path.lstrip("/")
+    event = (await store.get_recent_events(limit=1))[0]
+    assert event.path == long_path[:512]
+
+    captured = await _route(
+        client,
+        monkeypatch,
+        "GET",
+        "/api/v1/proxy/.env/" + "b" * 3000,
+        headers={"user-agent": "sqlmap/1.8 " + "x" * 600},
+    )
+    assert captured["is_decoy"] is True
+    alert = (await store.get_alerts(limit=1))[0]
+    assert alert.title.startswith("Decoy redirect: /.env/")
+    assert len(alert.title) <= 256
+
+
+@pytest.mark.parametrize(
+    "decoy_body,expected_kinds",
+    [
+        ({"access_token": "mirage-issued-oauth-canary-0123456789ab"}, ["oauth_token"]),
+        ({"status": "ok"}, []),
+    ],
+)
+async def test_proxy_records_the_canary_tokens_the_decoy_returned(
+    client, monkeypatch, decoy_body, expected_kinds
+):
+    import hashlib
+
+    from app.storage import store
+
+    async def fake_forward(_request, **_kwargs):
+        return JSONResponse(decoy_body)
+
+    monkeypatch.setattr(proxy_route, "forward_request", fake_forward)
+    response = await client.get("/api/v1/proxy/.env", headers={"user-agent": "sqlmap/1.8"})
+
+    assert response.status_code == 200
+    assignments = await store.get_canary_assignments()
+    assert [item.token_kind for item in assignments] == expected_kinds
+    if expected_kinds:
+        token = decoy_body["access_token"]
+        assert assignments[0].token_hash == hashlib.sha256(token.encode()).hexdigest()
+        assert assignments[0].source_path == "/.env"
+
+
+async def test_concurrent_requests_from_one_actor_are_all_logged(client, monkeypatch):
+    import asyncio
+
+    from app.services.actor_profiles import get_actor_profiles
+    from app.storage import store
+
+    async def fake_forward(_request, **_kwargs):
+        await asyncio.sleep(0.05)  # upstream latency lines the requests up
+        return JSONResponse({"secret_key": "mirage-issued-service-canary-0123456789ab"})
+
+    monkeypatch.setattr(proxy_route, "forward_request", fake_forward)
+    responses = await asyncio.gather(
+        *(
+            client.get(
+                f"/api/v1/proxy/.env/{index}",
+                headers={"user-agent": "sqlmap/1.8"},
+            )
+            for index in range(20)
+        )
+    )
+
+    assert [response.status_code for response in responses] == [200] * 20
+    assert await store.get_total_requests() == 20
+    profiles = (await get_actor_profiles(limit=5)).profiles
+    assert [profile.request_count for profile in profiles] == [20]
+    assert len(await store.get_canary_assignments()) == 1

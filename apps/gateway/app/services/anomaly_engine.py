@@ -1,14 +1,11 @@
 """Anomaly detection engine — lightweight heuristic placeholder.
 
-This module provides a clean interface for anomaly detection. The current
-implementation uses simple heuristics. A real ML model can be plugged in later
-by implementing the ``AnomalyEngine`` protocol.
+The current implementation uses simple heuristics.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol
 
 from app.schemas.request import InspectRequest
 
@@ -20,12 +17,6 @@ class AnomalyResult:
     is_anomalous: bool
     confidence: float  # 0.0–1.0
     signals: list[str] = field(default_factory=list)
-
-
-class AnomalyDetector(Protocol):
-    """Interface for pluggable anomaly detectors."""
-
-    def detect(self, request: InspectRequest) -> AnomalyResult: ...
 
 
 class HeuristicAnomalyDetector:
@@ -68,4 +59,4 @@ class HeuristicAnomalyDetector:
 
 
 # Default detector instance
-anomaly_detector: AnomalyDetector = HeuristicAnomalyDetector()
+anomaly_detector = HeuristicAnomalyDetector()

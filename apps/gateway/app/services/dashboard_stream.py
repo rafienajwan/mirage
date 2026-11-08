@@ -35,6 +35,9 @@ logger = logging.getLogger(__name__)
 SnapshotBuilder = Callable[[], Awaitable[dict[str, Any]]]
 DashboardBroadcaster = Callable[[str, dict[str, Any]], Awaitable[None]]
 
+# Proxied requests wait on broadcasts; a stalled dashboard must not stall them.
+_SEND_TIMEOUT_SECONDS = 1.0
+
 
 class DashboardStreamManager:
     """Track connected dashboard WebSocket clients."""
@@ -49,12 +52,16 @@ class DashboardStreamManager:
     def disconnect(self, websocket: WebSocket) -> None:
         self._clients.discard(websocket)
 
+    def has_clients(self) -> bool:
+        return bool(self._clients)
+
     async def broadcast(self, message: dict[str, Any]) -> None:
         stale: list[WebSocket] = []
         for client in list(self._clients):
             try:
-                await client.send_json(message)
-            except RuntimeError:
+                await asyncio.wait_for(client.send_json(message), _SEND_TIMEOUT_SECONDS)
+            except Exception:
+                # Disconnected (WebSocketDisconnect, RuntimeError) or too slow.
                 stale.append(client)
         for client in stale:
             self.disconnect(client)
@@ -154,11 +161,6 @@ async def broadcast_dashboard_update(kind: str, payload: dict[str, Any]) -> None
     await dashboard_stream.broadcast({"type": kind, "payload": payload})
 
 
-async def broadcast_dashboard_snapshot() -> None:
-    """Broadcast a refreshed dashboard snapshot to connected clients."""
-    await broadcast_dashboard_update("snapshot", await build_dashboard_snapshot())
-
-
 async def build_dashboard_snapshot() -> dict[str, Any]:
     """Build the initial dashboard WebSocket snapshot payload."""
     recent_events = await store.get_recent_events(limit=50)
@@ -227,10 +229,12 @@ class DashboardSnapshotRefreshCoordinator:
         build_snapshot: SnapshotBuilder = build_dashboard_snapshot,
         broadcast_update: DashboardBroadcaster = broadcast_dashboard_update,
         debounce_seconds: float = 0.1,
+        has_clients: Callable[[], bool] = dashboard_stream.has_clients,
     ) -> None:
         self._build_snapshot = build_snapshot
         self._broadcast_update = broadcast_update
         self._debounce_seconds = debounce_seconds
+        self._has_clients = has_clients
         self._pending = False
         self._task: asyncio.Task[None] | None = None
 
@@ -246,6 +250,10 @@ class DashboardSnapshotRefreshCoordinator:
             await asyncio.sleep(self._debounce_seconds)
             while self._pending:
                 self._pending = False
+                if not self._has_clients():
+                    # Nobody would receive it; a new dashboard gets a fresh
+                    # snapshot when it connects.
+                    return
                 try:
                     snapshot = await self._build_snapshot()
                     await self._broadcast_update("snapshot", snapshot)

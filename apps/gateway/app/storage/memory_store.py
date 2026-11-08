@@ -6,7 +6,7 @@ Drop-in replacement for DatabaseStore — all methods are async.
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from app.schemas.actor import ActorCase, ActorCaseWorkflow, ActorProfile, CaseWorkflowStatus
 from app.schemas.canary import CanaryAssignment, CanaryAssignmentStatus
@@ -69,7 +69,7 @@ class MemoryStore:
         title: str,
         description: str,
         recommended_action: str,
-    ) -> None:
+    ) -> AlertRecord:
         self._alert_counter += 1
         alert = AlertRecord(
             alert_id=f"alert-{self._alert_counter:04d}",
@@ -80,6 +80,7 @@ class MemoryStore:
             created_at=datetime.now(timezone.utc),
         )
         self.alerts.append(alert)
+        return alert
 
     async def get_alerts(self, limit: int = 100) -> list[AlertRecord]:
         return list(reversed(self.alerts[-limit:]))
@@ -272,9 +273,12 @@ class MemoryStore:
     # ── Chart data ────────────────────────────────────────────
 
     async def get_traffic_breakdown(self) -> list[dict]:
-        """Group events by hour into normal/suspicious buckets."""
+        """Group events by hour into normal/suspicious buckets (last 12 hours)."""
         buckets: dict[int, dict] = defaultdict(lambda: {"normal": 0, "suspicious": 0})
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=12)
         for e in self.events:
+            if e.timestamp < cutoff:
+                continue
             hour = e.timestamp.hour
             if e.decision == Decision.ALLOW:
                 buckets[hour]["normal"] += 1
