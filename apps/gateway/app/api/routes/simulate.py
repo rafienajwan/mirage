@@ -12,11 +12,6 @@ from app.services.inspection import inspect_and_log
 router = APIRouter(prefix="/simulate", tags=["simulate"])
 
 
-async def _process_simulation(request: InspectRequest) -> InspectResponse:
-    """Shared logic for processing a simulated request."""
-    return await inspect_and_log(request, event_type="simulation")
-
-
 @router.post(
     "/normal",
     response_model=InspectResponse,
@@ -32,7 +27,7 @@ async def simulate_normal():
         request_count=3,
         payload_indicators=[],
     )
-    return await _process_simulation(request)
+    return await inspect_and_log(request, event_type="simulation")
 
 
 @router.post(
@@ -50,4 +45,4 @@ async def simulate_suspicious():
         request_count=85,
         payload_indicators=["sql-like", "path-traversal"],
     )
-    return await _process_simulation(request)
+    return await inspect_and_log(request, event_type="simulation")

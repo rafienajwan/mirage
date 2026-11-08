@@ -1,7 +1,7 @@
 "use client";
 
 import GlassPanel from "@/components/ui/GlassPanel";
-import type { ActorCaseSummary, ActorCaseWorkflow, ActorCaseWorkflowSummary, ActorClusterSummary } from "@/lib/api";
+import type { ActorCaseSummary, ActorCaseWorkflow, ActorCaseWorkflowSummary, ActorClusterSummary } from "@/lib/api-types";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, Boxes, CheckCircle2, FolderSearch, GitBranch, Inbox, KeyRound, Loader2, Play, UsersRound } from "lucide-react";
 
@@ -40,6 +40,7 @@ export default function ActorTriagePanel({
   const caseItems = cases?.cases ?? [];
   const workflowItems = workflows?.cases ?? [];
   const openCaseIds = new Set(workflowItems.map((item) => item.id));
+  const openWorkflowCount = workflowItems.filter((item) => item.status !== "closed").length;
 
   return (
     <GlassPanel className="p-5">
@@ -50,15 +51,15 @@ export default function ActorTriagePanel({
         <div className="flex flex-wrap items-center gap-2 text-[9px] font-mono text-white/40">
           <span className="flex items-center gap-1.5">
             <FolderSearch className="h-3.5 w-3.5 text-brand-cyan/80" />
-            {cases?.totalCases ?? 0} cases
+            {cases?.totalCases ?? "n/a"} cases
           </span>
           <span className="flex items-center gap-1.5">
             <CheckCircle2 className="h-3.5 w-3.5 text-brand-emerald/80" />
-            {workflows?.totalCases ?? 0} open
+            {workflows ? openWorkflowCount : "n/a"} open
           </span>
           <span className="flex items-center gap-1.5">
             <GitBranch className="h-3.5 w-3.5 text-brand-emerald/80" />
-            {clusters?.totalClusters ?? 0} clusters
+            {clusters?.totalClusters ?? "n/a"} clusters
           </span>
         </div>
       </div>

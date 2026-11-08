@@ -1,7 +1,7 @@
 "use client";
 
 import GlassPanel from "@/components/ui/GlassPanel";
-import type { CanaryAssignmentSummary } from "@/lib/api";
+import type { CanaryAssignmentSummary } from "@/lib/api-types";
 import { cn } from "@/lib/utils";
 import { Ban, CheckCircle2, KeyRound, Loader2, RotateCcw } from "lucide-react";
 

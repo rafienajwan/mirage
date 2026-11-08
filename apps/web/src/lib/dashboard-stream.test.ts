@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { mapDashboardSnapshot } from "./api";
+import { mapDashboardSnapshot } from "./api-map";
 import {
   DashboardStreamClient,
   parseDashboardStreamMessage,
@@ -246,4 +246,44 @@ describe("dashboard stream helpers", () => {
     assert.equal(scheduled[0].delay, 1_000);
     client.stop();
   });
+
+  for (const [name, url] of [
+    ["the socket constructor throws", "ws://localhost:8000/api/v1/dashboard/ws"],
+    ["the stream URL is malformed", "not a url"],
+  ] as const) {
+    it(`schedules a reconnect when ${name}`, async () => {
+      const scheduled: Array<{ callback: () => void; delay: number }> = [];
+      const statuses: string[] = [];
+      const unhandled: unknown[] = [];
+      const onUnhandled = (reason: unknown) => unhandled.push(reason);
+      process.on("unhandledRejection", onUnhandled);
+
+      const client = new DashboardStreamClient({
+        getConnection: async () => ({ url, token: "ticket" }),
+        createSocket: () => {
+          throw new Error("SecurityError: insecure WebSocket on https page");
+        },
+        schedule: (callback, delay) => {
+          scheduled.push({ callback, delay });
+          return callback;
+        },
+        cancel: () => undefined,
+        random: () => 0.5,
+        onStatus: (status) => statuses.push(status),
+        onMessage: () => undefined,
+        onReconcile: () => undefined,
+      });
+
+      try {
+        client.start();
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        assert.deepEqual(unhandled, []);
+        assert.deepEqual(statuses, ["connecting", "disconnected"]);
+        assert.equal(scheduled.length, 1);
+      } finally {
+        client.stop();
+        process.off("unhandledRejection", onUnhandled);
+      }
+    });
+  }
 });

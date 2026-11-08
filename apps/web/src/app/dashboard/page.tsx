@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import Header from "@/components/layout/Header";
 import MetricCard from "@/components/ui/MetricCard";
 import ThreatFeed from "@/components/dashboard/ThreatFeed";
@@ -11,14 +12,17 @@ import CanaryAssignmentsPanel from "@/components/dashboard/CanaryAssignmentsPane
 import DecoyStatusCard from "@/components/dashboard/DecoyStatusCard";
 import AlertPanel from "@/components/dashboard/AlertPanel";
 import SimulationPanel from "@/components/dashboard/SimulationPanel";
-import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchMLShadowSummary, fetchMLPromotionReadiness, fetchHoneytokens, fetchCanaryAssignments, fetchActorProfiles, fetchActorClusters, fetchActorCases, fetchActorCaseWorkflows, revokeCanaryAssignment, openActorCase, updateActorCase, labelEvent, downloadTrainingData, runRetraining, mapDashboardAlert, mapDashboardEvent, mapDashboardSnapshot } from "@/lib/api";
-import type { ActorCaseSummary, ActorCaseWorkflow, ActorCaseWorkflowSummary, ActorClusterSummary, ActorProfileSummary, AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, MLShadowSummaryData, MLPromotionReadinessData, HoneytokenSummary, CanaryAssignmentSummary, RetrainingRun, DashboardStreamMessage } from "@/lib/api";
+import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchMLShadowSummary, fetchMLPromotionReadiness, fetchHoneytokens, fetchCanaryAssignments, fetchActorProfiles, fetchActorClusters, fetchActorCases, fetchActorCaseWorkflows, revokeCanaryAssignment, openActorCase, updateActorCase, labelEvent, downloadTrainingData, runRetraining } from "@/lib/api";
+import { mapDashboardAlert, mapDashboardEvent, mapDashboardSnapshot } from "@/lib/api-map";
+import type { ActorCaseSummary, ActorCaseWorkflow, ActorCaseWorkflowSummary, ActorClusterSummary, ActorProfileSummary, AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, MLShadowSummaryData, MLPromotionReadinessData, HoneytokenSummary, CanaryAssignmentSummary, RetrainingRun, DashboardStreamMessage } from "@/lib/api-types";
 import { useDashboardStream } from "@/hooks/useDashboardStream";
 import { pollIntervalFor } from "@/lib/dashboard-stream";
-import { Globe, ShieldAlert, ArrowRightLeft, Bell, BrainCircuit, Database, Download, KeyRound, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
+import { selectNewAlerts } from "@/lib/alert-toasts";
+import { SessionExpiredError, summarizeFailures } from "@/lib/http-failure";
+import { Globe, ShieldAlert, ArrowRightLeft, Bell, BrainCircuit, Database, Download, KeyRound, Loader2, AlertTriangle, Volume2, VolumeX, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-// Charts use Recharts ResponsiveContainer — must be client-only to avoid SSR dimension warnings
+// Charts use Recharts ResponsiveContainer: must be client-only to avoid SSR dimension warnings
 const TrafficChart = dynamic(() => import("@/components/dashboard/TrafficChart"), { ssr: false });
 const RiskScoreWidget = dynamic(() => import("@/components/dashboard/RiskScoreWidget"), { ssr: false });
 
@@ -43,6 +47,12 @@ function playAlertSound(severity: string) {
     const AudioCtx = window.AudioContext;
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
+    // One context per sound; release it once the last oscillator stops.
+    const closeWhenDone = (last: OscillatorNode) => {
+      last.onended = () => {
+        void ctx.close();
+      };
+    };
     
     // Create nodes
     const osc = ctx.createOscillator();
@@ -59,6 +69,7 @@ function playAlertSound(severity: string) {
       gain.gain.setValueAtTime(0.12, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
       
+      closeWhenDone(osc);
       osc.start();
       osc.stop(ctx.currentTime + 0.4);
     } else if (severity === "warning") {
@@ -77,6 +88,7 @@ function playAlertSound(severity: string) {
       gain2.gain.setValueAtTime(0.08, ctx.currentTime + 0.12);
       gain2.gain.setValueAtTime(0.001, ctx.currentTime + 0.2);
       
+      closeWhenDone(osc2);
       osc.start();
       osc.stop(ctx.currentTime + 0.08);
       osc2.start(ctx.currentTime + 0.12);
@@ -88,6 +100,7 @@ function playAlertSound(severity: string) {
       gain.gain.setValueAtTime(0.04, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
       
+      closeWhenDone(osc);
       osc.start();
       osc.stop(ctx.currentTime + 0.15);
     }
@@ -97,6 +110,7 @@ function playAlertSound(severity: string) {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [overview, setOverview] = useState<OverviewMetrics | null>(null);
   const [events, setEvents] = useState<FeedEvent[]>([]);
   const [alerts, setAlerts] = useState<FeedAlert[]>([]);
@@ -126,8 +140,7 @@ export default function DashboardPage() {
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const soundEnabledRef = useRef(false);
-  const alertsInitializedRef = useRef(false);
-  const prevAlertIdsRef = useRef<Set<string>>(new Set());
+  const alertWatermarkRef = useRef<number | null>(null);
   const alertsRef = useRef<FeedAlert[]>([]);
 
   useEffect(() => {
@@ -142,38 +155,43 @@ export default function DashboardPage() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const handleAlertsUpdate = useCallback((newAlerts: FeedAlert[]) => {
-    // Only alert for events triggered AFTER mount
-    if (alertsInitializedRef.current) {
-      const newItems = newAlerts.filter((a) => !prevAlertIdsRef.current.has(a.id));
-      newItems.forEach((alert) => {
-        const toastId = `${alert.id}-${Date.now()}`;
-        setToasts((prev) => [
-          {
-            id: toastId,
-            title: alert.message || "Threat Event Triggered",
-            description: alert.description,
-            severity: alert.severity,
-            timestamp: alert.timestamp,
-          },
-          ...prev,
-        ].slice(0, 5));
-
-        // Auto remove toast after 6s
-        setTimeout(() => {
-          removeToast(toastId);
-        }, 6000);
-
-        // Play synth alert sound
-        if (soundEnabledRef.current && (alert.severity === "critical" || alert.severity === "warning")) {
-          playAlertSound(alert.severity);
-        }
-      });
+  // An expired session surfaces as 401 from our own /api routes: send the
+  // operator back to sign in instead of reporting the backend as down.
+  const reportError = useCallback((err: unknown, fallback: string) => {
+    if (err instanceof SessionExpiredError) {
+      router.replace("/login?next=/dashboard");
+      return;
     }
+    setError(err instanceof Error ? err.message : fallback);
+  }, [router]);
 
-    const ids = new Set(newAlerts.map((a) => a.id));
-    prevAlertIdsRef.current = ids;
-    alertsInitializedRef.current = true;
+  const handleAlertsUpdate = useCallback((newAlerts: FeedAlert[]) => {
+    const { fresh, watermark } = selectNewAlerts(newAlerts, alertWatermarkRef.current);
+    alertWatermarkRef.current = watermark;
+    fresh.forEach((alert) => {
+      const toastId = `${alert.id}-${Date.now()}`;
+      setToasts((prev) => [
+        {
+          id: toastId,
+          title: alert.message || "Threat Event Triggered",
+          description: alert.description,
+          severity: alert.severity,
+          timestamp: alert.timestamp,
+        },
+        ...prev,
+      ].slice(0, 5));
+
+      // Auto remove toast after 6s
+      setTimeout(() => {
+        removeToast(toastId);
+      }, 6000);
+
+      // Play synth alert sound
+      if (soundEnabledRef.current && (alert.severity === "critical" || alert.severity === "warning")) {
+        playAlertSound(alert.severity);
+      }
+    });
+
     setAlerts(newAlerts);
   }, [removeToast]);
 
@@ -186,11 +204,11 @@ export default function DashboardPage() {
       );
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to label event");
+      reportError(err, "Failed to label event");
     } finally {
       setLabelingEventId(null);
     }
-  }, []);
+  }, [reportError]);
 
   const handleTrainingExport = useCallback(async () => {
     setExportingTrainingData(true);
@@ -206,11 +224,11 @@ export default function DashboardPage() {
       URL.revokeObjectURL(url);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to export training data");
+      reportError(err, "Failed to export training data");
     } finally {
       setExportingTrainingData(false);
     }
-  }, []);
+  }, [reportError]);
 
   const handleRetraining = useCallback(async () => {
     setRetraining(true);
@@ -219,11 +237,11 @@ export default function DashboardPage() {
       setRetrainingRun(result);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to run retraining");
+      reportError(err, "Failed to run retraining");
     } finally {
       setRetraining(false);
     }
-  }, []);
+  }, [reportError]);
 
   const handleOpenActorCase = useCallback(async (caseId: string) => {
     setWorkingActorCaseId(caseId);
@@ -240,11 +258,11 @@ export default function DashboardPage() {
       }));
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to open actor case");
+      reportError(err, "Failed to open actor case");
     } finally {
       setWorkingActorCaseId(null);
     }
-  }, []);
+  }, [reportError]);
 
   const handleUpdateActorCase = useCallback(
     async (caseId: string, status: ActorCaseWorkflow["status"]) => {
@@ -266,12 +284,12 @@ export default function DashboardPage() {
         }));
         setError(null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to update actor case");
+        reportError(err, "Failed to update actor case");
       } finally {
         setWorkingActorCaseId(null);
       }
     },
-    [],
+    [reportError],
   );
 
   const handleRevokeCanaryAssignment = useCallback(async (assignmentId: string) => {
@@ -290,55 +308,41 @@ export default function DashboardPage() {
       }));
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to revoke canary assignment");
+      reportError(err, "Failed to revoke canary assignment");
     } finally {
       setWorkingCanaryAssignmentId(null);
     }
-  }, []);
+  }, [reportError]);
 
   const load = useCallback(async () => {
-    try {
-      const [ov, ev, al, tr, rh, ds, ts, ms, mss, mpr, ht, ca, ap, ac, cases, workflows] = await Promise.all([
-        fetchOverview(),
-        fetchEvents(),
-        fetchAlerts(),
-        fetchTraffic(),
-        fetchRiskHistory(),
-        fetchDecoyStatus(),
-        fetchTrainingDataSummary().catch(() => null),
-        fetchMLShadowStatus().catch(() => null),
-        fetchMLShadowSummary().catch(() => null),
-        fetchMLPromotionReadiness().catch(() => null),
-        fetchHoneytokens().catch(() => null),
-        fetchCanaryAssignments().catch(() => null),
-        fetchActorProfiles().catch(() => null),
-        fetchActorClusters().catch(() => null),
-        fetchActorCases().catch(() => null),
-        fetchActorCaseWorkflows().catch(() => null),
-      ]);
-      setOverview(ov);
-      setEvents(ev);
-      handleAlertsUpdate(al);
-      setTraffic(tr);
-      setRiskHistory(rh);
-      setDecoyStatus(ds);
-      setTrainingSummary(ts);
-      setMlShadowStatus(ms);
-      setMlShadowSummary(mss);
-      setMlPromotionReadiness(mpr);
-      setHoneytokens(ht);
-      setCanaryAssignments(ca);
-      setActorProfiles(ap);
-      setActorClusters(ac);
-      setActorCases(cases);
-      setActorCaseWorkflows(workflows);
+    // allSettled: a failed request keeps the previous value on screen and is
+    // reported in the error banner, instead of rendering as empty or zero.
+    const results = await Promise.allSettled([
+      fetchOverview().then(setOverview),
+      fetchEvents().then(setEvents),
+      fetchAlerts().then(handleAlertsUpdate),
+      fetchTraffic().then(setTraffic),
+      fetchRiskHistory().then(setRiskHistory),
+      fetchDecoyStatus().then(setDecoyStatus),
+      fetchTrainingDataSummary().then(setTrainingSummary),
+      fetchMLShadowStatus().then(setMlShadowStatus),
+      fetchMLShadowSummary().then(setMlShadowSummary),
+      fetchMLPromotionReadiness().then(setMlPromotionReadiness),
+      fetchHoneytokens().then(setHoneytokens),
+      fetchCanaryAssignments().then(setCanaryAssignments),
+      fetchActorProfiles().then(setActorProfiles),
+      fetchActorClusters().then(setActorClusters),
+      fetchActorCases().then(setActorCases),
+      fetchActorCaseWorkflows().then(setActorCaseWorkflows),
+    ]);
+    const failure = summarizeFailures(results);
+    if (failure) {
+      reportError(failure, "Failed to fetch data");
+    } else {
       setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch data");
-    } finally {
-      setLoading(false);
     }
-  }, [handleAlertsUpdate]);
+    setLoading(false);
+  }, [handleAlertsUpdate, reportError]);
 
   const handleStreamMessage = useCallback(
     (data: DashboardStreamMessage) => {
@@ -374,7 +378,7 @@ export default function DashboardPage() {
         [
           alert,
           ...alertsRef.current.filter((item) => item.id !== alert.id),
-        ].slice(0, 100),
+        ].slice(0, 20),
       );
     },
     [handleAlertsUpdate],
@@ -425,12 +429,24 @@ export default function DashboardPage() {
   const promotionBlocker = mlPromotionReadiness?.gates.find((gate) => !gate.passed);
   const promotionDetail = promotionBlocker?.message ?? "all configured gates passed";
   const latestHoneytoken = honeytokens?.hits[0];
-  const honeytokenLabel = honeytokens?.totalHits
-    ? `HONEYTOKEN HITS: ${honeytokens.totalHits}`
-    : "HONEYTOKENS CLEAR";
-  const honeytokenDetail = latestHoneytoken
-    ? `${latestHoneytoken.tokenLabel} on ${latestHoneytoken.method} ${latestHoneytoken.path}`
-    : "no decoy token use observed";
+  const honeytokenLabel = !honeytokens
+    ? "HONEYTOKENS N/A"
+    : honeytokens.totalHits
+      ? `HONEYTOKEN HITS: ${honeytokens.totalHits}`
+      : "HONEYTOKENS CLEAR";
+  const honeytokenDetail = !honeytokens
+    ? "honeytoken data not loaded"
+    : latestHoneytoken
+      ? `${latestHoneytoken.tokenLabel} on ${latestHoneytoken.method} ${latestHoneytoken.path}`
+      : "no decoy token use observed";
+
+  const footerStatus = error
+    ? { label: "LAST REFRESH FAILED", tone: "text-amber-400/70" }
+    : connectionStatus === "connected"
+      ? { label: "LIVE STREAM CONNECTED", tone: "text-brand-emerald/60" }
+      : connectionStatus === "connecting"
+        ? { label: "STREAM CONNECTING", tone: "text-white/40" }
+        : { label: `STREAM OFFLINE, POLLING EVERY ${pollIntervalFor("disconnected") / 1000}S`, tone: "text-amber-400/70" };
 
   return (
     <div className="min-h-screen flex flex-col bg-bg-dark-navy text-white relative">
@@ -452,9 +468,11 @@ export default function DashboardPage() {
             <div
               title={`Honeytokens: ${honeytokenDetail}`}
               className={`flex items-center gap-2 px-3 py-2 rounded border text-[10px] font-mono tracking-widest ${
-                honeytokens?.totalHits
-                  ? "border-red-500/25 bg-red-500/5 text-red-300"
-                  : "border-brand-emerald/25 bg-brand-emerald/10 text-brand-emerald"
+                !honeytokens
+                  ? "border-white/5 bg-white/2 text-white/40"
+                  : honeytokens.totalHits
+                    ? "border-red-500/25 bg-red-500/5 text-red-300"
+                    : "border-brand-emerald/25 bg-brand-emerald/10 text-brand-emerald"
               }`}
             >
               <KeyRound className="w-3.5 h-3.5 shrink-0" />
@@ -562,14 +580,8 @@ export default function DashboardPage() {
         {/* Error banner */}
         {error && (
           <div className="mb-6 flex items-center gap-3 p-4 rounded-lg border border-amber-500/20 bg-amber-500/5 text-[11px] font-mono text-amber-400">
-            <WifiOff className="w-4 h-4 shrink-0" />
-            <div>
-              <span className="font-bold">Backend unreachable</span>
-              <span className="text-white/40 ml-2">
-                — {error}. Start the gateway with{" "}
-                <code className="text-white/60">uvicorn app.main:app --reload</code>
-              </span>
-            </div>
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span role="alert">{error}</span>
           </div>
         )}
 
@@ -619,25 +631,25 @@ export default function DashboardPage() {
             <>
               <MetricCard
                 label="Total Requests"
-                value={overview?.totalRequests ?? 0}
+                value={overview?.totalRequests ?? null}
                 icon={Globe}
                 accentColor="cyan"
               />
               <MetricCard
                 label="Suspicious Requests"
-                value={overview?.suspiciousRequests ?? 0}
+                value={overview?.suspiciousRequests ?? null}
                 icon={ShieldAlert}
                 accentColor="amber"
               />
               <MetricCard
                 label="Decoy Redirects"
-                value={overview?.decoyRedirects ?? 0}
+                value={overview?.decoyRedirects ?? null}
                 icon={ArrowRightLeft}
                 accentColor="emerald"
               />
               <MetricCard
                 label="Active Alerts"
-                value={overview?.activeAlerts ?? 0}
+                value={overview?.activeAlerts ?? null}
                 icon={Bell}
                 accentColor="red"
               />
@@ -651,7 +663,7 @@ export default function DashboardPage() {
             <TrafficChart data={traffic} />
           </div>
           <div>
-            <RiskScoreWidget score={overview?.averageRiskScore ?? 0} history={riskHistory} />
+            <RiskScoreWidget score={overview?.averageRiskScore ?? null} history={riskHistory} />
           </div>
         </div>
 
@@ -677,6 +689,7 @@ export default function DashboardPage() {
             events={events}
             labelingEventId={labelingEventId}
             onLabel={handleLabelEvent}
+            connectionStatus={connectionStatus}
           />
         </div>
 
@@ -744,8 +757,8 @@ export default function DashboardPage() {
       {/* Footer */}
       <footer className="border-t border-white/5 py-6">
         <div className="max-w-350 mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-[9px] text-white/20 font-mono">
-          <span>PROJECT MIRAGE // SECURITY DASHBOARD v1.0</span>
-          <span className="text-brand-emerald/60">ALL SYSTEMS NOMINAL</span>
+          <span>PROJECT MIRAGE // SECURITY DASHBOARD</span>
+          <span className={footerStatus.tone}>{footerStatus.label}</span>
         </div>
       </footer>
     </div>

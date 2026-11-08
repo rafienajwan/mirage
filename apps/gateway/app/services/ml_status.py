@@ -5,7 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.core.config import settings
-from app.ml.artifacts import review_model_artifact
+from app.ml.artifact_integrity import UNPINNED_BLOCKER, pinned_digest
+from app.ml.artifacts import cached_artifact_review
 
 
 def get_ml_shadow_status() -> dict:
@@ -29,7 +30,15 @@ def get_ml_shadow_status() -> dict:
         }
 
     artifact_path = Path(artifact)
-    review = review_model_artifact(artifact_path)
+    expected_sha256, may_load = pinned_digest(settings)
+    if not may_load:
+        return {
+            **base_status,
+            "mode": "invalid",
+            "artifact": artifact_path.name,
+            "blockers": [UNPINNED_BLOCKER],
+        }
+    review = cached_artifact_review(artifact_path, expected_sha256=expected_sha256)
     if "Artifact file does not exist" in review.blockers:
         mode = "missing"
     elif review.shadow_ready:

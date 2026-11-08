@@ -5,7 +5,6 @@ import {
   createDashboardStreamTicket,
   createOperatorSession,
   isSameOriginRequest,
-  verifyDashboardStreamTicket,
   verifyOperatorSession,
 } from "./operator-auth";
 
@@ -55,27 +54,6 @@ describe("operator authentication tokens", () => {
     });
 
     assert.equal(result.expiresAt, 2_060);
-    assert.equal(
-      await verifyDashboardStreamTicket(result.token, TICKET_SECRET, 2_059),
-      true,
-    );
-    assert.equal(
-      await verifyDashboardStreamTicket(result.token, TICKET_SECRET, 2_060),
-      false,
-    );
-  });
-
-  it("does not allow a session token to authenticate the stream", async () => {
-    const session = await createOperatorSession({
-      secret: SESSION_SECRET,
-      now: 1_000,
-      nonce: "session-nonce-0123456789",
-    });
-
-    assert.equal(
-      await verifyDashboardStreamTicket(session, SESSION_SECRET, 1_001),
-      false,
-    );
   });
 
   it("rejects secrets shorter than 32 characters", async () => {

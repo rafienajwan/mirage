@@ -2,14 +2,16 @@
 
 import asyncio
 import base64
+import dataclasses
 import hashlib
 import hmac
 import json
 from types import SimpleNamespace
 
+from fastapi import WebSocketDisconnect
 import pytest
 
-from app.core import security
+from app.core import config
 from app.schemas.decision import Decision
 from app.schemas.event import EventRecord
 from app.services import actor_clusters, actor_profiles, dashboard_stream
@@ -45,17 +47,24 @@ def _stream_ticket(
 
 
 class FakeWebSocket:
-    def __init__(self, fail: bool = False) -> None:
+    def __init__(self, fail: bool = False, delay: float = 0) -> None:
         self.accepted = False
         self.messages: list[dict] = []
         self.fail = fail
+        self.delay = delay
+        self.closed = False
 
     async def accept(self) -> None:
         self.accepted = True
 
+    async def close(self, code: int = 1000) -> None:
+        self.closed = True
+
     async def send_json(self, message: dict) -> None:
         if self.fail:
-            raise RuntimeError("closed")
+            # What Starlette raises when the peer has gone away.
+            raise WebSocketDisconnect(code=1006)
+        await asyncio.sleep(self.delay)
         self.messages.append(message)
 
 
@@ -193,9 +202,7 @@ def test_dashboard_stream_origin_requires_configured_frontend(monkeypatch):
 @pytest.mark.asyncio
 async def test_dashboard_http_reads_require_operator_api_key(client, monkeypatch):
     monkeypatch.setattr(
-        security,
-        "settings",
-        SimpleNamespace(api_key="operator-key"),
+        config, "settings", dataclasses.replace(config.settings, api_key="operator-key")
     )
 
     denied = await client.get("/api/v1/dashboard/overview")
@@ -225,6 +232,26 @@ async def test_dashboard_stream_broadcasts_and_drops_closed_clients():
         {"type": "event", "payload": {"event_id": "evt-1"}},
         {"type": "alert", "payload": {"alert_id": "alert-1"}},
     ]
+    assert manager._clients == {live}
+
+
+@pytest.mark.asyncio
+async def test_dashboard_stream_drops_slow_clients_without_stalling(monkeypatch):
+    monkeypatch.setattr(dashboard_stream, "_SEND_TIMEOUT_SECONDS", 0.05)
+    manager = dashboard_stream.DashboardStreamManager()
+    live = FakeWebSocket()
+    slow = FakeWebSocket(delay=10)
+    await manager.connect(live)  # type: ignore[arg-type]
+    await manager.connect(slow)  # type: ignore[arg-type]
+
+    await asyncio.wait_for(manager.broadcast({"type": "event"}), timeout=1)
+
+    assert live.messages == [{"type": "event"}]
+    assert manager._clients == {live}
+    # Closing makes the browser reconnect instead of silently missing updates.
+    await asyncio.sleep(0)
+    assert slow.closed is True
+    assert live.closed is False
 
 
 @pytest.mark.asyncio
@@ -336,6 +363,7 @@ async def test_snapshot_refresh_coalesces_while_build_is_running():
         build_snapshot=build_snapshot,
         broadcast_update=broadcast_update,
         debounce_seconds=0,
+        has_clients=lambda: True,
     )
     task = coordinator.schedule()
     await started.wait()
@@ -368,6 +396,7 @@ async def test_snapshot_refresh_recovers_after_build_failure():
         build_snapshot=build_snapshot,
         broadcast_update=broadcast_update,
         debounce_seconds=0,
+        has_clients=lambda: True,
     )
 
     await coordinator.schedule()
@@ -375,3 +404,27 @@ async def test_snapshot_refresh_recovers_after_build_failure():
 
     assert attempts == 2
     assert messages == [{"type": "snapshot", "payload": {"attempt": 2}}]
+
+
+@pytest.mark.asyncio
+async def test_snapshot_refresh_skips_build_without_connected_dashboards():
+    builds = 0
+
+    async def build_snapshot() -> dict:
+        nonlocal builds
+        builds += 1
+        return {}
+
+    async def broadcast_update(kind: str, payload: dict) -> None:
+        pass
+
+    coordinator = dashboard_stream.DashboardSnapshotRefreshCoordinator(
+        build_snapshot=build_snapshot,
+        broadcast_update=broadcast_update,
+        debounce_seconds=0,
+        has_clients=lambda: False,
+    )
+
+    await coordinator.schedule()
+
+    assert builds == 0

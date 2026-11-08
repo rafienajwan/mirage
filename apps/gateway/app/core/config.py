@@ -46,8 +46,6 @@ class Settings:
             "DATABASE_URL", "sqlite+aiosqlite:///./mirage.db"
         )
     )
-    host: str = field(default_factory=lambda: os.getenv("HOST", "0.0.0.0"))  # noqa: S104 - container bind address; HOST env overrides
-    port: int = field(default_factory=lambda: int(os.getenv("PORT", "8000")))
     api_key: str | None = field(
         default_factory=lambda: os.getenv("MIRAGE_API_KEY") or None
     )
@@ -57,8 +55,14 @@ class Settings:
     dashboard_stream_ticket_secret: str | None = field(
         default_factory=lambda: os.getenv("MIRAGE_DASHBOARD_TICKET_SECRET") or None
     )
+    trusted_proxies: str = field(
+        default_factory=lambda: os.getenv("TRUSTED_PROXIES", "")
+    )
     rate_limit_per_minute: int = field(
         default_factory=lambda: int(os.getenv("RATE_LIMIT_PER_MINUTE", "120"))
+    )
+    rate_limit_max_clients: int = field(
+        default_factory=lambda: int(os.getenv("RATE_LIMIT_MAX_CLIENTS", "10000"))
     )
     real_app_url: str = field(
         default_factory=lambda: os.getenv("REAL_APP_URL", "http://localhost:8001")
@@ -72,8 +76,17 @@ class Settings:
     proxy_max_body_bytes: int = field(
         default_factory=lambda: int(os.getenv("PROXY_MAX_BODY_BYTES", "1048576"))
     )
+    proxy_max_response_bytes: int = field(
+        default_factory=lambda: int(os.getenv("PROXY_MAX_RESPONSE_BYTES", "10485760"))
+    )
+    payload_exemptions: str = field(
+        default_factory=lambda: os.getenv("PAYLOAD_EXEMPTIONS", "")
+    )
     ml_model_artifact: str | None = field(
         default_factory=lambda: os.getenv("MIRAGE_MODEL_ARTIFACT") or None
+    )
+    ml_model_artifact_sha256: str | None = field(
+        default_factory=lambda: os.getenv("MIRAGE_MODEL_ARTIFACT_SHA256") or None
     )
     ml_dataset_manifest: str | None = field(
         default_factory=lambda: os.getenv("MIRAGE_MODEL_DATASET_MANIFEST") or None

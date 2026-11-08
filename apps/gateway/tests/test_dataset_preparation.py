@@ -12,16 +12,15 @@ from app.ml.api_log_review import (
     review_api_log_source,
     write_api_log_source_review,
 )
+from app.ml.dataset_review import build_dataset_lineage, review_prepared_dataset
 from app.ml.datasets import (
     DatasetValidationError,
     PreparedTrainingRow,
-    build_dataset_lineage,
     load_api_log_jsonl,
     load_cicids_csv,
     load_dataset,
     load_mirage_jsonl,
     prepare_dataset,
-    review_prepared_dataset,
     stratified_split,
 )
 from app.services.feature_extraction import FEATURE_NAMES
@@ -43,35 +42,51 @@ def _write_jsonl(path, rows: list[dict]) -> None:
 
 def test_load_mirage_jsonl_normalizes_feature_order(tmp_path):
     source = tmp_path / "training_events.jsonl"
-    _write_jsonl(
-        source,
-        [
-            {
-                "event_id": "evt-1",
-                "label": 1,
-                "features": {
-                    "request_count_log": "3.5",
-                    "unknown_feature": 999,
-                },
-            }
-        ],
-    )
+    features = {name: 0.0 for name in reversed(FEATURE_NAMES)}
+    features["request_count_log"] = "3.5"
+    _write_jsonl(source, [{"event_id": "evt-1", "label": 1, "features": features}])
 
     rows = load_mirage_jsonl(source)
 
     assert len(rows) == 1
     assert rows[0].label == 1
-    assert set(rows[0].features) == set(FEATURE_NAMES)
+    assert tuple(rows[0].features) == FEATURE_NAMES
     assert rows[0].features["request_count_log"] == 3.5
-    assert "unknown_feature" not in rows[0].features
 
 
-def test_load_mirage_jsonl_rejects_bad_label(tmp_path):
+@pytest.mark.parametrize(
+    "features",
+    [
+        {"request_count_log": 3.5},
+        {**{name: 0.0 for name in FEATURE_NAMES}, "unknown_feature": 999},
+    ],
+)
+def test_load_mirage_jsonl_rejects_feature_contract_mismatch(tmp_path, features):
     source = tmp_path / "training_events.jsonl"
-    _write_jsonl(source, [{"label": 3, "features": _features()}])
+    _write_jsonl(
+        source,
+        [{"label": 0, "features": _features()}, {"label": 1, "features": features}],
+    )
+
+    with pytest.raises(DatasetValidationError, match="feature names .* on line 2"):
+        load_mirage_jsonl(source)
+
+
+@pytest.mark.parametrize("label", [3, 0.5, 1.9, True, False, None, "yes", " 1"])
+def test_load_mirage_jsonl_rejects_bad_label(tmp_path, label):
+    source = tmp_path / "training_events.jsonl"
+    _write_jsonl(source, [{"label": label, "features": _features()}])
 
     with pytest.raises(DatasetValidationError, match="label must be 0 or 1"):
         load_mirage_jsonl(source)
+
+
+@pytest.mark.parametrize("label, expected", [(0, 0), (1, 1), ("0", 0), ("1", 1)])
+def test_load_mirage_jsonl_accepts_binary_labels(tmp_path, label, expected):
+    source = tmp_path / "training_events.jsonl"
+    _write_jsonl(source, [{"label": label, "features": _features()}])
+
+    assert load_mirage_jsonl(source)[0].label == expected
 
 
 def test_load_api_log_jsonl_extracts_request_features(tmp_path):
@@ -218,7 +233,7 @@ def test_prepare_reviewed_api_logs_binds_safe_provenance_and_hashes_ids(tmp_path
             "path": f"/api/orders/{index}",
             "user_agent": "private-client/1.0",
         }
-        for index in range(12)
+        for index in range(14)
     ] + [
         {
             "request_id": f"private-attack-{index}",
@@ -229,7 +244,7 @@ def test_prepare_reviewed_api_logs_binds_safe_provenance_and_hashes_ids(tmp_path
             "payload_excerpt": f"password=private-{index}&query=' or 1=1",
             "payload_indicators": ["sql-like"],
         }
-        for index in range(12)
+        for index in range(14)
     ]
     _write_jsonl(source, [*rows, rows[0]])
     source_review = review_api_log_source(
@@ -268,7 +283,7 @@ def test_prepare_reviewed_api_logs_binds_safe_provenance_and_hashes_ids(tmp_path
     ]
 
     assert manifest.source_kind == "reviewed-api-log-jsonl"
-    assert manifest.total_rows == 24
+    assert manifest.total_rows == 28
     assert manifest.duplicate_rows_removed == 1
     assert manifest.rejected_rows == 0
     assert manifest.input_sha256 == {source.name: source_review.input_sha256}
@@ -475,7 +490,7 @@ def test_review_prepared_dataset_marks_valid_split_ready(tmp_path):
     rows = [
         {"label": label, "features": _features(float(index))}
         for label in (0, 1)
-        for index in range(12)
+        for index in range(14)
     ]
     _write_jsonl(source, rows)
     prepare_dataset(
@@ -494,9 +509,47 @@ def test_review_prepared_dataset_marks_valid_split_ready(tmp_path):
 
     assert review.ready_for_training is True
     assert review.blockers == []
-    assert review.total_rows == 24
+    assert review.total_rows == 28
     assert review.train_label_counts["0"] >= 1
     assert review.test_label_counts["1"] >= 1
+
+
+def _prepare_counts(tmp_path, normal: int, suspicious: int):
+    source = tmp_path / "training_events.jsonl"
+    rows = [
+        {"label": label, "features": _features(float(index))}
+        for label, count in ((0, normal), (1, suspicious))
+        for index in range(count)
+    ]
+    _write_jsonl(source, rows)
+    output_dir = tmp_path / "prepared" / "runtime-v1"
+    prepare_dataset(
+        source,
+        output_dir,
+        source_kind="mirage-jsonl",
+        dataset_name="runtime-export",
+        dataset_version="v1",
+        train_ratio=0.75,
+        random_seed=7,
+    )
+    return review_prepared_dataset(output_dir / "manifest.json")
+
+
+def test_review_prepared_dataset_requires_two_train_rows_per_class(tmp_path):
+    review = _prepare_counts(tmp_path, normal=26, suspicious=2)
+
+    assert review.train_rows >= 20
+    assert review.train_label_counts["1"] == 1
+    assert review.ready_for_training is False
+    assert "Train split has fewer than 2 rows of label 1" in review.blockers
+
+
+def test_review_prepared_dataset_requires_trainer_minimum_train_rows(tmp_path):
+    review = _prepare_counts(tmp_path, normal=12, suspicious=12)
+
+    assert review.train_rows == 18
+    assert review.ready_for_training is False
+    assert "Train rows 18 is below 20" in review.blockers
 
 
 def test_review_prepared_dataset_blocks_manifest_row_mismatch(tmp_path):
@@ -586,7 +639,7 @@ def test_build_dataset_lineage_rejects_unrelated_training_file(tmp_path):
     rows = [
         {"label": label, "features": _features(float(index))}
         for label in (0, 1)
-        for index in range(12)
+        for index in range(14)
     ]
     _write_jsonl(source, rows)
     output_dir = tmp_path / "prepared" / "runtime-v1"
@@ -670,6 +723,26 @@ def test_load_cicids_csv_accepts_headers_with_extra_spaces(tmp_path):
     assert rows[0].features["destination_port"] == 443.0
     assert rows[0].features["flow_duration_ms"] == 1200.0
     assert rows[1].features["syn_flag_count"] == 4.0
+
+
+def test_load_cicids_csv_accepts_cse_cic_ids2018_aliases(tmp_path):
+    source = tmp_path / "cicids.csv"
+    source.write_text(
+        "\n".join(
+            [
+                "Dst Port,Flow Duration,Avg Packet Size,label",
+                "443,1200,64.0,Benign",
+                "8080,5000,256.0,DDoS",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    rows = load_cicids_csv(source)
+
+    assert [row.label for row in rows] == [0, 1]
+    assert rows[0].features["destination_port"] == 443.0
+    assert rows[1].features["average_packet_size"] == 256.0
 
 
 def test_load_cicids_csv_zeroes_non_finite_values(tmp_path):

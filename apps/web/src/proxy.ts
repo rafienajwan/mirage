@@ -4,31 +4,39 @@ import {
   OPERATOR_SESSION_COOKIE,
   verifyOperatorSession,
 } from "@/lib/operator-auth";
+import { decideProxyAccess } from "@/lib/proxy-policy";
 
-const PUBLIC_API_PATHS = new Set([
-  "/api/auth/login",
-  "/api/auth/logout",
-]);
-
-export async function proxy(request: NextRequest) {
-  if (PUBLIC_API_PATHS.has(request.nextUrl.pathname)) {
-    return NextResponse.next();
-  }
-
+async function isAuthenticated(request: NextRequest) {
   const secret = process.env.MIRAGE_OPERATOR_SESSION_SECRET;
   const session = request.cookies.get(OPERATOR_SESSION_COOKIE)?.value;
-  const now = Math.floor(Date.now() / 1000);
-  const authenticated =
-    Boolean(secret && session) &&
-    await verifyOperatorSession(session as string, secret as string, now);
-  if (authenticated) {
-    return NextResponse.next();
-  }
+  if (!secret || !session) return false;
+  return verifyOperatorSession(session, secret, Math.floor(Date.now() / 1000));
+}
 
-  if (request.nextUrl.pathname.startsWith("/api/")) {
+export async function proxy(request: NextRequest) {
+  const decision = decideProxyAccess({
+    method: request.method,
+    pathname: request.nextUrl.pathname,
+    origin: request.headers.get("origin"),
+    host: request.headers.get("host"),
+    forwardedProto: request.headers.get("x-forwarded-proto"),
+    protocol: request.nextUrl.protocol,
+    authenticated: await isAuthenticated(request),
+  });
+
+  if (decision === "allow") return NextResponse.next();
+
+  if (decision === "unauthorized") {
     return NextResponse.json(
       { detail: "Authentication required" },
       { status: 401, headers: { "Cache-Control": "no-store" } },
+    );
+  }
+
+  if (decision === "forbidden") {
+    return NextResponse.json(
+      { detail: "Invalid request origin" },
+      { status: 403, headers: { "Cache-Control": "no-store" } },
     );
   }
 

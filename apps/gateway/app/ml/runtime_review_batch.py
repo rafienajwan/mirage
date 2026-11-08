@@ -68,21 +68,10 @@ def aggregate_review_batches(
                 raise ValueError(
                     f"batch {batch_id} contains unsanitized event {event_id}"
                 )
-            label = row.get("label")
-            if label not in (0, 1):
-                raise ValueError(
-                    f"batch {batch_id} has an invalid label for {event_id}"
-                )
-            analyst_label = row.get("analyst_label")
-            if not isinstance(analyst_label, str) or not analyst_label:
-                raise ValueError(
-                    f"batch {batch_id} has no analyst label for {event_id}"
-                )
-            features = row.get("features")
-            if not isinstance(features, dict) or not features:
-                raise ValueError(
-                    f"batch {batch_id} has a missing feature vector for {event_id}"
-                )
+            try:
+                label = _reviewed_label(row, event_id)
+            except ValueError as exc:
+                raise ValueError(f"batch {batch_id}: {exc}") from exc
             if event_id in seen_event_ids:
                 raise ValueError(f"duplicate event_id across batches: {event_id}")
             seen_event_ids.add(event_id)
@@ -136,6 +125,20 @@ def write_text_exact(path: Path, content: str) -> None:
     """Write canonical UTF-8 bytes without platform newline translation."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(content.encode("utf-8"))
+
+
+def _reviewed_label(row: dict[str, Any], event_id: str) -> int:
+    """Return the binary label of a reviewed row, rejecting incomplete rows."""
+    label = row.get("label")
+    if label not in (0, 1):
+        raise ValueError(f"invalid binary label for {event_id}")
+    analyst_label = row.get("analyst_label")
+    if not isinstance(analyst_label, str) or not analyst_label:
+        raise ValueError(f"missing analyst label for {event_id}")
+    features = row.get("features")
+    if not isinstance(features, dict) or not features:
+        raise ValueError(f"missing feature vector for {event_id}")
+    return label
 
 
 def _parse_export_rows(export_jsonl: str) -> dict[str, dict[str, Any]]:
@@ -220,15 +223,7 @@ def finalize_review_batch(
     label_counts = {"0": 0, "1": 0}
     for entry in entries:
         source = exported_by_id[entry["event_id"]]
-        label = source.get("label")
-        if label not in (0, 1):
-            raise ValueError(f"invalid binary label for {entry['event_id']}")
-        analyst_label = source.get("analyst_label")
-        if not isinstance(analyst_label, str) or not analyst_label:
-            raise ValueError(f"missing analyst label for {entry['event_id']}")
-        features = source.get("features")
-        if not isinstance(features, dict) or not features:
-            raise ValueError(f"missing feature vector for {entry['event_id']}")
+        label = _reviewed_label(source, entry["event_id"])
         sanitized_rows.append({field: source[field] for field in _EXPORTED_FIELDS})
         label_counts[str(label)] += 1
 

@@ -1,4 +1,4 @@
-import type { DashboardStreamMessage } from "@/lib/api";
+import type { DashboardStreamMessage } from "@/lib/api-types";
 
 export type DashboardConnectionStatus =
   | "connecting"
@@ -97,7 +97,7 @@ export class DashboardStreamClient {
   start() {
     if (!this.stopped) return;
     this.stopped = false;
-    this.connect();
+    void this.connect();
   }
 
   stop() {
@@ -132,10 +132,16 @@ export class DashboardStreamClient {
     }
     if (this.stopped) return;
 
-    const target = new URL(connection.url);
-    target.searchParams.set("token", connection.token);
-
-    const socket = this.options.createSocket(target.toString());
+    let socket: DashboardSocket;
+    try {
+      const target = new URL(connection.url);
+      target.searchParams.set("token", connection.token);
+      // Throws synchronously for a malformed URL or a ws:// URL on an https page.
+      socket = this.options.createSocket(target.toString());
+    } catch {
+      this.scheduleReconnect();
+      return;
+    }
     this.socket = socket;
     socket.onopen = () => {
       this.attempt = 0;

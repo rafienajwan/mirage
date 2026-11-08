@@ -11,7 +11,11 @@ from app.storage import store
 router = APIRouter(prefix="/decoy", tags=["decoy"])
 
 
-@router.get("/status", response_model=DecoyStatus)
+@router.get(
+    "/status",
+    response_model=DecoyStatus,
+    dependencies=[Depends(require_api_key)],
+)
 async def decoy_status():
     """Current state of decoy environments."""
     return DecoyStatus(
@@ -39,5 +43,6 @@ async def decoy_respond(request: DecoyResponseRequest):
         actor_hint=request.actor_hint,
         decoy_type=response.decoy_type,
         source_path=request.path,
+        response_text=response.model_dump_json(),
     )
     return response

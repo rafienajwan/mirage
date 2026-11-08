@@ -190,8 +190,8 @@ review. The aggregator validates each source hash and rejects duplicate event
 IDs before writing ignored local outputs under `data/processed/runtime/`.
 Collection is capped at 50 events so the complete batch remains available in
 the current dashboard feed.
-The older `collect_api_domain_training_data.py` command assigns scenario labels
-automatically and is only for deterministic pipeline validation.
+`build_api_domain_fixture_dataset.py` assigns scenario labels automatically and
+is only for deterministic pipeline validation.
 
 ## Known Limitations
 

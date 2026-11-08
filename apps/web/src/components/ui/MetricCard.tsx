@@ -6,7 +6,8 @@ import type { LucideIcon } from "lucide-react";
 
 interface MetricCardProps {
   label: string;
-  value: number;
+  /** null when the metric could not be loaded; renders as "n/a". */
+  value: number | null;
   icon: LucideIcon;
   accentColor?: "cyan" | "emerald" | "red" | "amber";
   className?: string;
@@ -31,12 +32,13 @@ export default function MetricCard({
   className,
 }: MetricCardProps) {
   const accent = accentMap[accentColor];
-  const [displayValue, setDisplayValue] = useState(value);
-  const prevValueRef = useRef(value);
+  const target = value ?? 0;
+  const [displayValue, setDisplayValue] = useState(target);
+  const prevValueRef = useRef(target);
 
   useEffect(() => {
     const start = prevValueRef.current;
-    const end = value;
+    const end = target;
     if (start === end) {
       setDisplayValue(end);
       return;
@@ -67,7 +69,7 @@ export default function MetricCard({
     return () => {
       cancelAnimationFrame(animId);
     };
-  }, [value]);
+  }, [target]);
 
   return (
     <GlassPanel className={cn("p-5 flex flex-col justify-between h-full", className)}>
@@ -80,7 +82,7 @@ export default function MetricCard({
         </div>
       </div>
       <span className={cn("text-2xl font-bold font-display", accent.text)}>
-        {formatNumber(displayValue)}
+        {value === null ? "n/a" : formatNumber(displayValue)}
       </span>
     </GlassPanel>
   );

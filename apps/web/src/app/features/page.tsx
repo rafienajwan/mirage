@@ -176,11 +176,11 @@ export default function FeaturesPage() {
                 <span className="font-mono text-2xl font-bold text-white/10 mb-2 block">02</span>
                 <h4 className="font-display font-bold text-[10px] sm:text-xs uppercase text-white mb-2">Anomaly Detected</h4>
                 <p className="text-[11px] text-white/40 leading-relaxed">
-                  A suspicious request (e.g., SQL Injection) is detected. The AI engine immediately flags the request and escalates the risk score to critical.
+                  A suspicious request (e.g., SQL injection) is detected. The risk engine scores it, and high or critical scores are routed to a decoy.
                 </p>
               </div>
               <div className="text-[9px] font-mono text-red-400 bg-red-400/5 border border-red-400/10 px-2 py-0.5 rounded self-start mt-4 uppercase">
-                Risk Score &gt;= 0.65
+                Risk band: high or critical
               </div>
             </motion.div>
 
@@ -242,12 +242,7 @@ export default function FeaturesPage() {
         <div className="mt-12 flex flex-col md:flex-row items-center justify-between text-[8px] font-mono tracking-widest text-white/20 border-t border-white/5 pt-6 gap-4 w-full">
           <div className="flex items-center space-x-2">
             <Terminal className="w-3.5 h-3.5 text-brand-cyan/60" />
-            <span>PROJECT MIRAGE // AUTONOMOUS DECEPTION LAYER v2.8-BETA</span>
-          </div>
-          <div className="flex items-center space-x-4">
-            <span className="text-brand-emerald/80">DECOY CONTAINMENT: 100% SUCCESS</span>
-            <span className="w-1.5 h-1.5 rounded-full bg-brand-emerald/60 animate-pulse" />
-            <span>ALL APIS SECURED</span>
+            <span>PROJECT MIRAGE // API DECEPTION GATEWAY</span>
           </div>
         </div>
       </main>

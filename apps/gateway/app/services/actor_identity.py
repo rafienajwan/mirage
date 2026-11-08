@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 
 from app.schemas.actor import ActorStatus
-from app.schemas.decision import Decision
 from app.schemas.event import EventRecord
 
 
@@ -36,7 +35,3 @@ def actor_status(
     if suspicious_requests:
         return "watch"
     return "quiet"
-
-
-def is_suspicious_decision(decision: Decision) -> bool:
-    return decision != Decision.ALLOW

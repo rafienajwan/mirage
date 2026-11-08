@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import uuid
 
+from starlette.concurrency import run_in_threadpool
+
 from app.schemas.decision import Decision, InspectResponse
 from app.schemas.request import InspectRequest
 from app.services.anomaly_engine import anomaly_detector
@@ -41,7 +43,8 @@ async def inspect_and_log(
         anomaly_confidence=anomaly.confidence,
         routing_mode="heuristic",
     )
-    ml_shadow = score_ml_shadow(
+    ml_shadow = await run_in_threadpool(
+        score_ml_shadow,
         feature_vector,
         heuristic_decision=heuristic_decision,
     )

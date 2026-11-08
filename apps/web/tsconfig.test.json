@@ -14,6 +14,21 @@
     "src/lib/dashboard-stream.ts",
     "src/lib/dashboard-stream.test.ts",
     "src/lib/operator-auth.ts",
-    "src/lib/operator-auth.test.ts"
+    "src/lib/operator-auth.test.ts",
+    "src/lib/login-throttle.ts",
+    "src/lib/login-throttle.test.ts",
+    "src/lib/safe-next-path.ts",
+    "src/lib/safe-next-path.test.ts",
+    "src/lib/proxy-policy.ts",
+    "src/lib/proxy-policy.test.ts",
+    "src/lib/gateway-bridge.ts",
+    "src/lib/gateway-bridge.test.ts",
+    "src/lib/api-types.ts",
+    "src/lib/api-map.ts",
+    "src/lib/api-map.test.ts",
+    "src/lib/alert-toasts.ts",
+    "src/lib/alert-toasts.test.ts",
+    "src/lib/http-failure.ts",
+    "src/lib/http-failure.test.ts"
   ]
 }

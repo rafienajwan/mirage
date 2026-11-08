@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Iterator
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 import hashlib
@@ -10,7 +11,9 @@ import json
 from pathlib import Path
 import re
 from typing import Any
+from urllib.parse import urlsplit
 
+from app.ml.artifact_integrity import sha256_file
 from app.ml.errors import DatasetValidationError
 from app.schemas.request import InspectRequest
 from app.services.feature_extraction import (
@@ -18,6 +21,285 @@ from app.services.feature_extraction import (
     FeatureVector,
     extract_features,
 )
+from app.services.payload_signals import build_payload_excerpt
+
+API_LOG_LABELS = {
+    "0": 0,
+    "normal": 0,
+    "benign": 0,
+    "allow": 0,
+    "allowed": 0,
+    "clean": 0,
+    "ok": 0,
+    "pass": 0,
+    "false_positive": 0,
+    "1": 1,
+    "suspicious": 1,
+    "malicious": 1,
+    "attack": 1,
+    "monitor": 1,
+    "redirect_to_decoy": 1,
+    "false_negative": 1,
+    "true_positive": 1,
+    "deny": 1,
+    "denied": 1,
+    "blocked": 1,
+    "redirected": 1,
+    "decoy": 1,
+    "threat": 1,
+}
+
+API_LOG_LABEL_FIELDS = (
+    "label",
+    "analyst_label",
+    "class",
+    "decision",
+    "outcome",
+    "verdict",
+    "classification",
+)
+
+
+def _label_from_api_log(value: object, *, line_number: int) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int) and value in {0, 1}:
+        return value
+    if isinstance(value, str):
+        normalized = API_LOG_LABELS.get(value.strip().lower())
+        if normalized is not None:
+            return normalized
+    raise DatasetValidationError(
+        f"API log label must be normal/suspicious or 0/1 on line {line_number}"
+    )
+
+
+def _first_object_value(record: dict, *names: str) -> object:
+    for name in names:
+        value = record.get(name)
+        if value not in (None, ""):
+            return value
+    return None
+
+
+def _headers_value(record: dict, *names: str) -> object:
+    headers = record.get("headers")
+    if not isinstance(headers, dict):
+        return None
+
+    normalized_headers = {str(key).lower(): value for key, value in headers.items()}
+    for name in names:
+        value = normalized_headers.get(name.lower())
+        if value not in (None, ""):
+            return value
+    return None
+
+
+def _request_object(record: dict) -> dict:
+    for name in ("request", "http_request", "httpRequest", "http"):
+        value = record.get(name)
+        if isinstance(value, dict):
+            return value
+    return record
+
+
+def _path_from_value(value: object) -> str:
+    if value in (None, ""):
+        return ""
+    raw_path = str(value)
+    parsed = urlsplit(raw_path)
+    if parsed.scheme and parsed.netloc:
+        return parsed.path or "/"
+    if "?" in raw_path:
+        return raw_path.split("?", 1)[0] or "/"
+    return raw_path
+
+
+def _query_from_value(value: object) -> str:
+    if value in (None, ""):
+        return ""
+    return urlsplit(str(value)).query
+
+
+def _payload_excerpt(request_data: dict) -> str:
+    explicit_excerpt = _first_object_value(request_data, "payload_excerpt")
+    if explicit_excerpt not in (None, ""):
+        return str(explicit_excerpt)[:4096]
+
+    target = _first_object_value(
+        request_data,
+        "path",
+        "endpoint",
+        "url_path",
+        "route",
+        "uri",
+        "url",
+        "request_uri",
+    )
+    query = _first_object_value(request_data, "query", "query_string")
+    body = _first_object_value(
+        request_data,
+        "body_excerpt",
+        "request_body",
+        "body",
+        "payload",
+    )
+    return build_payload_excerpt(
+        str(query or _query_from_value(target)),
+        str(body or ""),
+    )
+
+
+def _api_payload_indicators(value: object, *, line_number: int) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [item.strip() for item in value.split(",") if item.strip()]
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return value
+    raise DatasetValidationError(
+        f"payload_indicators must be a list of strings on line {line_number}"
+    )
+
+
+def _optional_float(value: object) -> float | None:
+    if value in (None, ""):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _optional_int(value: object) -> int | None:
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _api_log_request(record: dict, *, line_number: int) -> InspectRequest:
+    request_data = _request_object(record)
+    user_agent = _first_object_value(
+        request_data,
+        "user_agent",
+        "userAgent",
+        "ua",
+        "user-agent",
+    ) or _headers_value(request_data, "user-agent")
+    try:
+        return InspectRequest(
+            ip_address=str(
+                _first_object_value(
+                    request_data,
+                    "ip_address",
+                    "source_ip",
+                    "client_ip",
+                    "src_ip",
+                    "remote_addr",
+                    "remoteAddress",
+                    "clientIp",
+                )
+                or ""
+            ),
+            method=str(
+                _first_object_value(
+                    request_data,
+                    "method",
+                    "http_method",
+                    "httpMethod",
+                    "request_method",
+                )
+                or ""
+            ),
+            path=_path_from_value(
+                _first_object_value(
+                    request_data,
+                    "path",
+                    "endpoint",
+                    "url_path",
+                    "route",
+                    "uri",
+                    "url",
+                    "request_uri",
+                )
+            ),
+            user_agent=str(user_agent or ""),
+            request_count=_optional_int(
+                _first_object_value(
+                    request_data,
+                    "request_count",
+                    "source_request_count",
+                    "count",
+                    "hits",
+                )
+            )
+            or 1,
+            payload_indicators=_api_payload_indicators(
+                _first_object_value(
+                    request_data,
+                    "payload_indicators",
+                    "indicators",
+                    "signals",
+                    "tags",
+                ),
+                line_number=line_number,
+            ),
+            payload_excerpt=_payload_excerpt(request_data),
+            timestamp=request_data.get("timestamp"),
+            flow_duration_ms=_optional_float(
+                _first_object_value(
+                    request_data,
+                    "flow_duration_ms",
+                    "duration_ms",
+                    "durationMs",
+                    "latency_ms",
+                )
+            ),
+            flow_packets_per_second=_optional_float(
+                _first_object_value(
+                    request_data,
+                    "flow_packets_per_second",
+                    "flowPacketsPerSecond",
+                    "packets_per_second",
+                )
+            ),
+            packet_length_mean=_optional_float(
+                _first_object_value(
+                    request_data,
+                    "packet_length_mean",
+                    "packetLengthMean",
+                    "avg_packet_length",
+                )
+            ),
+            syn_flag_count=_optional_int(
+                _first_object_value(request_data, "syn_flag_count", "synFlagCount")
+            ),
+            destination_port=_optional_int(
+                _first_object_value(
+                    request_data,
+                    "destination_port",
+                    "destinationPort",
+                    "dst_port",
+                    "port",
+                )
+            ),
+            average_packet_size=_optional_float(
+                _first_object_value(
+                    request_data,
+                    "average_packet_size",
+                    "averagePacketSize",
+                    "avg_packet_size",
+                )
+            ),
+        )
+    except ValueError as exc:
+        raise DatasetValidationError(
+            f"invalid API log request fields on line {line_number}"
+        ) from exc
+
 
 MAX_API_LOG_LINE_BYTES = 1024 * 1024
 
@@ -66,14 +348,6 @@ class ReviewedAPILogRow:
     features: FeatureVector
     label: int
     record_id: str
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _metadata_blockers(metadata: dict[str, Any]) -> list[str]:
@@ -205,19 +479,55 @@ def api_log_source_review_errors(review: dict[str, Any]) -> list[str]:
 
 
 def _parse_record(record: dict, *, line_number: int) -> tuple[int, InspectRequest]:
-    # Imported lazily so the existing dataset adapter remains the single parser.
-    from app.ml.datasets import (  # pylint: disable=import-outside-toplevel
-        API_LOG_LABEL_FIELDS,
-        _api_log_request,
-        _first_object_value,
-        _label_from_api_log,
-    )
-
     label = _label_from_api_log(
         _first_object_value(record, *API_LOG_LABEL_FIELDS),
         line_number=line_number,
     )
     return label, _api_log_request(record, line_number=line_number)
+
+
+@dataclass(frozen=True)
+class _ParsedLine:
+    """One non-blank API-log line: a parsed request, or why it was rejected."""
+
+    line_number: int
+    record: dict = field(default_factory=dict)
+    label: int = 0
+    request: InspectRequest | None = None
+    rejection: str | None = None
+    error: Exception | None = None
+
+
+def _parse_api_log_line(raw_line: bytes, line_number: int) -> _ParsedLine:
+    def rejected(reason: str, message: str) -> _ParsedLine:
+        error = DatasetValidationError(f"{message} on line {line_number}")
+        return _ParsedLine(line_number, rejection=reason, error=error)
+
+    if len(raw_line) > MAX_API_LOG_LINE_BYTES:
+        return rejected(
+            "line_too_large", f"API log row exceeds {MAX_API_LOG_LINE_BYTES} bytes"
+        )
+    try:
+        record = json.loads(raw_line.decode("utf-8"))
+    except UnicodeDecodeError:
+        return rejected("invalid_utf8", "API log row is not UTF-8")
+    except json.JSONDecodeError:
+        return rejected("invalid_json", "invalid JSON")
+    if not isinstance(record, dict):
+        return rejected("row_not_object", "API log row must be an object")
+    try:
+        label, request = _parse_record(record, line_number=line_number)
+    except (DatasetValidationError, ValueError) as exc:
+        return _ParsedLine(line_number, rejection="invalid_request_or_label", error=exc)
+    return _ParsedLine(line_number, record, label, request)
+
+
+def _parse_api_log_lines(path: Path) -> Iterator[_ParsedLine]:
+    """Parse every non-blank line; rejected lines carry a reason and an error."""
+    with path.open("rb") as source:
+        for line_number, raw_line in enumerate(source, start=1):
+            if raw_line.strip():
+                yield _parse_api_log_line(raw_line, line_number)
 
 
 def _request_identity(request: InspectRequest) -> str:
@@ -242,63 +552,39 @@ def _hashed_record_id(
 
 def load_reviewed_api_log_rows(path: Path) -> list[ReviewedAPILogRow]:
     """Load deduplicated API-log rows without persisting raw identifiers."""
-    input_sha256 = _sha256_file(path)
+    input_sha256 = sha256_file(path)
     labels_by_identity: dict[str, int] = {}
     rows_by_identity: dict[str, ReviewedAPILogRow] = {}
 
-    with path.open("rb") as source:
-        for line_number, raw_line in enumerate(source, start=1):
-            if not raw_line.strip():
-                continue
-            if len(raw_line) > MAX_API_LOG_LINE_BYTES:
+    for row in _parse_api_log_lines(path):
+        if row.error is not None:
+            raise row.error
+        identity = _request_identity(row.request)
+        previous_label = labels_by_identity.get(identity)
+        if previous_label is not None:
+            if previous_label != row.label:
                 raise DatasetValidationError(
-                    f"API log row exceeds {MAX_API_LOG_LINE_BYTES} bytes on line "
-                    f"{line_number}"
+                    "API log source contains conflicting labels for one "
+                    "request identity"
                 )
-            try:
-                line = raw_line.decode("utf-8")
-            except UnicodeDecodeError as exc:
-                raise DatasetValidationError(
-                    f"API log row is not UTF-8 on line {line_number}"
-                ) from exc
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError as exc:
-                raise DatasetValidationError(
-                    f"invalid JSON on line {line_number}"
-                ) from exc
-            if not isinstance(record, dict):
-                raise DatasetValidationError(
-                    f"API log row must be an object on line {line_number}"
-                )
+            continue
 
-            label, request = _parse_record(record, line_number=line_number)
-            identity = _request_identity(request)
-            previous_label = labels_by_identity.get(identity)
-            if previous_label is not None:
-                if previous_label != label:
-                    raise DatasetValidationError(
-                        "API log source contains conflicting labels for one "
-                        "request identity"
-                    )
-                continue
-
-            source_id = (
-                record.get("event_id")
-                or record.get("request_id")
-                or record.get("id")
-                or line_number
-            )
-            labels_by_identity[identity] = label
-            rows_by_identity[identity] = ReviewedAPILogRow(
-                features=extract_features(request),
-                label=label,
-                record_id=_hashed_record_id(
-                    input_sha256=input_sha256,
-                    source_id=source_id,
-                    identity=identity,
-                ),
-            )
+        source_id = (
+            row.record.get("event_id")
+            or row.record.get("request_id")
+            or row.record.get("id")
+            or row.line_number
+        )
+        labels_by_identity[identity] = row.label
+        rows_by_identity[identity] = ReviewedAPILogRow(
+            features=extract_features(row.request),
+            label=row.label,
+            record_id=_hashed_record_id(
+                input_sha256=input_sha256,
+                source_id=source_id,
+                identity=identity,
+            ),
+        )
 
     return list(rows_by_identity.values())
 
@@ -317,41 +603,20 @@ def review_api_log_source(
     labels_by_identity: dict[str, int] = {}
     conflicting_identities: set[str] = set()
 
-    with path.open("rb") as source:
-        for line_number, raw_line in enumerate(source, start=1):
-            if not raw_line.strip():
-                continue
-            total_rows += 1
-            if len(raw_line) > MAX_API_LOG_LINE_BYTES:
-                rejection_reasons["line_too_large"] += 1
-                continue
-            try:
-                line = raw_line.decode("utf-8")
-            except UnicodeDecodeError:
-                rejection_reasons["invalid_utf8"] += 1
-                continue
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError:
-                rejection_reasons["invalid_json"] += 1
-                continue
-            if not isinstance(record, dict):
-                rejection_reasons["row_not_object"] += 1
-                continue
-            try:
-                label, request = _parse_record(record, line_number=line_number)
-            except (DatasetValidationError, ValueError):
-                rejection_reasons["invalid_request_or_label"] += 1
-                continue
+    for row in _parse_api_log_lines(path):
+        total_rows += 1
+        if row.rejection is not None:
+            rejection_reasons[row.rejection] += 1
+            continue
 
-            identity = _request_identity(request)
-            previous_label = labels_by_identity.get(identity)
-            if previous_label is None:
-                labels_by_identity[identity] = label
-            elif previous_label == label:
-                duplicate_rows_removed += 1
-            else:
-                conflicting_identities.add(identity)
+        identity = _request_identity(row.request)
+        previous_label = labels_by_identity.get(identity)
+        if previous_label is None:
+            labels_by_identity[identity] = row.label
+        elif previous_label == row.label:
+            duplicate_rows_removed += 1
+        else:
+            conflicting_identities.add(identity)
 
     label_counts = Counter(labels_by_identity.values())
     accepted_rows = len(labels_by_identity)
@@ -381,7 +646,7 @@ def review_api_log_source(
         source_kind="reviewed-api-log-jsonl",
         generated_at=datetime.now(timezone.utc).isoformat(),
         input_file=path.name,
-        input_sha256=_sha256_file(path),
+        input_sha256=sha256_file(path),
         feature_contract_version=FEATURE_CONTRACT_VERSION,
         metadata=metadata,
         total_rows=total_rows,
@@ -429,7 +694,7 @@ def validate_api_log_source_review(review_path: Path, input_path: Path) -> dict:
         )
 
     expected_sha256 = str(review["input_sha256"])
-    if _sha256_file(input_path) != expected_sha256:
+    if sha256_file(input_path) != expected_sha256:
         raise DatasetValidationError(
             "API log source review SHA-256 does not match input"
         )

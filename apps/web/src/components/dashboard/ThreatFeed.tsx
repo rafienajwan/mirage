@@ -1,8 +1,8 @@
 "use client";
 
 import GlassPanel from "@/components/ui/GlassPanel";
-import type { ThreatSeverity, ThreatStatus } from "@/lib/mock-data";
-import type { AnalystLabel, FeedEvent } from "@/lib/api";
+import type { AnalystLabel, FeedEvent, ThreatSeverity, ThreatStatus } from "@/lib/api-types";
+import type { DashboardConnectionStatus } from "@/lib/dashboard-stream";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, Inbox } from "lucide-react";
 
@@ -16,16 +16,12 @@ const severityStyles: Record<ThreatSeverity, string> = {
 const statusStyles: Record<ThreatStatus, string> = {
   allowed: "text-white/50 bg-white/5 border-white/10",
   redirected: "text-brand-cyan bg-brand-cyan/10 border-brand-cyan/20",
-  decoy_active: "text-brand-emerald bg-brand-emerald/10 border-brand-emerald/20",
-  contained: "text-purple-400 bg-purple-500/10 border-purple-500/20",
   alert: "text-amber-400 bg-amber-500/10 border-amber-500/20",
 };
 
 const statusLabel: Record<ThreatStatus, string> = {
   allowed: "Allowed",
   redirected: "Redirected",
-  decoy_active: "Decoy Active",
-  contained: "Contained",
   alert: "Alert",
 };
 
@@ -40,17 +36,20 @@ interface ThreatFeedProps {
   events: FeedEvent[];
   labelingEventId?: string | null;
   onLabel?: (eventId: string, label: AnalystLabel) => void;
+  /** Stream state; the LIVE badge shows only while the stream is connected. */
+  connectionStatus?: DashboardConnectionStatus;
 }
 
 /**
  * Recent threat activity feed/table for the dashboard.
- * Accepts events as a prop — pass live data from the API or mock data.
  */
 export default function ThreatFeed({
   events,
   labelingEventId = null,
   onLabel,
+  connectionStatus = "disconnected",
 }: ThreatFeedProps) {
+  const live = connectionStatus === "connected";
   const showMLShadow = events.some((event) => event.mlShadow);
   const headerGridClass = showMLShadow
     ? "hidden sm:grid grid-cols-[1fr_92px_68px_76px_86px_96px] gap-2 text-[8px] text-white/30 uppercase tracking-widest pb-2 border-b border-white/5 mb-2"
@@ -65,17 +64,21 @@ export default function ThreatFeed({
         <span className="font-display text-[10px] tracking-widest text-white/50 uppercase">
           Recent Threat Activity
         </span>
-        <div className="flex items-center gap-1.5">
-          <AlertTriangle className="w-3.5 h-3.5 text-red-400/60 animate-pulse" />
-          <span className="text-[9px] text-red-400/80 font-mono">LIVE</span>
-        </div>
+        {live ? (
+          <div className="flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5 text-red-400/60 animate-pulse" />
+            <span className="text-[9px] text-red-400/80 font-mono">LIVE</span>
+          </div>
+        ) : (
+          <span className="text-[9px] text-white/40 font-mono">POLLING</span>
+        )}
       </div>
 
       {events.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-10 gap-2 text-white/25">
           <Inbox className="w-6 h-6" />
           <span className="text-[10px] font-mono">
-            No events yet — run a simulation to generate activity
+            No events yet. Run a simulation to generate activity.
           </span>
         </div>
       ) : (
@@ -111,7 +114,7 @@ export default function ThreatFeed({
                           onLabel(event.id, item.target.value as AnalystLabel);
                         }
                       }}
-                      className="mt-1 w-fit max-w-full rounded border border-white/10 bg-bg-dark-navy px-2 py-1 text-[8px] font-mono uppercase text-white/70 outline-none scheme-dark transition-colors hover:border-white/20 disabled:cursor-wait disabled:opacity-40"
+                      className="mt-1 w-fit max-w-full rounded border border-white/10 bg-bg-dark-navy px-2 py-1 text-[8px] font-mono uppercase text-white/70 outline-none scheme-dark transition-colors hover:border-white/20 focus-visible:ring-2 focus-visible:ring-brand-cyan/60 disabled:cursor-wait disabled:opacity-40"
                     >
                       <option value="" className="bg-bg-dark-navy text-white/70">
                         Unlabeled

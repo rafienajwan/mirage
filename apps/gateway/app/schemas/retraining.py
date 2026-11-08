@@ -22,6 +22,7 @@ class RetrainingRun(BaseModel):
     """Result of training an artifact from analyst-labeled events."""
 
     artifact_path: str
+    artifact_sha256: str
     training_summary: TrainingDataSummary
     metrics: dict[str, float | int]
     review: RetrainingArtifactReview

@@ -40,7 +40,6 @@ class LoadedCSICHTTP:
     records: list[CSICHTTPRequest]
     input_sha256: dict[str, str]
     duplicate_rows_removed: int
-    rejected_rows: int = 0
 
 
 def _header_end(payload: bytes, start: int) -> tuple[int, int]:

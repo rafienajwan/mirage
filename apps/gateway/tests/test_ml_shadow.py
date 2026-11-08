@@ -24,6 +24,7 @@ def test_ml_shadow_is_disabled_without_artifact(monkeypatch):
         ml_shadow,
         "settings",
         SimpleNamespace(
+            ml_model_artifact_sha256=None,
             ml_model_artifact=None,
             ml_shadow_monitor_threshold=0.35,
             ml_shadow_redirect_threshold=0.65,
@@ -43,7 +44,8 @@ def test_ml_shadow_scores_with_valid_artifact(monkeypatch):
             ml_shadow,
             "settings",
             SimpleNamespace(
-                ml_model_artifact=str(artifact),
+                ml_model_artifact_sha256=None,
+            ml_model_artifact=str(artifact),
                 ml_shadow_monitor_threshold=0.35,
                 ml_shadow_redirect_threshold=0.65,
             ),
@@ -76,7 +78,8 @@ def test_ml_shadow_rejects_artifact_that_fails_review(monkeypatch):
             ml_shadow,
             "settings",
             SimpleNamespace(
-                ml_model_artifact=str(artifact),
+                ml_model_artifact_sha256=None,
+            ml_model_artifact=str(artifact),
                 ml_shadow_monitor_threshold=0.35,
                 ml_shadow_redirect_threshold=0.65,
             ),

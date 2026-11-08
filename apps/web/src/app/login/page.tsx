@@ -4,12 +4,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { KeyRound, Loader2, ShieldCheck } from "lucide-react";
 
-function safeNextPath() {
-  const target = new URLSearchParams(window.location.search).get("next");
-  return target?.startsWith("/") && !target.startsWith("//")
-    ? target
-    : "/dashboard";
-}
+import { safeNextPath } from "@/lib/safe-next-path";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,7 +27,12 @@ export default function LoginPage() {
         setError(body.detail ?? "Unable to authenticate");
         return;
       }
-      router.replace(safeNextPath());
+      router.replace(
+        safeNextPath(
+          new URLSearchParams(window.location.search).get("next"),
+          window.location.origin,
+        ),
+      );
       router.refresh();
     } catch {
       setError("Authentication service is unavailable");
@@ -71,7 +71,7 @@ export default function LoginPage() {
                 autoComplete="current-password"
                 required
                 autoFocus
-                className="h-11 w-full rounded border border-white/10 bg-black/20 pl-10 pr-3 text-sm text-white outline-none transition focus:border-brand-cyan/50 focus:ring-2 focus:ring-brand-cyan/10"
+                className="h-11 w-full rounded border border-white/10 bg-black/20 pl-10 pr-3 text-sm text-white outline-none transition focus:border-brand-cyan/60 focus:ring-2 focus:ring-brand-cyan/40"
               />
             </span>
           </label>

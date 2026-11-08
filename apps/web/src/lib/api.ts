@@ -1,674 +1,94 @@
 /**
- * API client for MIRAGE backend gateway.
- * All functions are safe to call from the browser (client components).
+ * Browser-side fetchers for the MIRAGE dashboard. Every call goes through
+ * the server-side gateway bridge, which adds the API key.
  */
 
-import type { ThreatSeverity, ThreatStatus, AlertSeverity } from "@/lib/mock-data";
-
-// ─── Configuration ──────────────────────────────────────────────
+import {
+  mapActorCaseSummary,
+  mapActorCaseWorkflow,
+  mapActorCaseWorkflowSummary,
+  mapActorClusterSummary,
+  mapActorProfileSummary,
+  mapCanaryAssignment,
+  mapCanaryAssignmentSummary,
+  mapDashboardAlert,
+  mapDashboardEvent,
+  mapDecoyStatus,
+  mapHoneytokenSummary,
+  mapMLPromotionReadiness,
+  mapMLShadow,
+  mapMLShadowStatus,
+  mapMLShadowSummary,
+  mapOverview,
+  mapRiskHistoryPoint,
+  mapTrainingSummary,
+} from "./api-map";
+import type {
+  ActorCaseSummary,
+  ActorCaseWorkflow,
+  ActorCaseWorkflowSummary,
+  ActorClusterSummary,
+  ActorProfileSummary,
+  AnalystLabel,
+  BackendActorCaseSummary,
+  BackendActorCaseWorkflow,
+  BackendActorCaseWorkflowSummary,
+  BackendActorClusterSummary,
+  BackendActorProfileSummary,
+  BackendAlert,
+  BackendCanaryAssignment,
+  BackendCanaryAssignmentSummary,
+  BackendDecoyStatus,
+  BackendEvent,
+  BackendHoneytokenSummary,
+  BackendMLPromotionReadiness,
+  BackendMLShadowStatus,
+  BackendMLShadowSummary,
+  BackendOverview,
+  BackendRetrainingRun,
+  BackendRiskHistoryPoint,
+  BackendSimulationResult,
+  BackendTrainingDataSummary,
+  CanaryAssignment,
+  CanaryAssignmentSummary,
+  DecoyStatusData,
+  FeedAlert,
+  FeedEvent,
+  HoneytokenSummary,
+  MLPromotionReadinessData,
+  MLShadowStatusData,
+  MLShadowSummaryData,
+  OverviewMetrics,
+  RetrainingRun,
+  RiskHistoryPoint,
+  SimulationResult,
+  TrafficPoint,
+  TrainingDataSummary,
+} from "./api-types";
+import { describeHttpFailure, SessionExpiredError } from "./http-failure";
 
 const API_PREFIX = "/api/gateway";
 
-// ─── Backend response types ─────────────────────────────────────
-
-interface BackendOverview {
-  total_requests: number;
-  suspicious_requests: number;
-  decoy_redirects: number;
-  active_alerts: number;
-  average_risk_score: number;
-}
-
-interface BackendEvent {
-  event_id: string;
-  timestamp: string;
-  ip_address: string;
-  path: string;
-  method: string;
-  risk_score: number;
-  decision: "allow" | "monitor" | "redirect_to_decoy";
-  event_type: string;
-  summary: string;
-  ml_shadow: BackendMlShadow | null;
-  analyst_label: AnalystLabel | null;
-  analyst_note: string;
-  labeled_at: string | null;
-}
-
-interface BackendMlShadow {
-  artifact: string;
-  probability: number;
-  score: number;
-  prediction: string;
-  shadow_decision: "allow" | "monitor" | "redirect_to_decoy";
-  agrees_with_decision: boolean;
-}
-
-interface BackendAlert {
-  alert_id: string;
-  severity: "info" | "warning" | "critical";
-  title: string;
-  description: string;
-  recommended_action: string;
-  created_at: string;
-}
-
-interface BackendSimulationResult {
-  request_id: string;
-  risk_score: number;
-  risk_level: string;
-  decision: string;
-  reasons: string[];
-  fingerprint_hash: string;
-  decoy_type: string | null;
-  ml_shadow: BackendMlShadow | null;
-}
-
-interface BackendTrainingDataSummary {
-  labeled_rows: number;
-  exportable_rows: number;
-  minimum_rows: number;
-  minimum_rows_per_class: number;
-  normal_rows: number;
-  suspicious_rows: number;
-  has_both_classes: boolean;
-  has_minimum_class_rows: boolean;
-  ready_for_training: boolean;
-  analyst_labels: Record<AnalystLabel, number>;
-}
-
-interface BackendMLShadowStatus {
-  mode: "disabled" | "missing" | "invalid" | "shadow_ready";
-  artifact: string | null;
-  shadow_ready: boolean;
-  monitor_threshold: number;
-  redirect_threshold: number;
-  metrics: Record<string, number>;
-  blockers: string[];
-  warnings: string[];
-}
-
-interface BackendMLShadowDecisionBreakdown {
-  allow: number;
-  monitor: number;
-  redirect_to_decoy: number;
-}
-
-interface BackendMLShadowSummary {
-  inspected_events: number;
-  shadow_events: number;
-  agreements: number;
-  disagreements: number;
-  agreement_rate: number;
-  average_probability: number;
-  average_score: number;
-  live_decisions: BackendMLShadowDecisionBreakdown;
-  shadow_decisions: BackendMLShadowDecisionBreakdown;
-}
-
-interface BackendMLPromotionGate {
-  code: string;
-  passed: boolean;
-  message: string;
-  actual: number | string | null;
-  required: number | string | null;
-}
-
-interface BackendMLPromotionReadiness {
-  status: "unavailable" | "blocked" | "needs_observation" | "eligible";
-  artifact: string | null;
-  dataset_manifest: string | null;
-  dataset_name: string | null;
-  dataset_version: string | null;
-  routing_unchanged: boolean;
-  gates: BackendMLPromotionGate[];
-  warnings: string[];
-}
-
-interface BackendRetrainingRun {
-  artifact_path: string;
-  training_summary: BackendTrainingDataSummary;
-  metrics: Record<string, number>;
-  review: {
-    artifact_path: string;
-    artifact_version: number | null;
-    shadow_ready: boolean;
-    metrics: Record<string, number>;
-    blockers: string[];
-    warnings: string[];
-  };
-  next_steps: string[];
-}
-
-interface BackendHoneytokenHit {
-  hit_id: string;
-  timestamp: string;
-  event_id: string;
-  token_kind: string;
-  token_label: string;
-  source_ip: string;
-  path: string;
-  method: string;
-  evidence: string;
-}
-
-interface BackendHoneytokenSummary {
-  total_hits: number;
-  hits: BackendHoneytokenHit[];
-}
-
-interface BackendCanaryAssignment {
-  assignment_id: string;
-  actor_id: string;
-  token_kind: string;
-  token_label: string;
-  token_hash: string;
-  rotation_epoch: string;
-  decoy_type: string;
-  source_path: string;
-  status: "active" | "revoked";
-  issued_at: string;
-  last_seen_at: string;
-  revoked_at: string | null;
-  revoke_reason: string;
-}
-
-interface BackendCanaryAssignmentSummary {
-  total_assignments: number;
-  assignments: BackendCanaryAssignment[];
-}
-
-interface BackendActorProfile {
-  actor_id: string;
-  fingerprint_hash: string;
-  source_ip: string;
-  first_seen: string;
-  last_seen: string;
-  request_count: number;
-  suspicious_requests: number;
-  decoy_redirects: number;
-  honeytoken_hits: number;
-  max_risk_score: number;
-  average_risk_score: number;
-  top_paths: string[];
-  last_decision: "allow" | "monitor" | "redirect_to_decoy";
-  status: "quiet" | "watch" | "suspicious" | "confirmed_interaction";
-}
-
-interface BackendActorProfileSummary {
-  total_actors: number;
-  profiles: BackendActorProfile[];
-}
-
-interface BackendActorCluster {
-  cluster_id: string;
-  label: string;
-  status: "quiet" | "watch" | "suspicious" | "confirmed_interaction";
-  actor_count: number;
-  actor_ids: string[];
-  shared_paths: string[];
-  max_risk_score: number;
-  honeytoken_hits: number;
-  decoy_redirects: number;
-  last_seen: string;
-}
-
-interface BackendActorClusterSummary {
-  total_clusters: number;
-  clusters: BackendActorCluster[];
-}
-
-interface BackendActorCase {
-  case_id: string;
-  cluster_id: string;
-  title: string;
-  severity: "low" | "medium" | "high" | "critical";
-  status: "recommended";
-  actor_count: number;
-  actor_ids: string[];
-  evidence: string[];
-  recommended_action: string;
-  last_seen: string;
-}
-
-interface BackendActorCaseSummary {
-  total_cases: number;
-  cases: BackendActorCase[];
-}
-
-interface BackendActorCaseWorkflow {
-  case_id: string;
-  cluster_id: string;
-  title: string;
-  severity: "low" | "medium" | "high" | "critical";
-  status: "open" | "investigating" | "closed";
-  actor_count: number;
-  actor_ids: string[];
-  evidence: string[];
-  recommended_action: string;
-  assigned_to: string;
-  analyst_note: string;
-  opened_at: string;
-  updated_at: string;
-  last_seen: string;
-}
-
-interface BackendActorCaseWorkflowSummary {
-  total_cases: number;
-  cases: BackendActorCaseWorkflow[];
-}
-
-interface BackendDecoyStatus {
-  active_decoys: number;
-  fake_endpoints: string[];
-  captured_interactions: number;
-  last_decoy_trigger: string | null;
-}
-
-interface BackendRiskHistoryPoint {
-  timestamp: string;
-  risk_score: number;
-}
-
-interface BackendDashboardSnapshot {
-  events: BackendEvent[];
-  alerts: BackendAlert[];
-  metrics: BackendOverview;
-  traffic: TrafficPoint[];
-  risk_history: BackendRiskHistoryPoint[];
-  decoy_status: BackendDecoyStatus;
-  training_summary: BackendTrainingDataSummary;
-  ml_shadow_status: BackendMLShadowStatus;
-  ml_shadow_summary: BackendMLShadowSummary;
-  ml_promotion_readiness: BackendMLPromotionReadiness;
-  honeytokens: BackendHoneytokenSummary;
-  canary_assignments: BackendCanaryAssignmentSummary;
-  actor_profiles: BackendActorProfileSummary;
-  actor_clusters: BackendActorClusterSummary;
-  actor_cases: BackendActorCaseSummary;
-  actor_case_workflows: BackendActorCaseWorkflowSummary;
-}
-
-// ─── Frontend types (mapped from backend) ───────────────────────
-
-export interface OverviewMetrics {
-  totalRequests: number;
-  suspiciousRequests: number;
-  decoyRedirects: number;
-  activeAlerts: number;
-  averageRiskScore: number;
-}
-
-export interface FeedEvent {
-  id: string;
-  timestamp: string;
-  type: string;
-  sourceIp: string;
-  endpoint: string;
-  riskScore: number;
-  severity: ThreatSeverity;
-  status: ThreatStatus;
-  description: string;
-  mlShadow: MLShadow | null;
-  analystLabel: AnalystLabel | null;
-  analystNote: string;
-  labeledAt: string | null;
-}
-
-export type AnalystLabel =
-  | "normal"
-  | "suspicious"
-  | "false_positive"
-  | "false_negative";
-
-export interface MLShadow {
-  artifact: string;
-  probability: number;
-  score: number;
-  prediction: string;
-  shadowDecision: ThreatStatus;
-  agreesWithDecision: boolean;
-}
-
-export interface FeedAlert {
-  id: string;
-  message: string;
-  description: string;
-  recommendedAction: string;
-  severity: AlertSeverity;
-  timestamp: string;
-  acknowledged: boolean;
-}
-
-export interface SimulationResult {
-  requestId: string;
-  riskScore: number;
-  riskLevel: string;
-  decision: string;
-  reasons: string[];
-  fingerprintHash: string;
-  decoyType: string | null;
-  mlShadow: MLShadow | null;
-}
-
-export interface TrafficPoint {
-  hour: number;
-  normal: number;
-  suspicious: number;
-}
-
-export interface RiskHistoryPoint {
-  timestamp: string;
-  riskScore: number;
-}
-
-export interface TrainingDataSummary {
-  labeledRows: number;
-  exportableRows: number;
-  minimumRows: number;
-  minimumRowsPerClass: number;
-  normalRows: number;
-  suspiciousRows: number;
-  hasBothClasses: boolean;
-  hasMinimumClassRows: boolean;
-  readyForTraining: boolean;
-  analystLabels: Record<AnalystLabel, number>;
-}
-
-export interface MLShadowStatusData {
-  mode: "disabled" | "missing" | "invalid" | "shadow_ready";
-  artifact: string | null;
-  shadowReady: boolean;
-  monitorThreshold: number;
-  redirectThreshold: number;
-  metrics: Record<string, number>;
-  blockers: string[];
-  warnings: string[];
-}
-
-export interface MLShadowDecisionBreakdown {
-  allow: number;
-  monitor: number;
-  redirectToDecoy: number;
-}
-
-export interface MLShadowSummaryData {
-  inspectedEvents: number;
-  shadowEvents: number;
-  agreements: number;
-  disagreements: number;
-  agreementRate: number;
-  averageProbability: number;
-  averageScore: number;
-  liveDecisions: MLShadowDecisionBreakdown;
-  shadowDecisions: MLShadowDecisionBreakdown;
-}
-
-export interface MLPromotionGate {
-  code: string;
-  passed: boolean;
-  message: string;
-  actual: number | string | null;
-  required: number | string | null;
-}
-
-export interface MLPromotionReadinessData {
-  status: "unavailable" | "blocked" | "needs_observation" | "eligible";
-  artifact: string | null;
-  datasetManifest: string | null;
-  datasetName: string | null;
-  datasetVersion: string | null;
-  routingUnchanged: boolean;
-  gates: MLPromotionGate[];
-  warnings: string[];
-}
-
-export interface RetrainingRun {
-  artifactPath: string;
-  trainingSummary: TrainingDataSummary;
-  metrics: Record<string, number>;
-  review: {
-    artifactPath: string;
-    artifactVersion: number | null;
-    shadowReady: boolean;
-    metrics: Record<string, number>;
-    blockers: string[];
-    warnings: string[];
-  };
-  nextSteps: string[];
-}
-
-export interface HoneytokenHit {
-  id: string;
-  timestamp: string;
-  eventId: string;
-  tokenKind: string;
-  tokenLabel: string;
-  sourceIp: string;
-  path: string;
-  method: string;
-  evidence: string;
-}
-
-export interface HoneytokenSummary {
-  totalHits: number;
-  hits: HoneytokenHit[];
-}
-
-export interface CanaryAssignment {
-  id: string;
-  actorId: string;
-  tokenKind: string;
-  tokenLabel: string;
-  tokenHash: string;
-  rotationEpoch: string;
-  decoyType: string;
-  sourcePath: string;
-  status: "active" | "revoked";
-  issuedAt: string;
-  lastSeenAt: string;
-  revokedAt: string | null;
-  revokeReason: string;
-}
-
-export interface CanaryAssignmentSummary {
-  totalAssignments: number;
-  assignments: CanaryAssignment[];
-}
-
-export interface ActorProfile {
-  id: string;
-  fingerprintHash: string;
-  sourceIp: string;
-  firstSeen: string;
-  lastSeen: string;
-  requestCount: number;
-  suspiciousRequests: number;
-  decoyRedirects: number;
-  honeytokenHits: number;
-  maxRiskScore: number;
-  averageRiskScore: number;
-  topPaths: string[];
-  lastDecision: ThreatStatus;
-  status: "quiet" | "watch" | "suspicious" | "confirmed_interaction";
-}
-
-export interface ActorProfileSummary {
-  totalActors: number;
-  profiles: ActorProfile[];
-}
-
-export interface ActorCluster {
-  id: string;
-  label: string;
-  status: ActorProfile["status"];
-  actorCount: number;
-  actorIds: string[];
-  sharedPaths: string[];
-  maxRiskScore: number;
-  honeytokenHits: number;
-  decoyRedirects: number;
-  lastSeen: string;
-}
-
-export interface ActorClusterSummary {
-  totalClusters: number;
-  clusters: ActorCluster[];
-}
-
-export interface ActorCase {
-  id: string;
-  clusterId: string;
-  title: string;
-  severity: ThreatSeverity;
-  status: "recommended";
-  actorCount: number;
-  actorIds: string[];
-  evidence: string[];
-  recommendedAction: string;
-  lastSeen: string;
-}
-
-export interface ActorCaseSummary {
-  totalCases: number;
-  cases: ActorCase[];
-}
-
-export interface ActorCaseWorkflow {
-  id: string;
-  clusterId: string;
-  title: string;
-  severity: ThreatSeverity;
-  status: "open" | "investigating" | "closed";
-  actorCount: number;
-  actorIds: string[];
-  evidence: string[];
-  recommendedAction: string;
-  assignedTo: string;
-  analystNote: string;
-  openedAt: string;
-  updatedAt: string;
-  lastSeen: string;
-}
-
-export interface ActorCaseWorkflowSummary {
-  totalCases: number;
-  cases: ActorCaseWorkflow[];
-}
-
-export interface DashboardSnapshot {
-  events: FeedEvent[];
-  alerts: FeedAlert[];
-  overview: OverviewMetrics;
-  traffic: TrafficPoint[];
-  riskHistory: RiskHistoryPoint[];
-  decoyStatus: DecoyStatusData;
-  trainingSummary: TrainingDataSummary;
-  mlShadowStatus: MLShadowStatusData;
-  mlShadowSummary: MLShadowSummaryData;
-  mlPromotionReadiness: MLPromotionReadinessData;
-  honeytokens: HoneytokenSummary;
-  canaryAssignments: CanaryAssignmentSummary;
-  actorProfiles: ActorProfileSummary;
-  actorClusters: ActorClusterSummary;
-  actorCases: ActorCaseSummary;
-  actorCaseWorkflows: ActorCaseWorkflowSummary;
-}
-
-// ─── Mapping helpers ────────────────────────────────────────────
-
-function mapDecision(decision: string): ThreatStatus {
-  switch (decision) {
-    case "redirect_to_decoy":
-      return "redirected";
-    case "monitor":
-      return "alert";
-    case "allow":
-      return "allowed";
-    default:
-      return "alert";
+/** Every gateway call goes through the server-side bridge, which adds the API key. */
+async function gatewayRequest(path: string, init?: RequestInit): Promise<Response> {
+  const res = await fetch(`${API_PREFIX}${path}`, { cache: "no-store", ...init });
+  if (!res.ok) {
+    const failure = describeHttpFailure(res.status, await res.text().catch(() => ""));
+    if (failure.sessionExpired) throw new SessionExpiredError();
+    throw new Error(failure.message);
   }
+  return res;
 }
-
-function mapRiskLevel(riskScore: number): ThreatSeverity {
-  // Thresholds match backend risk_engine.py: <30 low, <60 medium, <80 high, ≥80 critical
-  if (riskScore >= 80) return "critical";
-  if (riskScore >= 60) return "high";
-  if (riskScore >= 30) return "medium";
-  return "low";
-}
-
-export function mapDashboardEvent(e: BackendEvent): FeedEvent {
-  return {
-    id: e.event_id,
-    timestamp: e.timestamp,
-    type: e.event_type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-    sourceIp: e.ip_address,
-    endpoint: e.path,
-    riskScore: e.risk_score,
-    severity: mapRiskLevel(e.risk_score),
-    status: mapDecision(e.decision),
-    description: e.summary || `${e.method} ${e.path}`,
-    mlShadow: mapMLShadow(e.ml_shadow),
-    analystLabel: e.analyst_label,
-    analystNote: e.analyst_note,
-    labeledAt: e.labeled_at,
-  };
-}
-
-function mapMLShadow(shadow: BackendMlShadow | null): MLShadow | null {
-  if (!shadow) return null;
-  return {
-    artifact: shadow.artifact,
-    probability: shadow.probability,
-    score: shadow.score,
-    prediction: shadow.prediction,
-    shadowDecision: mapDecision(shadow.shadow_decision),
-    agreesWithDecision: shadow.agrees_with_decision,
-  };
-}
-
-export function mapDashboardAlert(a: BackendAlert): FeedAlert {
-  return {
-    id: a.alert_id,
-    message: a.title,
-    description: a.description,
-    recommendedAction: a.recommended_action,
-    severity: a.severity,
-    timestamp: a.created_at,
-    acknowledged: false,
-  };
-}
-
-// ─── Fetcher functions ──────────────────────────────────────────
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_PREFIX}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...init,
-  });
-  if (!res.ok) {
-    throw new Error(`API error: ${res.status} ${res.statusText}`);
-  }
-  return res.json();
+  return (await gatewayRequest(path, init)).json();
 }
 
-async function simulationFetch<T>(kind: "normal" | "suspicious"): Promise<T> {
-  const res = await fetch(`/api/simulate/${kind}`, { method: "POST" });
-  if (!res.ok) {
-    throw new Error(`Simulation error: ${res.status} ${res.statusText}`);
-  }
-  return res.json();
-}
-
-/** Fetch dashboard overview metrics. */
-export function mapOverview(data: BackendOverview): OverviewMetrics {
+function sendJson(method: "POST" | "PATCH", body?: unknown): RequestInit {
   return {
-    totalRequests: data.total_requests,
-    suspiciousRequests: data.suspicious_requests,
-    decoyRedirects: data.decoy_redirects,
-    activeAlerts: data.active_alerts,
-    averageRiskScore: data.average_risk_score,
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body ?? {}),
   };
 }
 
@@ -687,74 +107,33 @@ export async function fetchEvents(): Promise<FeedEvent[]> {
 export async function labelEvent(
   eventId: string,
   label: AnalystLabel,
-  note = "",
 ): Promise<FeedEvent> {
-  const res = await fetch(`/api/events/${encodeURIComponent(eventId)}/label`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ label, note }),
-  });
-  if (!res.ok) {
-    throw new Error(`Labeling error: ${res.status} ${res.statusText}`);
-  }
-  return mapDashboardEvent(await res.json());
+  return mapDashboardEvent(
+    await apiFetch<BackendEvent>(
+      `/dashboard/events/${encodeURIComponent(eventId)}/label`,
+      sendJson("PATCH", { label }),
+    ),
+  );
 }
 
 /** Download analyst-labeled feature vectors as JSON Lines. */
 export async function downloadTrainingData(): Promise<Blob> {
-  const res = await fetch("/api/training-data/export", { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Training export error: ${res.status} ${res.statusText}`);
-  }
-  return res.blob();
+  return (await gatewayRequest("/dashboard/training-data/export")).blob();
 }
 
 /** Fetch analyst-labeled training data readiness. */
 export async function fetchTrainingDataSummary(): Promise<TrainingDataSummary> {
-  const res = await fetch("/api/training-data/summary", { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Training summary error: ${res.status} ${res.statusText}`);
-  }
-  const data = (await res.json()) as BackendTrainingDataSummary;
-  return {
-    labeledRows: data.labeled_rows,
-    exportableRows: data.exportable_rows,
-    minimumRows: data.minimum_rows,
-    minimumRowsPerClass: data.minimum_rows_per_class,
-    normalRows: data.normal_rows,
-    suspiciousRows: data.suspicious_rows,
-    hasBothClasses: data.has_both_classes,
-    hasMinimumClassRows: data.has_minimum_class_rows,
-    readyForTraining: data.ready_for_training,
-    analystLabels: data.analyst_labels,
-  };
-}
-
-export function mapTrainingSummary(data: BackendTrainingDataSummary): TrainingDataSummary {
-  return {
-    labeledRows: data.labeled_rows,
-    exportableRows: data.exportable_rows,
-    minimumRows: data.minimum_rows,
-    minimumRowsPerClass: data.minimum_rows_per_class,
-    normalRows: data.normal_rows,
-    suspiciousRows: data.suspicious_rows,
-    hasBothClasses: data.has_both_classes,
-    hasMinimumClassRows: data.has_minimum_class_rows,
-    readyForTraining: data.ready_for_training,
-    analystLabels: data.analyst_labels,
-  };
+  return mapTrainingSummary(
+    await apiFetch<BackendTrainingDataSummary>("/dashboard/training-data/summary"),
+  );
 }
 
 /** Train a local shadow-mode candidate from analyst-labeled events. */
 export async function runRetraining(): Promise<RetrainingRun> {
-  const res = await fetch("/api/training-data/retrain", {
-    method: "POST",
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    throw new Error(`Retraining error: ${res.status} ${res.statusText}`);
-  }
-  const data = (await res.json()) as BackendRetrainingRun;
+  const data = await apiFetch<BackendRetrainingRun>(
+    "/dashboard/training-data/retrain",
+    sendJson("POST"),
+  );
   return {
     artifactPath: data.artifact_path,
     trainingSummary: mapTrainingSummary(data.training_summary),
@@ -772,79 +151,23 @@ export async function runRetraining(): Promise<RetrainingRun> {
 }
 
 /** Fetch model-only shadow scoring status. */
-export function mapMLShadowStatus(data: BackendMLShadowStatus): MLShadowStatusData {
-  return {
-    mode: data.mode,
-    artifact: data.artifact,
-    shadowReady: data.shadow_ready,
-    monitorThreshold: data.monitor_threshold,
-    redirectThreshold: data.redirect_threshold,
-    metrics: data.metrics,
-    blockers: data.blockers,
-    warnings: data.warnings,
-  };
-}
-
-/** Fetch model-only shadow scoring status. */
 export async function fetchMLShadowStatus(): Promise<MLShadowStatusData> {
   return mapMLShadowStatus(
     await apiFetch<BackendMLShadowStatus>("/dashboard/ml-shadow/status"),
   );
 }
 
-function mapMLShadowBreakdown(
-  data: BackendMLShadowDecisionBreakdown,
-): MLShadowDecisionBreakdown {
-  return {
-    allow: data.allow,
-    monitor: data.monitor,
-    redirectToDecoy: data.redirect_to_decoy,
-  };
-}
-
-/** Fetch recent model-only shadow scoring agreement summary. */
-export function mapMLShadowSummary(data: BackendMLShadowSummary): MLShadowSummaryData {
-  return {
-    inspectedEvents: data.inspected_events,
-    shadowEvents: data.shadow_events,
-    agreements: data.agreements,
-    disagreements: data.disagreements,
-    agreementRate: data.agreement_rate,
-    averageProbability: data.average_probability,
-    averageScore: data.average_score,
-    liveDecisions: mapMLShadowBreakdown(data.live_decisions),
-    shadowDecisions: mapMLShadowBreakdown(data.shadow_decisions),
-  };
-}
-
 /** Fetch recent model-only shadow scoring agreement summary. */
 export async function fetchMLShadowSummary(): Promise<MLShadowSummaryData> {
   return mapMLShadowSummary(
-    await apiFetch<BackendMLShadowSummary>("/dashboard/ml-shadow/summary"),
+    await apiFetch<BackendMLShadowSummary>("/dashboard/ml-shadow/summary?limit=1000"),
   );
 }
 
-export function mapMLPromotionReadiness(
-  data: BackendMLPromotionReadiness,
-): MLPromotionReadinessData {
-  return {
-    status: data.status,
-    artifact: data.artifact,
-    datasetManifest: data.dataset_manifest,
-    datasetName: data.dataset_name,
-    datasetVersion: data.dataset_version,
-    routingUnchanged: data.routing_unchanged,
-    gates: data.gates,
-    warnings: data.warnings,
-  };
-}
-
 export async function fetchMLPromotionReadiness(): Promise<MLPromotionReadinessData> {
-  const res = await fetch("/api/ml-promotion/readiness", { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`ML promotion readiness error: ${res.status} ${res.statusText}`);
-  }
-  return mapMLPromotionReadiness(await res.json());
+  return mapMLPromotionReadiness(
+    await apiFetch<BackendMLPromotionReadiness>("/dashboard/ml-promotion/readiness"),
+  );
 }
 
 /** Fetch recent honeytoken interactions. */
@@ -853,56 +176,10 @@ export async function fetchHoneytokens(): Promise<HoneytokenSummary> {
   return mapHoneytokenSummary(data);
 }
 
-export function mapHoneytokenSummary(
-  data: BackendHoneytokenSummary,
-): HoneytokenSummary {
-  return {
-    totalHits: data.total_hits,
-    hits: data.hits.map((hit) => ({
-      id: hit.hit_id,
-      timestamp: hit.timestamp,
-      eventId: hit.event_id,
-      tokenKind: hit.token_kind,
-      tokenLabel: hit.token_label,
-      sourceIp: hit.source_ip,
-      path: hit.path,
-      method: hit.method,
-      evidence: hit.evidence,
-    })),
-  };
-}
-
-function mapCanaryAssignment(item: BackendCanaryAssignment): CanaryAssignment {
-  return {
-    id: item.assignment_id,
-    actorId: item.actor_id,
-    tokenKind: item.token_kind,
-    tokenLabel: item.token_label,
-    tokenHash: item.token_hash,
-    rotationEpoch: item.rotation_epoch,
-    decoyType: item.decoy_type,
-    sourcePath: item.source_path,
-    status: item.status,
-    issuedAt: item.issued_at,
-    lastSeenAt: item.last_seen_at,
-    revokedAt: item.revoked_at,
-    revokeReason: item.revoke_reason,
-  };
-}
-
 /** Fetch issued canary assignment lifecycle records. */
 export async function fetchCanaryAssignments(): Promise<CanaryAssignmentSummary> {
   const data = await apiFetch<BackendCanaryAssignmentSummary>("/dashboard/canary-assignments");
   return mapCanaryAssignmentSummary(data);
-}
-
-export function mapCanaryAssignmentSummary(
-  data: BackendCanaryAssignmentSummary,
-): CanaryAssignmentSummary {
-  return {
-    totalAssignments: data.total_assignments,
-    assignments: data.assignments.map(mapCanaryAssignment),
-  };
 }
 
 /** Revoke an issued canary assignment through the server-side API bridge. */
@@ -910,15 +187,12 @@ export async function revokeCanaryAssignment(
   assignmentId: string,
   reason = "",
 ): Promise<CanaryAssignment> {
-  const res = await fetch(`/api/canary-assignments/${encodeURIComponent(assignmentId)}/revoke`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ reason }),
-  });
-  if (!res.ok) {
-    throw new Error(`Canary revoke error: ${res.status} ${res.statusText}`);
-  }
-  return mapCanaryAssignment(await res.json());
+  return mapCanaryAssignment(
+    await apiFetch<BackendCanaryAssignment>(
+      `/dashboard/canary-assignments/${encodeURIComponent(assignmentId)}/revoke`,
+      sendJson("POST", { reason }),
+    ),
+  );
 }
 
 /** Fetch recent actor profiles from threat fingerprints. */
@@ -927,54 +201,10 @@ export async function fetchActorProfiles(): Promise<ActorProfileSummary> {
   return mapActorProfileSummary(data);
 }
 
-export function mapActorProfileSummary(
-  data: BackendActorProfileSummary,
-): ActorProfileSummary {
-  return {
-    totalActors: data.total_actors,
-    profiles: data.profiles.map((profile) => ({
-      id: profile.actor_id,
-      fingerprintHash: profile.fingerprint_hash,
-      sourceIp: profile.source_ip,
-      firstSeen: profile.first_seen,
-      lastSeen: profile.last_seen,
-      requestCount: profile.request_count,
-      suspiciousRequests: profile.suspicious_requests,
-      decoyRedirects: profile.decoy_redirects,
-      honeytokenHits: profile.honeytoken_hits,
-      maxRiskScore: profile.max_risk_score,
-      averageRiskScore: profile.average_risk_score,
-      topPaths: profile.top_paths,
-      lastDecision: mapDecision(profile.last_decision),
-      status: profile.status,
-    })),
-  };
-}
-
 /** Fetch lightweight actor clusters for dashboard triage. */
 export async function fetchActorClusters(): Promise<ActorClusterSummary> {
   const data = await apiFetch<BackendActorClusterSummary>("/dashboard/actor-clusters");
   return mapActorClusterSummary(data);
-}
-
-export function mapActorClusterSummary(
-  data: BackendActorClusterSummary,
-): ActorClusterSummary {
-  return {
-    totalClusters: data.total_clusters,
-    clusters: data.clusters.map((cluster) => ({
-      id: cluster.cluster_id,
-      label: cluster.label,
-      status: cluster.status,
-      actorCount: cluster.actor_count,
-      actorIds: cluster.actor_ids,
-      sharedPaths: cluster.shared_paths,
-      maxRiskScore: cluster.max_risk_score,
-      honeytokenHits: cluster.honeytoken_hits,
-      decoyRedirects: cluster.decoy_redirects,
-      lastSeen: cluster.last_seen,
-    })),
-  };
 }
 
 /** Fetch read-only recommended actor cases for analyst triage. */
@@ -983,65 +213,10 @@ export async function fetchActorCases(): Promise<ActorCaseSummary> {
   return mapActorCaseSummary(data);
 }
 
-export function mapActorCaseSummary(
-  data: BackendActorCaseSummary,
-): ActorCaseSummary {
-  return {
-    totalCases: data.total_cases,
-    cases: data.cases.map((item) => ({
-      id: item.case_id,
-      clusterId: item.cluster_id,
-      title: item.title,
-      severity: item.severity,
-      status: item.status,
-      actorCount: item.actor_count,
-      actorIds: item.actor_ids,
-      evidence: item.evidence,
-      recommendedAction: item.recommended_action,
-      lastSeen: item.last_seen,
-    })),
-  };
-}
-
-function mapActorCaseWorkflow(item: BackendActorCaseWorkflow): ActorCaseWorkflow {
-  return {
-    id: item.case_id,
-    clusterId: item.cluster_id,
-    title: item.title,
-    severity: item.severity,
-    status: item.status,
-    actorCount: item.actor_count,
-    actorIds: item.actor_ids,
-    evidence: item.evidence,
-    recommendedAction: item.recommended_action,
-    assignedTo: item.assigned_to,
-    analystNote: item.analyst_note,
-    openedAt: item.opened_at,
-    updatedAt: item.updated_at,
-    lastSeen: item.last_seen,
-  };
-}
-
 /** Fetch persisted actor case workflow records. */
-export async function fetchActorCaseWorkflows(filters?: {
-  status?: ActorCaseWorkflow["status"];
-  assignedTo?: string;
-}): Promise<ActorCaseWorkflowSummary> {
-  const params = new URLSearchParams();
-  if (filters?.status) params.set("status", filters.status);
-  if (filters?.assignedTo) params.set("assigned_to", filters.assignedTo);
-  const query = params.size ? `?${params.toString()}` : "";
-  const data = await apiFetch<BackendActorCaseWorkflowSummary>(`/dashboard/actor-case-workflows${query}`);
+export async function fetchActorCaseWorkflows(): Promise<ActorCaseWorkflowSummary> {
+  const data = await apiFetch<BackendActorCaseWorkflowSummary>("/dashboard/actor-case-workflows");
   return mapActorCaseWorkflowSummary(data);
-}
-
-export function mapActorCaseWorkflowSummary(
-  data: BackendActorCaseWorkflowSummary,
-): ActorCaseWorkflowSummary {
-  return {
-    totalCases: data.total_cases,
-    cases: data.cases.map(mapActorCaseWorkflow),
-  };
 }
 
 /** Open a recommended actor case through the server-side API bridge. */
@@ -1050,15 +225,12 @@ export async function openActorCase(
   note = "",
   assignedTo = "",
 ): Promise<ActorCaseWorkflow> {
-  const res = await fetch(`/api/actor-cases/${encodeURIComponent(caseId)}/open`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ note, assigned_to: assignedTo }),
-  });
-  if (!res.ok) {
-    throw new Error(`Open actor case error: ${res.status} ${res.statusText}`);
-  }
-  return mapActorCaseWorkflow(await res.json());
+  return mapActorCaseWorkflow(
+    await apiFetch<BackendActorCaseWorkflow>(
+      `/dashboard/actor-cases/${encodeURIComponent(caseId)}/open`,
+      sendJson("POST", { note, assigned_to: assignedTo }),
+    ),
+  );
 }
 
 /** Update a persisted actor case through the server-side API bridge. */
@@ -1068,59 +240,28 @@ export async function updateActorCase(
   note = "",
   assignedTo?: string,
 ): Promise<ActorCaseWorkflow> {
-  const res = await fetch(`/api/actor-case-workflows/${encodeURIComponent(caseId)}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status, note, assigned_to: assignedTo }),
-  });
-  if (!res.ok) {
-    throw new Error(`Update actor case error: ${res.status} ${res.statusText}`);
-  }
-  return mapActorCaseWorkflow(await res.json());
+  return mapActorCaseWorkflow(
+    await apiFetch<BackendActorCaseWorkflow>(
+      `/dashboard/actor-case-workflows/${encodeURIComponent(caseId)}`,
+      sendJson("PATCH", { status, note, assigned_to: assignedTo }),
+    ),
+  );
 }
 
 /** Fetch active alerts. */
 export async function fetchAlerts(): Promise<FeedAlert[]> {
-  const { alerts } = await apiFetch<{ alerts: BackendAlert[] }>("/dashboard/alerts");
+  const { alerts } = await apiFetch<{ alerts: BackendAlert[] }>("/dashboard/alerts?limit=20");
   return alerts.map(mapDashboardAlert);
 }
 
-export function mapDashboardSnapshot(
-  data: BackendDashboardSnapshot,
-): DashboardSnapshot {
-  return {
-    events: data.events.map(mapDashboardEvent),
-    alerts: data.alerts.map(mapDashboardAlert),
-    overview: mapOverview(data.metrics),
-    traffic: data.traffic,
-    riskHistory: data.risk_history.map(mapRiskHistoryPoint),
-    decoyStatus: mapDecoyStatus(data.decoy_status),
-    trainingSummary: mapTrainingSummary(data.training_summary),
-    mlShadowStatus: mapMLShadowStatus(data.ml_shadow_status),
-    mlShadowSummary: mapMLShadowSummary(data.ml_shadow_summary),
-    mlPromotionReadiness: mapMLPromotionReadiness(data.ml_promotion_readiness),
-    honeytokens: mapHoneytokenSummary(data.honeytokens),
-    canaryAssignments: mapCanaryAssignmentSummary(data.canary_assignments),
-    actorProfiles: mapActorProfileSummary(data.actor_profiles),
-    actorClusters: mapActorClusterSummary(data.actor_clusters),
-    actorCases: mapActorCaseSummary(data.actor_cases),
-    actorCaseWorkflows: mapActorCaseWorkflowSummary(data.actor_case_workflows),
-  };
-}
-
-export type DashboardStreamMessage =
-  | {
-      type: "snapshot";
-      payload: BackendDashboardSnapshot;
-    }
-  | { type: "event"; payload: BackendEvent }
-  | { type: "alert"; payload: BackendAlert };
-
-// ─── Simulation triggers ────────────────────────────────────────
-
-/** Simulate a normal (low-risk) request. */
-export async function simulateNormal(): Promise<SimulationResult> {
-  const data = await simulationFetch<BackendSimulationResult>("normal");
+/** Send a safe simulated normal or suspicious request through the gateway. */
+export async function simulateRequest(
+  kind: "normal" | "suspicious",
+): Promise<SimulationResult> {
+  const data = await apiFetch<BackendSimulationResult>(
+    `/simulate/${kind}`,
+    sendJson("POST"),
+  );
   return {
     requestId: data.request_id,
     riskScore: data.risk_score,
@@ -1132,23 +273,6 @@ export async function simulateNormal(): Promise<SimulationResult> {
     mlShadow: mapMLShadow(data.ml_shadow),
   };
 }
-
-/** Simulate a suspicious (high-risk) request. */
-export async function simulateSuspicious(): Promise<SimulationResult> {
-  const data = await simulationFetch<BackendSimulationResult>("suspicious");
-  return {
-    requestId: data.request_id,
-    riskScore: data.risk_score,
-    riskLevel: data.risk_level,
-    decision: data.decision,
-    reasons: data.reasons,
-    fingerprintHash: data.fingerprint_hash,
-    decoyType: data.decoy_type,
-    mlShadow: mapMLShadow(data.ml_shadow),
-  };
-}
-
-// ─── Chart data fetchers ────────────────────────────────────────
 
 /** Fetch traffic breakdown by hour for the traffic chart. */
 export async function fetchTraffic(): Promise<TrafficPoint[]> {
@@ -1162,28 +286,7 @@ export async function fetchRiskHistory(): Promise<RiskHistoryPoint[]> {
   return history.map(mapRiskHistoryPoint);
 }
 
-export function mapRiskHistoryPoint(point: BackendRiskHistoryPoint): RiskHistoryPoint {
-  return { timestamp: point.timestamp, riskScore: point.risk_score };
-}
-
-/** Fetch decoy environment status. */
-export function mapDecoyStatus(data: BackendDecoyStatus): DecoyStatusData {
-  return {
-    activeDecoys: data.active_decoys,
-    fakeEndpoints: data.fake_endpoints,
-    capturedInteractions: data.captured_interactions,
-    lastDecoyTrigger: data.last_decoy_trigger,
-  };
-}
-
 /** Fetch decoy environment status. */
 export async function fetchDecoyStatus(): Promise<DecoyStatusData> {
   return mapDecoyStatus(await apiFetch<BackendDecoyStatus>("/decoy/status"));
-}
-
-export interface DecoyStatusData {
-  activeDecoys: number;
-  fakeEndpoints: string[];
-  capturedInteractions: number;
-  lastDecoyTrigger: string | null;
 }

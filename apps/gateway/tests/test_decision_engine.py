@@ -45,17 +45,6 @@ def test_redirect_critical_risk():
     assert decision == Decision.REDIRECT_TO_DECOY
 
 
-def test_redirect_known_malicious_fingerprint():
-    from app.services.decision_engine import register_malicious_fingerprint
-
-    register_malicious_fingerprint("known_bad_hash")
-    risk = RiskResult(score=5.0, level=RiskLevel.LOW, reasons=["Known bad"])
-    decision = make_decision(
-        risk, fingerprint_hash="known_bad_hash", is_anomalous=False
-    )
-    assert decision == Decision.REDIRECT_TO_DECOY
-
-
 @pytest.mark.asyncio
 async def test_inspect_endpoint_normal(client):
     response = await client.post(

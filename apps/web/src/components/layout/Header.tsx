@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Shield, Menu, X, LayoutDashboard, LogOut } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 const NAV_ITEMS = [
   { name: "Overview", href: "/" },
@@ -15,10 +16,12 @@ const NAV_ITEMS = [
 export default function Header({ showLogout = false }: { showLogout?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const router = useRouter();
 
   async function signOut() {
     await fetch("/api/auth/logout", { method: "POST" });
-    window.location.assign("/login");
+    router.push("/login");
+    router.refresh();
   }
 
   return (
@@ -90,9 +93,11 @@ export default function Header({ showLogout = false }: { showLogout?: boolean })
 
         {/* Mobile Hamburger Button */}
         <button
+          type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className="lg:hidden p-2 text-white/80 hover:text-brand-cyan transition-colors z-50 focus:outline-none"
+          className="lg:hidden p-2 rounded text-white/80 hover:text-brand-cyan transition-colors z-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-cyan/70"
           aria-label="Toggle Menu"
+          aria-expanded={isOpen}
         >
           {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>

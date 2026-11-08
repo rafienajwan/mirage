@@ -2,7 +2,7 @@
 
 import React from "react";
 import GlassPanel from "@/components/ui/GlassPanel";
-import type { DecoyStatusData } from "@/lib/api";
+import type { DecoyStatusData } from "@/lib/api-types";
 import { cn } from "@/lib/utils";
 import { Shield } from "lucide-react";
 
@@ -16,8 +16,8 @@ interface DecoyStatusCardProps {
  */
 export default function DecoyStatusCard({ data }: DecoyStatusCardProps) {
   const endpoints = data?.fakeEndpoints ?? [];
-  const activeCount = data?.activeDecoys ?? 0;
-  const captured = data?.capturedInteractions ?? 0;
+  const activeCount = data?.activeDecoys ?? "n/a";
+  const captured = data?.capturedInteractions ?? "n/a";
   const lastTrigger = data?.lastDecoyTrigger
     ? new Date(data.lastDecoyTrigger).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     : null;

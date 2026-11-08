@@ -6,11 +6,13 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
 
+from app.core.client_ip import client_ip
 from app.core.config import settings
 from app.schemas.decision import Decision
 from app.schemas.request import InspectRequest
 from app.services.canary_assignments import record_canary_assignments
 from app.services.inspection import inspect_and_log
+from app.services.payload_exemptions import apply_exemptions
 from app.services.payload_signals import (
     build_payload_excerpt,
     detect_payload_indicators,
@@ -46,7 +48,7 @@ async def proxy_request(target_path: str, request: Request) -> Response:
     body = await _read_limited_body(request)
 
     path = "/" + target_path.lstrip("/")
-    source_ip = request.client.host if request.client else "unknown"
+    source_ip = client_ip(request)
     request_count = await traffic_tracker.record(source_ip)
     # Inspecting a large body is CPU-bound (~0.4 s per MiB); keep it off the
     # event loop so other requests are not stalled behind it.
@@ -57,18 +59,34 @@ async def proxy_request(target_path: str, request: Request) -> Response:
         body,
         content_type=request.headers.get("content-type"),
     )
+    # Route exemptions cover what the route accepts (path, query, body), never
+    # attacks carried in headers, so header findings are added afterwards.
+    indicators, exempted = apply_exemptions(request.method, path, indicators)
+    header_indicators = detect_payload_indicators(
+        "",
+        "",
+        b"",
+        headers=(request.headers.get("user-agent", ""), request.headers.get("referer", "")),
+    )
+    indicators = sorted(set(indicators) | set(header_indicators))
     payload_excerpt = build_payload_excerpt(
         request.url.query,
         body[: settings.proxy_max_body_bytes].decode("utf-8", errors="ignore"),
     )
+    # Logged values are truncated to the stored column sizes; detection above
+    # and the forwarded request use the complete path.
     metadata = InspectRequest(
         ip_address=source_ip,
         method=request.method,
-        path=path,
-        user_agent=request.headers.get("user-agent", ""),
+        path=path[:512],
+        user_agent=request.headers.get("user-agent", "")[:512],
         request_count=request_count,
         payload_indicators=indicators,
+        exempted_indicators=exempted,
         payload_excerpt=payload_excerpt,
+        header_text=" ".join(
+            request.headers.get(name, "") for name in ("authorization", "cookie", "referer")
+        )[:8192],
     )
     inspection = await inspect_and_log(metadata, event_type="proxy")
     is_decoy = inspection.decision == Decision.REDIRECT_TO_DECOY
@@ -77,7 +95,6 @@ async def proxy_request(target_path: str, request: Request) -> Response:
         {
             "x-mirage-actor-hint": inspection.fingerprint_hash,
             "x-mirage-risk-score": f"{inspection.risk_score:.1f}",
-            "x-mirage-decoy-type": inspection.decoy_type or "auto",
         }
         if is_decoy
         else None
@@ -92,9 +109,11 @@ async def proxy_request(target_path: str, request: Request) -> Response:
         decoy_context=decoy_context,
     )
     if is_decoy:
+        # Record what the decoy really issued, not what the gateway would issue.
         await record_canary_assignments(
             actor_hint=inspection.fingerprint_hash,
             decoy_type=inspection.decoy_type or "auto",
-            source_path=path,
+            source_path=metadata.path,
+            response_text=response.body.decode("utf-8", errors="ignore"),
         )
     return response

@@ -105,6 +105,34 @@ Fill every variable marked `REQUIRED` in `.env`:
 - `DECOY_CANARY_EPOCH` can be increased when rotating newly issued canary
   tokens.
 
+The compose gateway runs with `APP_ENV=production` and refuses to start when
+the configuration is unsafe: an API key or ticket secret shorter than 32
+characters, placeholder decoy tokens, an in-memory database, or a model
+artifact without `MIRAGE_MODEL_ARTIFACT_SHA256`. Optional hardening settings:
+
+- `TRUSTED_PROXIES`: comma-separated IPs or CIDRs of reverse proxies whose
+  `X-Forwarded-For` is honored (empty: forwarded headers are ignored).
+- `PAYLOAD_EXEMPTIONS`: rules such as `POST /api/posts:xss;PUT /api/snippets/*:rce-indicator`
+  for routes that legitimately accept code or rich text. Labels are removed
+  from routing only, recorded in the event summary, and never applied to
+  non-canonical paths (`..`, `%`, `\`, `;`, `//`).
+- `MIRAGE_MODEL_ARTIFACT_SHA256`: pins the model file; the retraining result
+  reports the digest of each new artifact.
+- `PROXY_MAX_RESPONSE_BYTES` (10 MiB) and `RATE_LIMIT_MAX_CLIENTS` (10,000)
+  bound gateway memory.
+- The dashboard is published on `127.0.0.1` by default
+  (`WEB_BIND_ADDRESS`). Its login allows 5 failures per client and 50 in total
+  per 15 minutes. Without a trusted reverse proxy every client shares one
+  budget, so anyone who can reach the login could lock operators out. Before
+  exposing it, put a TLS reverse proxy in front, set
+  `MIRAGE_TRUST_PROXY_HEADERS=true` (the proxy-appended `X-Forwarded-For` hop
+  identifies the client), and set `WEB_BIND_ADDRESS` to the proxy-facing
+  address.
+
+Networks are segmented: the decoy and the protected app are reachable only
+from the gateway, and Postgres only from the gateway. Containers run as
+non-root users with `no-new-privileges`.
+
 Then start the stack:
 
 ```bash
@@ -115,8 +143,10 @@ Open:
 
 - dashboard: `http://localhost:3000/dashboard` by default, or the port set in
   `WEB_PORT`;
-- gateway docs: `http://localhost:8000/docs`;
-- gateway health: `http://localhost:8000/health`.
+- gateway health: `http://localhost:8000/health` (returns only `{"status": "ok"}`).
+
+API docs (`/docs`, `/openapi.json`) exist only with `APP_ENV=development`, so
+the attacker-facing port never describes the gateway.
 
 Stop the stack with:
 
@@ -227,11 +257,12 @@ All paths below use the `http://localhost:8000` base URL.
 | `POST /api/v1/dashboard/actor-cases/{case_id}/open` | API key | Open a recommended actor case workflow |
 | `PATCH /api/v1/dashboard/actor-case-workflows/{case_id}` | API key | Update an actor case workflow status |
 | `WS /api/v1/dashboard/ws` | Signed ticket | Stream dashboard event and alert updates |
-| `GET /api/v1/decoy/status` | Public | Current decoy metrics |
+| `GET /api/v1/decoy/status` | API key | Current decoy metrics |
 | `POST /api/v1/decoy/respond` | API key | Generate an in-process synthetic response |
 
 Send protected requests with `X-Mirage-API-Key`. Docker Compose refuses to start
-without `MIRAGE_API_KEY`; standalone development permits it to be unset.
+without `MIRAGE_API_KEY`. With no key configured, only `APP_ENV=development`
+admits requests; every other environment answers 503.
 
 ## Tests and Checks
 

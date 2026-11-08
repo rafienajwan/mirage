@@ -104,6 +104,14 @@ or URL is needed. Use the public Railway gateway URL for
 `MIRAGE_INTERNAL_API_URL` and its `wss://` dashboard URL for
 `MIRAGE_DASHBOARD_WS_URL`.
 
+The operator login throttle (five failures per client and 50 overall per 15
+minutes) lives in the memory of one Node.js process. On Vercel each serverless
+instance has its own memory and instances start and stop freely, so the limit
+is not enforced across instances and an attacker can get more password
+attempts than the throttle suggests. Run the dashboard as a single long-lived Node.js process
+(the Docker image or `npm run start`) if you rely on the throttle, and use a
+long random `MIRAGE_OPERATOR_PASSWORD` on any target.
+
 For Supabase, copy the connection string from the project dashboard and change
 the scheme to `postgresql+asyncpg://`. A persistent Railway gateway should use
 the direct connection when IPv6 is available, or the shared session pooler on
@@ -116,8 +124,6 @@ test before marking the cloud deployment complete.
 | --- | --- | --- |
 | `APP_NAME` | `Project MIRAGE Gateway` | OpenAPI service name |
 | `API_VERSION` | `0.1.0` | Reported API version |
-| `HOST` | `0.0.0.0` | Uvicorn bind host |
-| `PORT` | `8000` | Uvicorn port |
 | `REAL_APP_URL` | `http://localhost:8001` | Allowed/monitored upstream |
 | `DECOY_SERVICE_URL` | `http://localhost:8002` | Redirected upstream |
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import type { DashboardStreamMessage } from "@/lib/api";
+import type { DashboardStreamMessage } from "@/lib/api-types";
 import {
   DashboardStreamClient,
   type DashboardConnectionStatus,

@@ -7,13 +7,21 @@ import json
 
 import pytest
 
-from app.ml.csic_http import load_csic_http_directory, parse_csic_http_requests
+from app.ml.csic_http import (
+    LoadedCSICHTTP,
+    load_csic_http_directory,
+    parse_csic_http_requests,
+)
+from app.ml.dataset_review import review_prepared_dataset
 from app.ml.datasets import (
     DatasetValidationError,
+    _csic_http_rows,
     load_csic_http_rows,
     prepare_dataset,
-    review_prepared_dataset,
 )
+from app.schemas.request import InspectRequest
+from app.services.feature_extraction import extract_features
+from app.services.payload_signals import build_payload_excerpt, detect_payload_indicators
 
 
 def _request(method: str, target: str, body: str = "", *, user_agent: str = "Mozilla/5.0") -> bytes:
@@ -87,6 +95,33 @@ def test_csic_rows_combine_query_and_body_features(tmp_path):
     )
 
 
+def test_csic_training_features_match_serving_for_non_utf8_bodies():
+    body = b"nombre=Jam\xf3n"
+    payload = _request("POST", "/tienda1/publico/anadir.jsp", body.decode("latin-1"))
+    records = parse_csic_http_requests(payload, source_file="normalTrafficTest.txt", label=0)
+    loaded = LoadedCSICHTTP(records=records, input_sha256={}, duplicate_rows_removed=0)
+
+    trained = _csic_http_rows(loaded)[0].features
+    # Mirrors api/routes/proxy.py: the excerpt decodes the body as UTF-8, ignoring errors.
+    served = extract_features(
+        InspectRequest(
+            ip_address="127.0.0.1",
+            method="POST",
+            path="/tienda1/publico/anadir.jsp",
+            user_agent="Mozilla/5.0",
+            payload_indicators=detect_payload_indicators(
+                "/tienda1/publico/anadir.jsp", "", body
+            ),
+            payload_excerpt=build_payload_excerpt(
+                "", body.decode("utf-8", errors="ignore")
+            ),
+            destination_port=8080,
+        )
+    )
+
+    assert trained == served
+
+
 def test_parser_rejects_truncated_content_length():
     payload = (
         b"POST /login HTTP/1.1\r\nHost: localhost\r\n"
@@ -121,7 +156,6 @@ def test_directory_loader_records_hashes_and_removes_same_label_duplicates(tmp_p
 
     assert len(loaded.records) == 20
     assert loaded.duplicate_rows_removed == 1
-    assert loaded.rejected_rows == 0
     assert set(loaded.input_sha256) == {
         "normalTrafficTraining.txt",
         "normalTrafficTest.txt",

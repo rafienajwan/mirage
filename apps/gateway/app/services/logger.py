@@ -27,6 +27,14 @@ def _mask_ip(ip: str) -> str:
     return ip[:8] + "..."
 
 
+def _summary(request: InspectRequest, decision: Decision, risk_score: float) -> str:
+    summary = f"{request.method} {request.path} → {decision.value} (score: {risk_score})"
+    if request.exempted_indicators:
+        # Events do not persist risk reasons; keep exemptions visible to analysts.
+        summary += f"; exempted: {', '.join(request.exempted_indicators)}"
+    return summary
+
+
 async def log_inspection(
     request: InspectRequest,
     risk_score: float,
@@ -40,7 +48,7 @@ async def log_inspection(
 ) -> EventRecord:
     """Log an inspection event and create an alert if needed."""
     event = EventRecord(
-        event_id=str(uuid.uuid4())[:8],
+        event_id=uuid.uuid4().hex,
         timestamp=utcnow(),
         ip_address=_mask_ip(request.ip_address),
         path=request.path,
@@ -51,14 +59,14 @@ async def log_inspection(
         event_type=event_type,
         feature_vector=feature_vector or {},
         ml_shadow=ml_shadow,
-        summary=f"{request.method} {request.path} → {decision.value} (score: {risk_score})",
+        summary=_summary(request, decision, risk_score),
     )
     await store.add_event(event)
     await broadcast_dashboard_update("event", event.model_dump(mode="json"))
 
     for match in honeytoken_matches or []:
         hit = HoneytokenHit(
-            hit_id=str(uuid.uuid4())[:8],
+            hit_id=uuid.uuid4().hex,
             timestamp=utcnow(),
             event_id=event.event_id,
             token_kind=match.token_kind,
@@ -69,7 +77,7 @@ async def log_inspection(
             evidence=match.evidence,
         )
         await store.add_honeytoken_hit(hit)
-        await store.add_alert(
+        alert = await store.add_alert(
             severity=AlertSeverity.CRITICAL,
             title=f"Honeytoken touched: {match.token_label}",
             description=(
@@ -80,37 +88,31 @@ async def log_inspection(
                 "Treat as high-confidence deception interaction and review attacker activity."
             ),
         )
-        await _broadcast_latest_alert()
+        await broadcast_dashboard_update("alert", alert.model_dump(mode="json"))
 
     # Create alert for redirected traffic
     if decision == Decision.REDIRECT_TO_DECOY:
-        await store.add_alert(
+        alert = await store.add_alert(
             severity=AlertSeverity.CRITICAL,
-            title=f"Decoy redirect: {request.path}",
+            title=f"Decoy redirect: {request.path}"[:256],
             description=(
                 f"Suspicious request from {_mask_ip(request.ip_address)} "
                 f"with risk score {risk_score} was redirected to decoy."
             ),
             recommended_action="Review actor profile and consider IP block.",
         )
-        await _broadcast_latest_alert()
+        await broadcast_dashboard_update("alert", alert.model_dump(mode="json"))
     elif decision == Decision.MONITOR:
-        await store.add_alert(
+        alert = await store.add_alert(
             severity=AlertSeverity.WARNING,
-            title=f"Monitoring: {request.path}",
+            title=f"Monitoring: {request.path}"[:256],
             description=(
                 f"Request from {_mask_ip(request.ip_address)} flagged for monitoring "
                 f"(risk score: {risk_score})."
             ),
             recommended_action="Continue monitoring for escalation.",
         )
-        await _broadcast_latest_alert()
+        await broadcast_dashboard_update("alert", alert.model_dump(mode="json"))
 
     schedule_dashboard_snapshot_refresh()
     return event
-
-
-async def _broadcast_latest_alert() -> None:
-    alerts = await store.get_alerts(limit=1)
-    if alerts:
-        await broadcast_dashboard_update("alert", alerts[0].model_dump(mode="json"))

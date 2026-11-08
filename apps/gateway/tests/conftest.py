@@ -1,7 +1,9 @@
 """Shared test fixtures."""
 
+import atexit
 import os
 from pathlib import Path
+import shutil
 import tempfile
 
 from httpx import ASGITransport, AsyncClient
@@ -11,6 +13,8 @@ import pytest
 # database (not :memory:) gives each session its own connection, matching
 # production isolation.
 _TEST_DB = Path(tempfile.mkdtemp(prefix="mirage-tests-")) / "test.db"
+atexit.register(shutil.rmtree, _TEST_DB.parent, ignore_errors=True)
+os.environ["APP_ENV"] = "development"
 os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{_TEST_DB.as_posix()}"
 os.environ["MIRAGE_API_KEY"] = ""
 # The rate limiter's per-IP window is process-global, so request-heavy tests
@@ -30,6 +34,9 @@ async def setup_db():
     yield
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+    # Each test runs on its own event loop; a pool that once had to queue for
+    # a connection stays bound to the loop of the test that filled it.
+    await engine.dispose()
 
 
 @pytest.fixture

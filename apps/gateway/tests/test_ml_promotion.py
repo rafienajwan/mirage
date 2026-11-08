@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import dataclasses
 from types import SimpleNamespace
 
 import pytest
 
-from app.core import security
+from app.core import config
 from app.schemas.dashboard import MLPromotionReadiness
 from app.services.ml_promotion import evaluate_ml_promotion
 
@@ -179,9 +180,43 @@ def test_promotion_caches_unchanged_artifact_and_dataset_reviews(tmp_path):
     assert calls == {"artifact": 1, "dataset": 1}
 
 
+def test_promotion_re_reviews_dataset_when_a_split_file_changes(tmp_path):
+    artifact = tmp_path / "risk-model.joblib"
+    manifest = tmp_path / "manifest.json"
+    test_split = tmp_path / "test.jsonl"
+    artifact.write_text("artifact", encoding="utf-8")
+    manifest.write_text(
+        '{"files": {"train": "train.jsonl", "test": "test.jsonl"}}', encoding="utf-8"
+    )
+    (tmp_path / "train.jsonl").write_text("{}\n", encoding="utf-8")
+    test_split.write_text("{}\n", encoding="utf-8")
+    calls = {"dataset": 0}
+
+    def dataset_reviewer(*_args, **_kwargs):
+        calls["dataset"] += 1
+        return _dataset_review()
+
+    configured = _settings(
+        ml_model_artifact=str(artifact),
+        ml_dataset_manifest=str(manifest),
+    )
+    for content in ("{}\n", '{"replaced": true}\n'):
+        test_split.write_text(content, encoding="utf-8")
+        evaluate_ml_promotion(
+            settings=configured,
+            shadow_summary=_summary(),
+            artifact_reviewer=lambda *_args, **_kwargs: _artifact_review(),
+            dataset_reviewer=dataset_reviewer,
+        )
+
+    assert calls == {"dataset": 2}
+
+
 @pytest.mark.asyncio
 async def test_promotion_endpoint_requires_operator_api_key(client, monkeypatch):
-    monkeypatch.setattr(security, "settings", SimpleNamespace(api_key="operator-key"))
+    monkeypatch.setattr(
+        config, "settings", dataclasses.replace(config.settings, api_key="operator-key")
+    )
 
     denied = await client.get("/api/v1/dashboard/ml-promotion/readiness")
     allowed = await client.get(

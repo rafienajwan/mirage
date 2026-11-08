@@ -1,10 +1,12 @@
 """Tests for analyst-label retraining workflow."""
 
 from pathlib import Path
+import threading
 from types import SimpleNamespace
 
 import pytest
 
+from app.ml.artifact_integrity import sha256_file
 from app.services import retraining
 
 
@@ -72,4 +74,41 @@ async def test_retraining_trains_and_reviews_local_artifact(client, tmp_path, mo
     assert data["metrics"]["training_rows"] == 15
     assert data["metrics"]["test_rows"] == 5
     assert data["review"]["artifact_version"] == 1
+    assert data["artifact_sha256"] == sha256_file(artifact)
     assert "live routing heuristic" in data["next_steps"][2]
+
+
+@pytest.mark.asyncio
+async def test_retraining_trains_off_the_event_loop(client, tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        retraining,
+        "settings",
+        SimpleNamespace(retraining_artifact_dir=str(tmp_path)),
+    )
+    loop_thread = threading.get_ident()
+    train_threads: list[int] = []
+    real_train = retraining.train_risk_classifier
+
+    def recording_train(*args, **kwargs):
+        train_threads.append(threading.get_ident())
+        return real_train(*args, **kwargs)
+
+    monkeypatch.setattr(retraining, "train_risk_classifier", recording_train)
+    for index in range(10):
+        await _create_labeled_event(client, index, "normal")
+        await _create_labeled_event(client, index + 10, "suspicious")
+
+    response = await client.post("/api/v1/dashboard/training-data/retrain")
+
+    assert response.status_code == 200
+    assert train_threads and train_threads[0] != loop_thread
+
+
+def test_retraining_artifact_paths_do_not_collide_within_a_second(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        retraining,
+        "settings",
+        SimpleNamespace(retraining_artifact_dir=str(tmp_path)),
+    )
+
+    assert retraining._artifact_path() != retraining._artifact_path()

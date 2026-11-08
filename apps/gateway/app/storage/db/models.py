@@ -6,8 +6,30 @@ from datetime import datetime, timezone
 
 from sqlalchemy import JSON, DateTime, Float, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.types import TypeDecorator
 
 from app.storage.db.database import Base
+
+
+class UTCDateTime(TypeDecorator):
+    """Timezone-aware datetime that always reads back in UTC.
+
+    SQLite stores no offset, so its values come back naive and would
+    serialize without one; a browser then parses them as local time.
+    """
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None and value.tzinfo is not None:
+            value = value.astimezone(timezone.utc)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value
 
 
 class EventModel(Base):
@@ -18,7 +40,7 @@ class EventModel(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     event_id: Mapped[str] = mapped_column(String(32), index=True)
     timestamp: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+        UTCDateTime(), default=lambda: datetime.now(timezone.utc)
     )
     ip_address: Mapped[str] = mapped_column(String(64))
     path: Mapped[str] = mapped_column(String(512))
@@ -33,7 +55,7 @@ class EventModel(Base):
     analyst_label: Mapped[str | None] = mapped_column(String(32), nullable=True)
     analyst_note: Mapped[str] = mapped_column(Text, default="")
     labeled_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UTCDateTime(), nullable=True
     )
 
 
@@ -49,7 +71,7 @@ class AlertModel(Base):
     description: Mapped[str] = mapped_column(Text)
     recommended_action: Mapped[str] = mapped_column(String(512))
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+        UTCDateTime(), default=lambda: datetime.now(timezone.utc)
     )
 
 
@@ -61,7 +83,7 @@ class HoneytokenHitModel(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     hit_id: Mapped[str] = mapped_column(String(32), index=True)
     timestamp: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+        UTCDateTime(), default=lambda: datetime.now(timezone.utc)
     )
     event_id: Mapped[str] = mapped_column(String(32), index=True)
     token_kind: Mapped[str] = mapped_column(String(32))
@@ -87,10 +109,10 @@ class CanaryAssignmentModel(Base):
     decoy_type: Mapped[str] = mapped_column(String(32))
     source_path: Mapped[str] = mapped_column(String(512))
     status: Mapped[str] = mapped_column(String(16), default="active", index=True)
-    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    issued_at: Mapped[datetime] = mapped_column(UTCDateTime())
+    last_seen_at: Mapped[datetime] = mapped_column(UTCDateTime(), index=True)
     revoked_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+        UTCDateTime(), nullable=True
     )
     revoke_reason: Mapped[str] = mapped_column(String(240), default="")
 
@@ -104,8 +126,8 @@ class ActorProfileModel(Base):
     actor_id: Mapped[str] = mapped_column(String(32), unique=True, index=True)
     fingerprint_hash: Mapped[str] = mapped_column(String(64), index=True)
     source_ip: Mapped[str] = mapped_column(String(64))
-    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    first_seen: Mapped[datetime] = mapped_column(UTCDateTime())
+    last_seen: Mapped[datetime] = mapped_column(UTCDateTime(), index=True)
     request_count: Mapped[int] = mapped_column(Integer, default=0)
     suspicious_requests: Mapped[int] = mapped_column(Integer, default=0)
     decoy_redirects: Mapped[int] = mapped_column(Integer, default=0)
@@ -135,9 +157,9 @@ class ActorCaseModel(Base):
     assigned_to: Mapped[str] = mapped_column(String(120), default="", index=True)
     analyst_note: Mapped[str] = mapped_column(Text, default="")
     opened_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+        UTCDateTime(), default=lambda: datetime.now(timezone.utc)
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+        UTCDateTime(), default=lambda: datetime.now(timezone.utc)
     )
-    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    last_seen: Mapped[datetime] = mapped_column(UTCDateTime(), index=True)

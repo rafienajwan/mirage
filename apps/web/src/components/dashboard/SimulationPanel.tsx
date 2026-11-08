@@ -2,8 +2,8 @@
 
 import React, { useState } from "react";
 import GlassPanel from "@/components/ui/GlassPanel";
-import { simulateNormal, simulateSuspicious } from "@/lib/api";
-import type { SimulationResult } from "@/lib/api";
+import { simulateRequest } from "@/lib/api";
+import type { SimulationResult } from "@/lib/api-types";
 import { cn } from "@/lib/utils";
 import { Play, Zap, Loader2, CheckCircle, XCircle } from "lucide-react";
 
@@ -13,7 +13,7 @@ interface SimulationPanelProps {
 }
 
 /**
- * Simulation trigger panel — lets operators generate demo events
+ * Simulation trigger panel: lets operators generate demo events
  * directly from the dashboard.
  */
 export default function SimulationPanel({ onRefresh }: SimulationPanelProps) {
@@ -26,7 +26,7 @@ export default function SimulationPanel({ onRefresh }: SimulationPanelProps) {
     setError(null);
     setLastResult(null);
     try {
-      const result = type === "normal" ? await simulateNormal() : await simulateSuspicious();
+      const result = await simulateRequest(type);
       setLastResult(result);
       onRefresh?.();
     } catch (err) {
@@ -129,9 +129,6 @@ export default function SimulationPanel({ onRefresh }: SimulationPanelProps) {
       {error && (
         <div className="mt-3 p-3 rounded-md border border-amber-500/20 bg-amber-500/5 text-[10px] font-mono text-amber-400">
           {error}
-          <span className="text-white/30 ml-2">
-            — make sure the backend is running on port 8000
-          </span>
         </div>
       )}
     </GlassPanel>

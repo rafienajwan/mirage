@@ -6,8 +6,9 @@ import argparse
 import json
 from pathlib import Path
 
-from app.ml.datasets import build_dataset_lineage
-from app.ml.training import LabeledFeatures, train_risk_classifier
+from app.ml.dataset_review import build_dataset_lineage
+from app.ml.datasets import load_mirage_jsonl
+from app.ml.training import train_risk_classifier
 
 
 def parse_args() -> argparse.Namespace:
@@ -17,35 +18,30 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--manifest",
         type=Path,
-        help="Prepared dataset manifest used to bind lineage into the artifact",
+        help=(
+            "Prepared dataset manifest used to bind lineage into the artifact; "
+            "its test split becomes the held-out evaluation set"
+        ),
     )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    rows = []
-    with args.input.open(encoding="utf-8") as source:
-        for line_number, line in enumerate(source, start=1):
-            if not line.strip():
-                continue
-            record = json.loads(line)
-            try:
-                rows.append(
-                    LabeledFeatures(
-                        features=record["features"], label=int(record["label"])
-                    )
-                )
-            except (KeyError, TypeError, ValueError) as exc:
-                raise ValueError(f"Invalid training row {line_number}") from exc
+    rows = load_mirage_jsonl(args.input)
 
-    lineage = (
-        build_dataset_lineage(args.manifest, args.input) if args.manifest else None
-    )
+    lineage = None
+    test_rows = None
+    if args.manifest:
+        lineage = build_dataset_lineage(args.manifest, args.input)
+        manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
+        test_rows = load_mirage_jsonl(args.manifest.parent / manifest["files"]["test"])
+
     metrics = train_risk_classifier(
         rows,
         args.output,
         dataset_lineage=lineage,
+        test_rows=test_rows,
     )
     print(json.dumps(metrics.__dict__, indent=2))
 

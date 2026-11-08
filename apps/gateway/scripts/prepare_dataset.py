@@ -5,8 +5,9 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from typing import get_args
 
-from app.ml.datasets import prepare_dataset
+from app.ml.datasets import DatasetSource, prepare_dataset
 
 
 def parse_args() -> argparse.Namespace:
@@ -15,14 +16,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument(
         "--source",
-        choices=[
-            "mirage-jsonl",
-            "api-log-jsonl",
-            "reviewed-api-log-jsonl",
-            "cicids-csv",
-            "cicids-csv-dir",
-            "csic-http-dir",
-        ],
+        choices=get_args(DatasetSource),
         required=True,
         dest="source_kind",
     )

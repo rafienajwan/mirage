@@ -26,16 +26,18 @@ been explicitly approved for publication.
 Prepared JSONL records use the model's stable feature schema:
 
 ```json
-{"label": 0, "features": {"request_count_log": 0.0, "path_length": 0.0}}
+{"label": 0, "features": {"request_count_log": 0.0, "path_length": 0.0, "...": 0.0}}
 ```
 
-Labels are binary:
+Labels are binary, written as `0`/`1` or `"0"`/`"1"`:
 
 - `0`: normal or false positive;
 - `1`: suspicious or false negative.
 
-Missing known features are filled with `0.0`. Unknown features are ignored so
-training and inference keep the same feature order. Prepared manifests and
+`features` must contain exactly the current feature names (`FEATURE_NAMES` in
+`app/services/feature_extraction.py`). A row with a missing or unknown feature
+is rejected with its line number instead of being zero-filled, so training and
+inference always use the same feature contract. Prepared manifests and
 trained artifacts record `feature_contract_version`. A dataset or artifact from
 an older contract must be regenerated instead of being mixed with runtime
 features from the current contract.
@@ -151,8 +153,13 @@ Only continue when the dataset review reports `ready_for_training: true`.
 ```bash
 python scripts/train_model.py \
   --input data/prepared/runtime-v1/train.jsonl \
-  --output artifacts/risk_model.joblib
+  --output artifacts/risk_model.joblib \
+  --manifest data/prepared/runtime-v1/manifest.json
 ```
+
+With `--manifest`, the model fits on the whole train split and the artifact
+metrics come from the prepared `test.jsonl`. Without it, the trainer holds out
+25% of the input itself.
 
 Review `data/prepared/runtime-v1/manifest.json` before training or enabling an
 artifact in shadow mode. It records row counts, label balance, split ratio,
@@ -267,27 +274,14 @@ python scripts/review_dataset.py \
 These thresholds validate the 40-row pilot pipeline only. They do not replace
 the configured promotion minimums for representative training data.
 
-The older collector below assigns deterministic scenario labels automatically.
-Use it only to validate API, labeling, and export plumbing, never as independent
-human-reviewed model-quality evidence:
-
-```bash
-cd apps/gateway
-python scripts/collect_api_domain_training_data.py \
-  --base-url http://localhost:8000 \
-  --api-key YOUR_LOCAL_MIRAGE_API_KEY \
-  --normal-count 10 \
-  --suspicious-count 10 \
-  --output data/raw/runtime/api-domain-training-events.jsonl \
-  --summary-output data/raw/runtime/api-domain-training-summary.json
-```
-
 The generated files should stay in ignored local `data/` paths unless they have
-been reviewed and explicitly approved for publication. Both collector outputs
-use `--source mirage-jsonl` because they already contain MIRAGE feature vectors.
+been reviewed and explicitly approved for publication. Collector exports use
+`--source mirage-jsonl` because they already contain MIRAGE feature vectors.
 
 When a running gateway is not available, use the deterministic API-domain
-fixture generator to exercise the same custom API-log adapter path locally:
+fixture generator to exercise the custom API-log adapter path locally. Its
+labels come from generated scenarios, not analyst review, so use it only to
+validate pipeline plumbing, never as model-quality evidence:
 
 ```bash
 cd apps/gateway
@@ -452,11 +446,12 @@ cd apps/gateway
 python scripts/review_dataset.py \
   --manifest data/prepared/runtime-v1/manifest.json \
   --min-total-rows 20 \
-  --min-train-rows 15 \
+  --min-train-rows 20 \
   --min-test-rows 5
 ```
 
 The command checks manifest integrity, train/test file hashes and row counts,
-label presence in both splits, and the feature contract. It exits with code `1`
+label presence in both splits (at least two rows of each label in the train
+split, matching what the trainer needs), and the feature contract. It exits with code `1`
 when blockers are found. Passing this review means the split is ready for local
 training review, not that the resulting model should control live routing.

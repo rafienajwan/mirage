@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
+from app.ml import artifacts
 from app.ml.training import LabeledFeatures, train_risk_classifier
 from app.services import ml_status
 from app.services.feature_extraction import FEATURE_NAMES
@@ -59,3 +60,22 @@ def test_ml_shadow_status_ready_artifact(monkeypatch, tmp_path):
     assert status["artifact"] == "risk_model.joblib"
     assert status["shadow_ready"] is True
     assert status["metrics"]["training_rows"] == 30
+
+
+def test_ml_shadow_status_reuses_review_of_unchanged_artifact(monkeypatch, tmp_path):
+    artifact = Path(tmp_path / "risk_model.joblib")
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(20)]
+    train_risk_classifier(rows, artifact)
+    monkeypatch.setattr(ml_status, "settings", _settings(str(artifact)))
+    loads = []
+    real_load = artifacts.joblib.load
+    monkeypatch.setattr(
+        artifacts.joblib, "load", lambda *a, **k: loads.append(a) or real_load(*a, **k)
+    )
+
+    first = ml_status.get_ml_shadow_status()
+    second = ml_status.get_ml_shadow_status()
+
+    assert first == second
+    assert first["shadow_ready"] is True
+    assert len(loads) == 1

@@ -1,7 +1,7 @@
 "use client";
 
 import GlassPanel from "@/components/ui/GlassPanel";
-import type { ActorProfileSummary } from "@/lib/api";
+import type { ActorProfileSummary } from "@/lib/api-types";
 import { cn } from "@/lib/utils";
 import { Fingerprint, ShieldCheck, UsersRound } from "lucide-react";
 
@@ -34,7 +34,7 @@ export default function ActorProfilesPanel({ data }: ActorProfilesPanelProps) {
         </span>
         <div className="flex items-center gap-1.5 text-[9px] text-brand-cyan/80 font-mono">
           <UsersRound className="w-3.5 h-3.5" />
-          <span>{data?.totalActors ?? 0} tracked</span>
+          <span>{data?.totalActors ?? "n/a"} tracked</span>
         </div>
       </div>
 

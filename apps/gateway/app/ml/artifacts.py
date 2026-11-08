@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
+from functools import lru_cache
 import math
 from pathlib import Path
 import re
 from typing import Any
 
 import joblib
+from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
 
+from app.ml.artifact_integrity import ArtifactIntegrityError, verify_artifact_digest
 from app.services.feature_extraction import FEATURE_CONTRACT_VERSION, FEATURE_NAMES
 
 REQUIRED_METRICS = (
@@ -81,9 +85,80 @@ def _review_dataset_lineage(
     return lineage
 
 
+def load_checked_artifact(
+    artifact_path: Path,
+    *,
+    expected_sha256: str | None = None,
+) -> tuple[dict[str, Any] | None, list[str]]:
+    """Load an artifact (after the optional pin check) and check its contract.
+
+    Returns (None, blockers) when the file cannot be loaded at all, otherwise
+    the payload (``{}`` if it is not a dictionary) and its contract blockers.
+    """
+    try:
+        if expected_sha256 is not None:
+            verify_artifact_digest(artifact_path, expected_sha256)
+        artifact = joblib.load(artifact_path)
+    except ArtifactIntegrityError:
+        return None, ["Artifact SHA-256 does not match MIRAGE_MODEL_ARTIFACT_SHA256"]
+    except FileNotFoundError:
+        return None, ["Artifact file does not exist"]
+    except Exception as exc:
+        return None, [f"Artifact could not be loaded: {exc}"]
+
+    blockers: list[str] = []
+    if not isinstance(artifact, dict):
+        blockers.append("Artifact must be a dictionary payload")
+        artifact = {}
+    if artifact.get("model") is None:
+        blockers.append("Artifact is missing model")
+    if artifact.get("feature_contract_version") != FEATURE_CONTRACT_VERSION:
+        blockers.append("Artifact feature contract version does not match the gateway")
+    if tuple(artifact.get("feature_names", ())) != FEATURE_NAMES:
+        blockers.append("Artifact feature contract does not match the gateway")
+    return artifact, blockers
+
+
+def classification_metrics(y_true: Any, predictions: Any) -> dict[str, float]:
+    """Precision, recall, F1 and false-positive rate for binary labels."""
+    tn, fp, _, _ = confusion_matrix(y_true, predictions, labels=[0, 1]).ravel()
+    return {
+        "precision": float(precision_score(y_true, predictions, zero_division=0)),
+        "recall": float(recall_score(y_true, predictions, zero_division=0)),
+        "f1_score": float(f1_score(y_true, predictions, zero_division=0)),
+        "false_positive_rate": float(fp / (fp + tn)) if fp + tn else 0.0,
+    }
+
+
+def threshold_blockers(
+    metrics: dict[str, float | int],
+    *,
+    min_precision: float,
+    min_recall: float,
+    min_f1_score: float,
+    max_false_positive_rate: float,
+) -> list[str]:
+    """Blockers for metrics outside the thresholds; absent metrics are skipped."""
+    blockers: list[str] = []
+    for key, name, minimum in (
+        ("precision", "Precision", min_precision),
+        ("recall", "Recall", min_recall),
+        ("f1_score", "F1", min_f1_score),
+    ):
+        if key in metrics and metrics[key] < minimum:
+            blockers.append(f"{name} {metrics[key]:.3f} is below {minimum:.3f}")
+    rate = metrics.get("false_positive_rate")
+    if rate is not None and rate > max_false_positive_rate:
+        blockers.append(
+            f"False-positive rate {rate:.3f} is above {max_false_positive_rate:.3f}"
+        )
+    return blockers
+
+
 def review_model_artifact(
     artifact_path: Path,
     *,
+    expected_sha256: str | None = None,
     min_precision: float = 0.5,
     min_recall: float = 0.5,
     min_f1_score: float = 0.5,
@@ -92,54 +167,29 @@ def review_model_artifact(
     min_test_rows: int = 5,
 ) -> ArtifactReview:
     """Validate an artifact before enabling model-only shadow scoring."""
-    blockers: list[str] = []
     warnings: list[str] = []
     metrics: dict[str, float | int] = {}
-    artifact_version: int | None = None
-    feature_contract_version: int | None = None
 
-    try:
-        artifact = joblib.load(artifact_path)
-    except FileNotFoundError:
+    artifact, blockers = load_checked_artifact(
+        artifact_path, expected_sha256=expected_sha256
+    )
+    if artifact is None:
         return ArtifactReview(
             artifact_path=str(artifact_path),
             artifact_version=None,
             shadow_ready=False,
             metrics={},
-            blockers=["Artifact file does not exist"],
-            warnings=[],
-        )
-    except Exception as exc:
-        return ArtifactReview(
-            artifact_path=str(artifact_path),
-            artifact_version=None,
-            shadow_ready=False,
-            metrics={},
-            blockers=[f"Artifact could not be loaded: {exc}"],
+            blockers=blockers,
             warnings=[],
         )
 
-    if not isinstance(artifact, dict):
-        blockers.append("Artifact must be a dictionary payload")
-        artifact = {}
-
-    artifact_version_value = artifact.get("artifact_version")
-    if isinstance(artifact_version_value, int):
-        artifact_version = artifact_version_value
-    else:
+    artifact_version = artifact.get("artifact_version")
+    if not isinstance(artifact_version, int):
+        artifact_version = None
         blockers.append("Artifact version is missing or invalid")
-
-    if "model" not in artifact:
-        blockers.append("Artifact is missing model")
-
-    feature_contract_version_value = artifact.get("feature_contract_version")
-    if isinstance(feature_contract_version_value, int):
-        feature_contract_version = feature_contract_version_value
-    if feature_contract_version != FEATURE_CONTRACT_VERSION:
-        blockers.append("Artifact feature contract version does not match the gateway")
-
-    if tuple(artifact.get("feature_names", ())) != FEATURE_NAMES:
-        blockers.append("Artifact feature contract does not match the gateway")
+    feature_contract_version = artifact.get("feature_contract_version")
+    if not isinstance(feature_contract_version, int):
+        feature_contract_version = None
 
     dataset_lineage = _review_dataset_lineage(
         artifact.get("dataset_lineage"),
@@ -159,23 +209,15 @@ def review_model_artifact(
         else:
             metrics[name] = value
 
-    if "precision" in metrics and metrics["precision"] < min_precision:
-        blockers.append(
-            f"Precision {metrics['precision']:.3f} is below {min_precision:.3f}"
+    blockers.extend(
+        threshold_blockers(
+            metrics,
+            min_precision=min_precision,
+            min_recall=min_recall,
+            min_f1_score=min_f1_score,
+            max_false_positive_rate=max_false_positive_rate,
         )
-    if "recall" in metrics and metrics["recall"] < min_recall:
-        blockers.append(f"Recall {metrics['recall']:.3f} is below {min_recall:.3f}")
-    if "f1_score" in metrics and metrics["f1_score"] < min_f1_score:
-        blockers.append(f"F1 {metrics['f1_score']:.3f} is below {min_f1_score:.3f}")
-    if (
-        "false_positive_rate" in metrics
-        and metrics["false_positive_rate"] > max_false_positive_rate
-    ):
-        blockers.append(
-            "False-positive rate "
-            f"{metrics['false_positive_rate']:.3f} is above "
-            f"{max_false_positive_rate:.3f}"
-        )
+    )
     if "training_rows" in metrics and metrics["training_rows"] < min_training_rows:
         blockers.append(
             f"Training rows {metrics['training_rows']} is below {min_training_rows}"
@@ -199,4 +241,38 @@ def review_model_artifact(
         warnings=warnings,
         feature_contract_version=feature_contract_version,
         dataset_lineage=dataset_lineage,
+    )
+
+
+def file_stamp(path: Path) -> tuple[int, int]:
+    """Return (mtime_ns, size) so caches notice a replaced file."""
+    try:
+        stat = path.stat()
+    except OSError:
+        return -1, -1
+    return stat.st_mtime_ns, stat.st_size
+
+
+@lru_cache(maxsize=8)
+def _cached_review(
+    reviewer: Callable[..., ArtifactReview],
+    path_value: str,
+    _stamp: tuple[int, int],
+    expected_sha256: str | None,
+) -> ArtifactReview:
+    return reviewer(Path(path_value), expected_sha256=expected_sha256)
+
+
+def cached_artifact_review(
+    artifact_path: Path,
+    *,
+    expected_sha256: str | None = None,
+    reviewer: Callable[..., ArtifactReview] | None = None,
+) -> ArtifactReview:
+    """Review an artifact once per (path, mtime, size, pinned digest)."""
+    return _cached_review(
+        reviewer or review_model_artifact,
+        str(artifact_path),
+        file_stamp(artifact_path),
+        expected_sha256,
     )
