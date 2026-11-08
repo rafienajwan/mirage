@@ -27,7 +27,11 @@ def _load_classifier() -> RiskClassifier | None:
         logger.warning("ML shadow artifact does not exist: %s", artifact_path)
         return None
 
-    review = review_model_artifact(artifact_path)
+    expected_sha256 = settings.ml_model_artifact_sha256
+    if expected_sha256 is None:
+        logger.warning("MIRAGE_MODEL_ARTIFACT_SHA256 not set; loading unpinned artifact")
+
+    review = review_model_artifact(artifact_path, expected_sha256=expected_sha256)
     if not review.shadow_ready:
         logger.warning(
             "ML shadow artifact failed review: %s",
@@ -36,7 +40,7 @@ def _load_classifier() -> RiskClassifier | None:
         return None
 
     try:
-        return RiskClassifier(artifact_path)
+        return RiskClassifier(artifact_path, expected_sha256=expected_sha256)
     except (KeyError, ValueError, OSError) as exc:
         logger.warning("ML shadow artifact could not be loaded: %s", exc)
         return None

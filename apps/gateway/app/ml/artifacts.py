@@ -10,6 +10,7 @@ from typing import Any
 
 import joblib
 
+from app.ml.artifact_integrity import ArtifactIntegrityError, verify_artifact_digest
 from app.services.feature_extraction import FEATURE_CONTRACT_VERSION, FEATURE_NAMES
 
 REQUIRED_METRICS = (
@@ -84,6 +85,7 @@ def _review_dataset_lineage(
 def review_model_artifact(
     artifact_path: Path,
     *,
+    expected_sha256: str | None = None,
     min_precision: float = 0.5,
     min_recall: float = 0.5,
     min_f1_score: float = 0.5,
@@ -99,7 +101,18 @@ def review_model_artifact(
     feature_contract_version: int | None = None
 
     try:
+        if expected_sha256 is not None:
+            verify_artifact_digest(artifact_path, expected_sha256)
         artifact = joblib.load(artifact_path)
+    except ArtifactIntegrityError:
+        return ArtifactReview(
+            artifact_path=str(artifact_path),
+            artifact_version=None,
+            shadow_ready=False,
+            metrics={},
+            blockers=["Artifact SHA-256 does not match MIRAGE_MODEL_ARTIFACT_SHA256"],
+            warnings=[],
+        )
     except FileNotFoundError:
         return ArtifactReview(
             artifact_path=str(artifact_path),

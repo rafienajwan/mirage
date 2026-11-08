@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.ml.artifact_integrity import sha256_file
 from app.services import retraining
 
 
@@ -72,4 +73,5 @@ async def test_retraining_trains_and_reviews_local_artifact(client, tmp_path, mo
     assert data["metrics"]["training_rows"] == 15
     assert data["metrics"]["test_rows"] == 5
     assert data["review"]["artifact_version"] == 1
+    assert data["artifact_sha256"] == sha256_file(artifact)
     assert "live routing heuristic" in data["next_steps"][2]

@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import HTTPException, status
 
 from app.core.config import settings
+from app.ml.artifact_integrity import sha256_file
 from app.ml.artifacts import review_model_artifact
 from app.ml.training import LabeledFeatures, train_risk_classifier
 from app.schemas.retraining import RetrainingRun
@@ -48,10 +49,12 @@ async def train_from_labeled_events(limit: int = 10000) -> RetrainingRun:
     output_path = _artifact_path()
     metrics = train_risk_classifier(rows, output_path)
     review = review_model_artifact(output_path)
+    artifact_sha256 = sha256_file(output_path)
     metrics_dict = metrics.__dict__
 
     return RetrainingRun(
         artifact_path=str(output_path),
+        artifact_sha256=artifact_sha256,
         training_summary=summary,
         metrics=metrics_dict,
         review=review.to_dict(),
@@ -59,5 +62,6 @@ async def train_from_labeled_events(limit: int = 10000) -> RetrainingRun:
             "Review dataset provenance and artifact metrics.",
             "Set MIRAGE_MODEL_ARTIFACT to this path only for shadow mode.",
             "Keep live routing heuristic until shadow performance is reviewed.",
+            "Set MIRAGE_MODEL_ARTIFACT_SHA256 to artifact_sha256 to pin the file.",
         ],
     )

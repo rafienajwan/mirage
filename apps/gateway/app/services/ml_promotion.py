@@ -34,8 +34,9 @@ def _cached_artifact_review(
     reviewer: ArtifactReviewer,
     path_value: str,
     _modified_at: int,
+    expected_sha256: str | None,
 ) -> ArtifactReview:
-    return reviewer(Path(path_value))
+    return reviewer(Path(path_value), expected_sha256=expected_sha256)
 
 
 @lru_cache(maxsize=8)
@@ -187,6 +188,7 @@ def evaluate_ml_promotion(
         artifact_reviewer,
         str(artifact_path),
         _mtime(artifact_path),
+        getattr(settings, "ml_model_artifact_sha256", None),
     )
     gates.append(
         _gate(

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import joblib
 
+from app.ml.artifact_integrity import verify_artifact_digest
 from app.services.feature_extraction import (
     FEATURE_CONTRACT_VERSION,
     FEATURE_NAMES,
@@ -14,7 +15,9 @@ from app.services.feature_extraction import (
 
 
 class RiskClassifier:
-    def __init__(self, artifact_path: Path) -> None:
+    def __init__(self, artifact_path: Path, *, expected_sha256: str | None = None) -> None:
+        if expected_sha256 is not None:
+            verify_artifact_digest(artifact_path, expected_sha256)
         artifact = joblib.load(artifact_path)
         if artifact.get("feature_contract_version") != FEATURE_CONTRACT_VERSION:
             raise ValueError(

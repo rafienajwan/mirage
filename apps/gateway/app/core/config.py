@@ -84,6 +84,9 @@ class Settings:
     ml_model_artifact: str | None = field(
         default_factory=lambda: os.getenv("MIRAGE_MODEL_ARTIFACT") or None
     )
+    ml_model_artifact_sha256: str | None = field(
+        default_factory=lambda: os.getenv("MIRAGE_MODEL_ARTIFACT_SHA256") or None
+    )
     ml_dataset_manifest: str | None = field(
         default_factory=lambda: os.getenv("MIRAGE_MODEL_DATASET_MANIFEST") or None
     )
