@@ -9,7 +9,11 @@ from typing import Any
 
 from app.core.config import settings as app_settings
 from app.ml.artifact_integrity import UNPINNED_BLOCKER, pinned_digest
-from app.ml.artifacts import ArtifactReview, review_model_artifact
+from app.ml.artifacts import (
+    ArtifactReview,
+    cached_artifact_review,
+    review_model_artifact,
+)
 from app.ml.datasets import (
     DatasetReview,
     DatasetValidationError,
@@ -28,16 +32,6 @@ def _mtime(path: Path) -> int:
         return path.stat().st_mtime_ns
     except OSError:
         return -1
-
-
-@lru_cache(maxsize=8)
-def _cached_artifact_review(
-    reviewer: ArtifactReviewer,
-    path_value: str,
-    _modified_at: int,
-    expected_sha256: str | None,
-) -> ArtifactReview:
-    return reviewer(Path(path_value), expected_sha256=expected_sha256)
 
 
 @lru_cache(maxsize=8)
@@ -187,11 +181,10 @@ def evaluate_ml_promotion(
 
     expected_sha256, may_load = pinned_digest(settings)
     artifact_review = (
-        _cached_artifact_review(
-            artifact_reviewer,
-            str(artifact_path),
-            _mtime(artifact_path),
-            expected_sha256,
+        cached_artifact_review(
+            artifact_path,
+            expected_sha256=expected_sha256,
+            reviewer=artifact_reviewer,
         )
         if may_load
         else ArtifactReview(

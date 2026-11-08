@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
+from functools import lru_cache
 import math
 from pathlib import Path
 import re
@@ -212,4 +214,38 @@ def review_model_artifact(
         warnings=warnings,
         feature_contract_version=feature_contract_version,
         dataset_lineage=dataset_lineage,
+    )
+
+
+def file_stamp(path: Path) -> tuple[int, int]:
+    """Return (mtime_ns, size) so caches notice a replaced file."""
+    try:
+        stat = path.stat()
+    except OSError:
+        return -1, -1
+    return stat.st_mtime_ns, stat.st_size
+
+
+@lru_cache(maxsize=8)
+def _cached_review(
+    reviewer: Callable[..., ArtifactReview],
+    path_value: str,
+    _stamp: tuple[int, int],
+    expected_sha256: str | None,
+) -> ArtifactReview:
+    return reviewer(Path(path_value), expected_sha256=expected_sha256)
+
+
+def cached_artifact_review(
+    artifact_path: Path,
+    *,
+    expected_sha256: str | None = None,
+    reviewer: Callable[..., ArtifactReview] | None = None,
+) -> ArtifactReview:
+    """Review an artifact once per (path, mtime, size, pinned digest)."""
+    return _cached_review(
+        reviewer or review_model_artifact,
+        str(artifact_path),
+        file_stamp(artifact_path),
+        expected_sha256,
     )
