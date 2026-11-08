@@ -35,6 +35,9 @@ logger = logging.getLogger(__name__)
 SnapshotBuilder = Callable[[], Awaitable[dict[str, Any]]]
 DashboardBroadcaster = Callable[[str, dict[str, Any]], Awaitable[None]]
 
+# Proxied requests wait on broadcasts; a stalled dashboard must not stall them.
+_SEND_TIMEOUT_SECONDS = 1.0
+
 
 class DashboardStreamManager:
     """Track connected dashboard WebSocket clients."""
@@ -53,8 +56,9 @@ class DashboardStreamManager:
         stale: list[WebSocket] = []
         for client in list(self._clients):
             try:
-                await client.send_json(message)
-            except RuntimeError:
+                await asyncio.wait_for(client.send_json(message), _SEND_TIMEOUT_SECONDS)
+            except Exception:
+                # Disconnected (WebSocketDisconnect, RuntimeError) or too slow.
                 stale.append(client)
         for client in stale:
             self.disconnect(client)
