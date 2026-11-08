@@ -33,6 +33,8 @@ from app.storage.db.models import (
 
 T = TypeVar("T")
 
+_MAX_ACTOR_PATHS = 50
+
 
 async def _retry_once(operation: Callable[[], Awaitable[T]]) -> T:
     """Run a select-then-write transaction again after losing a race.
@@ -618,8 +620,11 @@ class DatabaseStore:
         profile.max_risk_score = max(profile.max_risk_score, event.risk_score)
         profile.last_decision = event.decision.value
         path_counts = dict(profile.path_counts or {})
-        path_counts[event.path] = int(path_counts.get(event.path, 0)) + 1
-        profile.path_counts = path_counts
+        # A scanner hits thousands of paths; rewriting an unbounded JSON map
+        # on every request is quadratic. Known paths keep counting.
+        if event.path in path_counts or len(path_counts) < _MAX_ACTOR_PATHS:
+            path_counts[event.path] = int(path_counts.get(event.path, 0)) + 1
+            profile.path_counts = path_counts
         if event.decision != Decision.ALLOW:
             profile.suspicious_requests += 1
         if event.decision == Decision.REDIRECT_TO_DECOY:
