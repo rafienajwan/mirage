@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import GlassPanel from "@/components/ui/GlassPanel";
-import { simulateNormal, simulateSuspicious } from "@/lib/api";
+import { simulateRequest } from "@/lib/api";
 import type { SimulationResult } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Play, Zap, Loader2, CheckCircle, XCircle } from "lucide-react";
@@ -26,7 +26,7 @@ export default function SimulationPanel({ onRefresh }: SimulationPanelProps) {
     setError(null);
     setLastResult(null);
     try {
-      const result = type === "normal" ? await simulateNormal() : await simulateSuspicious();
+      const result = await simulateRequest(type);
       setLastResult(result);
       onRefresh?.();
     } catch (err) {

@@ -663,10 +663,6 @@ function sendJson(method: "POST" | "PATCH", body?: unknown): RequestInit {
   };
 }
 
-async function simulationFetch<T>(kind: "normal" | "suspicious"): Promise<T> {
-  return apiFetch<T>(`/simulate/${kind}`, sendJson("POST"));
-}
-
 /** Fetch dashboard overview metrics. */
 export function mapOverview(data: BackendOverview): OverviewMetrics {
   return {
@@ -693,12 +689,11 @@ export async function fetchEvents(): Promise<FeedEvent[]> {
 export async function labelEvent(
   eventId: string,
   label: AnalystLabel,
-  note = "",
 ): Promise<FeedEvent> {
   return mapDashboardEvent(
     await apiFetch<BackendEvent>(
       `/dashboard/events/${encodeURIComponent(eventId)}/label`,
-      sendJson("PATCH", { label, note }),
+      sendJson("PATCH", { label }),
     ),
   );
 }
@@ -710,19 +705,9 @@ export async function downloadTrainingData(): Promise<Blob> {
 
 /** Fetch analyst-labeled training data readiness. */
 export async function fetchTrainingDataSummary(): Promise<TrainingDataSummary> {
-  const data = await apiFetch<BackendTrainingDataSummary>("/dashboard/training-data/summary");
-  return {
-    labeledRows: data.labeled_rows,
-    exportableRows: data.exportable_rows,
-    minimumRows: data.minimum_rows,
-    minimumRowsPerClass: data.minimum_rows_per_class,
-    normalRows: data.normal_rows,
-    suspiciousRows: data.suspicious_rows,
-    hasBothClasses: data.has_both_classes,
-    hasMinimumClassRows: data.has_minimum_class_rows,
-    readyForTraining: data.ready_for_training,
-    analystLabels: data.analyst_labels,
-  };
+  return mapTrainingSummary(
+    await apiFetch<BackendTrainingDataSummary>("/dashboard/training-data/summary"),
+  );
 }
 
 export function mapTrainingSummary(data: BackendTrainingDataSummary): TrainingDataSummary {
@@ -1009,15 +994,8 @@ function mapActorCaseWorkflow(item: BackendActorCaseWorkflow): ActorCaseWorkflow
 }
 
 /** Fetch persisted actor case workflow records. */
-export async function fetchActorCaseWorkflows(filters?: {
-  status?: ActorCaseWorkflow["status"];
-  assignedTo?: string;
-}): Promise<ActorCaseWorkflowSummary> {
-  const params = new URLSearchParams();
-  if (filters?.status) params.set("status", filters.status);
-  if (filters?.assignedTo) params.set("assigned_to", filters.assignedTo);
-  const query = params.size ? `?${params.toString()}` : "";
-  const data = await apiFetch<BackendActorCaseWorkflowSummary>(`/dashboard/actor-case-workflows${query}`);
+export async function fetchActorCaseWorkflows(): Promise<ActorCaseWorkflowSummary> {
+  const data = await apiFetch<BackendActorCaseWorkflowSummary>("/dashboard/actor-case-workflows");
   return mapActorCaseWorkflowSummary(data);
 }
 
@@ -1098,24 +1076,14 @@ export type DashboardStreamMessage =
 
 // ─── Simulation triggers ────────────────────────────────────────
 
-/** Simulate a normal (low-risk) request. */
-export async function simulateNormal(): Promise<SimulationResult> {
-  const data = await simulationFetch<BackendSimulationResult>("normal");
-  return {
-    requestId: data.request_id,
-    riskScore: data.risk_score,
-    riskLevel: data.risk_level,
-    decision: data.decision,
-    reasons: data.reasons,
-    fingerprintHash: data.fingerprint_hash,
-    decoyType: data.decoy_type,
-    mlShadow: mapMLShadow(data.ml_shadow),
-  };
-}
-
-/** Simulate a suspicious (high-risk) request. */
-export async function simulateSuspicious(): Promise<SimulationResult> {
-  const data = await simulationFetch<BackendSimulationResult>("suspicious");
+/** Send a safe simulated normal or suspicious request through the gateway. */
+export async function simulateRequest(
+  kind: "normal" | "suspicious",
+): Promise<SimulationResult> {
+  const data = await apiFetch<BackendSimulationResult>(
+    `/simulate/${kind}`,
+    sendJson("POST"),
+  );
   return {
     requestId: data.request_id,
     riskScore: data.risk_score,

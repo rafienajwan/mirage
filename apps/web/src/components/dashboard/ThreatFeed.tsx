@@ -16,16 +16,12 @@ const severityStyles: Record<ThreatSeverity, string> = {
 const statusStyles: Record<ThreatStatus, string> = {
   allowed: "text-white/50 bg-white/5 border-white/10",
   redirected: "text-brand-cyan bg-brand-cyan/10 border-brand-cyan/20",
-  decoy_active: "text-brand-emerald bg-brand-emerald/10 border-brand-emerald/20",
-  contained: "text-purple-400 bg-purple-500/10 border-purple-500/20",
   alert: "text-amber-400 bg-amber-500/10 border-amber-500/20",
 };
 
 const statusLabel: Record<ThreatStatus, string> = {
   allowed: "Allowed",
   redirected: "Redirected",
-  decoy_active: "Decoy Active",
-  contained: "Contained",
   alert: "Alert",
 };
 
