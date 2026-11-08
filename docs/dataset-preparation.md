@@ -399,7 +399,15 @@ Preparation fails unless:
 
 - at least 20 rows are present;
 - both binary classes are present;
-- each class has at least two rows, matching the trainer's stratified split.
+- each class has at least two rows, matching the trainer's stratified split;
+- each class has at least two distinct feature vectors (groups).
+
+The split groups rows by the SHA-256 of their feature vector. A group goes
+wholly to train or wholly to test, so repeated requests cannot appear on both
+sides and inflate holdout metrics. A group whose rows carry both labels follows
+its majority label (ties count as suspicious) and is counted in the manifest's
+`conflicting_feature_groups`. Because whole groups move together, the train and
+test row counts only approximate `--train-ratio`.
 
 These rules match the dashboard training readiness indicator and prevent a
 dataset from being marked ready when the trainer would fail immediately.

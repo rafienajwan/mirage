@@ -16,6 +16,7 @@ def _write_source(path) -> None:
             "source_ip": f"203.0.113.{index + 10}",
             "method": "GET",
             "path": f"/api/{label}/{index}",
+            "request_count": index + 1,
         }
         for label in ("normal", "suspicious")
         for index in range(10)
