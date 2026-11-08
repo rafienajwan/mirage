@@ -21,10 +21,11 @@ from app.ml.api_log_review import (  # noqa: E402 - imported after the sys.path 
 from app.ml.artifacts import review_model_artifact  # noqa: E402 - imported after the sys.path bootstrap so the script runs standalone
 from app.ml.datasets import (  # noqa: E402 - imported after the sys.path bootstrap so the script runs standalone
     build_dataset_lineage,
+    load_mirage_jsonl,
     prepare_dataset,
     review_prepared_dataset,
 )
-from app.ml.training import LabeledFeatures, train_risk_classifier  # noqa: E402 - imported after the sys.path bootstrap so the script runs standalone
+from app.ml.training import train_risk_classifier  # noqa: E402 - imported after the sys.path bootstrap so the script runs standalone
 from scripts.build_api_domain_fixture_dataset import (  # noqa: E402 - imported after the sys.path bootstrap so the script runs standalone
     build_fixture_rows,
     write_fixture_jsonl,
@@ -95,15 +96,7 @@ def generate_and_train_custom_api_dataset(
 
     # Step 5: Load prepared training rows from train.jsonl
     train_jsonl_path = prepared_dir / "train.jsonl"
-    training_rows: list[LabeledFeatures] = []
-    with train_jsonl_path.open(encoding="utf-8") as source:
-        for line in source:
-            if not line.strip():
-                continue
-            rec = json.loads(line)
-            training_rows.append(
-                LabeledFeatures(features=rec["features"], label=int(rec["label"]))
-            )
+    training_rows = load_mirage_jsonl(train_jsonl_path)
 
     # Step 6: Train Random Forest model artifact bound to dataset lineage
     lineage = build_dataset_lineage(dataset_manifest_path, train_jsonl_path)
