@@ -12,7 +12,7 @@ import {
 import GlassPanel from "@/components/ui/GlassPanel";
 import type { TrafficPoint } from "@/lib/api-types";
 
-// SSR-safe mount detection — no setState needed
+// SSR-safe mount detection, no setState needed
 const subscribe = () => () => {};
 const getSnapshot = () => true;
 const getServerSnapshot = () => false;
@@ -113,7 +113,7 @@ export default function TrafficChart({ data }: TrafficChartProps) {
         )}
         {mounted && chartData.length === 0 && (
           <div className="h-full flex items-center justify-center text-white/30 text-xs">
-            No traffic data yet — run simulations to generate activity
+            No traffic data yet. Run a simulation to generate activity.
           </div>
         )}
       </div>

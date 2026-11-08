@@ -13,7 +13,7 @@ interface SimulationPanelProps {
 }
 
 /**
- * Simulation trigger panel — lets operators generate demo events
+ * Simulation trigger panel: lets operators generate demo events
  * directly from the dashboard.
  */
 export default function SimulationPanel({ onRefresh }: SimulationPanelProps) {

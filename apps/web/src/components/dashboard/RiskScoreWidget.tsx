@@ -13,7 +13,7 @@ import {
 } from "recharts";
 import { ShieldAlert } from "lucide-react";
 
-// SSR-safe mount detection — no setState needed
+// SSR-safe mount detection, no setState needed
 const subscribe = () => () => {};
 const getSnapshot = () => true;
 const getServerSnapshot = () => false;

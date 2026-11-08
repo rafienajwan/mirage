@@ -71,7 +71,7 @@ export default function LoginPage() {
                 autoComplete="current-password"
                 required
                 autoFocus
-                className="h-11 w-full rounded border border-white/10 bg-black/20 pl-10 pr-3 text-sm text-white outline-none transition focus:border-brand-cyan/50 focus:ring-2 focus:ring-brand-cyan/10"
+                className="h-11 w-full rounded border border-white/10 bg-black/20 pl-10 pr-3 text-sm text-white outline-none transition focus:border-brand-cyan/60 focus:ring-2 focus:ring-brand-cyan/40"
               />
             </span>
           </label>

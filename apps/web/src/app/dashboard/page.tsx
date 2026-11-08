@@ -22,7 +22,7 @@ import { SessionExpiredError, summarizeFailures } from "@/lib/http-failure";
 import { Globe, ShieldAlert, ArrowRightLeft, Bell, BrainCircuit, Database, Download, KeyRound, Loader2, AlertTriangle, Volume2, VolumeX, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-// Charts use Recharts ResponsiveContainer — must be client-only to avoid SSR dimension warnings
+// Charts use Recharts ResponsiveContainer: must be client-only to avoid SSR dimension warnings
 const TrafficChart = dynamic(() => import("@/components/dashboard/TrafficChart"), { ssr: false });
 const RiskScoreWidget = dynamic(() => import("@/components/dashboard/RiskScoreWidget"), { ssr: false });
 

@@ -64,6 +64,20 @@ body {
   font-family: var(--font-sans);
 }
 
+@layer base {
+  /* Tailwind v4 leaves buttons with the default cursor. */
+  button:not(:disabled),
+  select:not(:disabled) {
+    cursor: pointer;
+  }
+
+  /* One visible keyboard focus style for every interactive element. */
+  :focus-visible {
+    outline: 2px solid var(--color-brand-cyan);
+    outline-offset: 2px;
+  }
+}
+
 /* Premium Glassmorphism styling */
 .glass-panel {
   background: rgba(255, 255, 255, 0.02);
