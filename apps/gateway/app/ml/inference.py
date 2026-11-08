@@ -26,6 +26,9 @@ class RiskClassifier:
         if tuple(artifact.get("feature_names", ())) != FEATURE_NAMES:
             raise ValueError("Model feature contract does not match the gateway")
         self.model = artifact["model"]
+        # One-row predictions: a per-call thread pool costs far more than it saves.
+        if hasattr(self.model, "n_jobs"):
+            self.model.n_jobs = 1
         self.metrics = artifact.get("metrics", {})
 
     def suspicious_probability(self, features: FeatureVector) -> float:

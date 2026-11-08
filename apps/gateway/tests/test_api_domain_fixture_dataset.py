@@ -8,9 +8,21 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from build_api_domain_fixture_dataset import build_fixture_rows, write_fixture_jsonl  # noqa: E402
+from build_api_domain_fixture_dataset import (  # noqa: E402
+    build_fixture_rows,
+    build_scenarios,
+    write_fixture_jsonl,
+)
 
 from app.ml.datasets import prepare_dataset  # noqa: E402
+
+
+def test_build_scenarios_creates_balanced_unique_api_domain_requests():
+    scenarios = build_scenarios(normal_count=3, suspicious_count=2)
+
+    assert [scenario.label for scenario in scenarios].count("normal") == 3
+    assert [scenario.label for scenario in scenarios].count("suspicious") == 2
+    assert len({scenario.request["path"] for scenario in scenarios}) == 5
 
 
 def test_build_fixture_rows_creates_balanced_api_log_records():

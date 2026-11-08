@@ -1,12 +1,14 @@
 """Smoke tests for the real ML training and inference path."""
 
+import json
 from pathlib import Path
 import sys
 
 import joblib
 import pytest
 
-from app.ml.datasets import build_dataset_lineage, prepare_dataset
+from app.ml.dataset_review import build_dataset_lineage
+from app.ml.datasets import DatasetValidationError, prepare_dataset
 from app.ml.inference import RiskClassifier
 from app.ml.training import LabeledFeatures, train_risk_classifier
 from app.services.feature_extraction import FEATURE_NAMES
@@ -36,13 +38,32 @@ def test_train_and_load_classifier():
         artifact.unlink(missing_ok=True)
 
 
+def test_training_with_held_out_rows_fits_all_training_rows(tmp_path):
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(20)]
+    held_out = [_row(label, float(index + 1)) for label in (0, 1) for index in range(5)]
+
+    metrics = train_risk_classifier(rows, tmp_path / "model.joblib", test_rows=held_out)
+
+    assert metrics.training_rows == 40
+    assert metrics.test_rows == 10
+
+
+def test_classifier_scores_single_rows_without_a_thread_pool(tmp_path):
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(20)]
+    artifact = tmp_path / "risk-model.joblib"
+    train_risk_classifier(rows, artifact)
+
+    assert RiskClassifier(artifact).model.n_jobs == 1
+
+
 def test_training_artifact_embeds_dataset_lineage(tmp_path):
     source = tmp_path / "source.jsonl"
     source.write_text(
         "".join(
-            f'{{"label": {label}, "features": {{"request_count_log": {index}}}}}\n'
+            json.dumps({"label": label, "features": _row(label, index + 1).features})
+            + "\n"
             for label in (0, 1)
-            for index in range(12)
+            for index in range(14)
         ),
         encoding="utf-8",
     )
@@ -93,7 +114,8 @@ def test_train_script_binds_reviewed_manifest(tmp_path, monkeypatch):
     source = tmp_path / "source.jsonl"
     source.write_text(
         "".join(
-            f'{{"label": {label}, "features": {{"request_count_log": {index}}}}}\n'
+            json.dumps({"label": label, "features": _row(label, index + 1).features})
+            + "\n"
             for label in (0, 1)
             for index in range(20)
         ),
@@ -128,3 +150,19 @@ def test_train_script_binds_reviewed_manifest(tmp_path, monkeypatch):
     assert payload["feature_contract_version"] == 2
     assert payload["artifact_version"] == 2
     assert payload["dataset_lineage"]["dataset_name"] == "runtime-export"
+    # Fits on the whole prepared train split and scores on the prepared test split.
+    assert payload["metrics"]["training_rows"] == 30
+    assert payload["metrics"]["test_rows"] == 10
+
+
+def test_train_script_rejects_rows_without_features(tmp_path, monkeypatch):
+    source = tmp_path / "train.jsonl"
+    source.write_text('{"label": 1, "features": null}\n', encoding="utf-8")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["train_model.py", "--input", str(source), "--output", str(tmp_path / "m")],
+    )
+
+    with pytest.raises(DatasetValidationError, match="line 1"):
+        train_model.main()

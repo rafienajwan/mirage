@@ -4,18 +4,20 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from functools import lru_cache
+import json
 from pathlib import Path
 from typing import Any
 
 from app.core.config import settings as app_settings
-from app.ml.artifact_integrity import UNPINNED_BLOCKER, pinned_digest
-from app.ml.artifacts import ArtifactReview, review_model_artifact
-from app.ml.datasets import (
-    DatasetReview,
-    DatasetValidationError,
-    review_prepared_dataset,
-    sha256_file,
+from app.ml.artifact_integrity import UNPINNED_BLOCKER, pinned_digest, sha256_file
+from app.ml.artifacts import (
+    ArtifactReview,
+    cached_artifact_review,
+    file_stamp,
+    review_model_artifact,
 )
+from app.ml.dataset_review import DatasetReview, review_prepared_dataset
+from app.ml.errors import DatasetValidationError
 from app.schemas.dashboard import MLPromotionGate, MLPromotionReadiness, MLShadowSummary
 
 ArtifactReviewer = Callable[..., ArtifactReview]
@@ -23,28 +25,26 @@ DatasetReviewer = Callable[..., DatasetReview]
 LineageReviewer = Callable[[ArtifactReview, DatasetReview, Path], bool]
 
 
-def _mtime(path: Path) -> int:
+def _dataset_stamp(manifest_path: Path) -> tuple[tuple[int, int], ...]:
+    """Stamp the manifest and every file it lists, so replacing a split re-reviews."""
+    stamps = [file_stamp(manifest_path)]
     try:
-        return path.stat().st_mtime_ns
-    except OSError:
-        return -1
-
-
-@lru_cache(maxsize=8)
-def _cached_artifact_review(
-    reviewer: ArtifactReviewer,
-    path_value: str,
-    _modified_at: int,
-    expected_sha256: str | None,
-) -> ArtifactReview:
-    return reviewer(Path(path_value), expected_sha256=expected_sha256)
+        files = json.loads(manifest_path.read_text(encoding="utf-8")).get("files")
+    except (OSError, ValueError, AttributeError):
+        files = None
+    if isinstance(files, dict):
+        stamps.extend(
+            file_stamp(manifest_path.parent / str(name))
+            for _, name in sorted(files.items())
+        )
+    return tuple(stamps)
 
 
 @lru_cache(maxsize=8)
 def _cached_dataset_review(
     reviewer: DatasetReviewer,
     path_value: str,
-    _modified_at: int,
+    _stamp: tuple[tuple[int, int], ...],
     min_total_rows: int,
     min_rows_per_class: int,
 ) -> DatasetReview:
@@ -187,11 +187,10 @@ def evaluate_ml_promotion(
 
     expected_sha256, may_load = pinned_digest(settings)
     artifact_review = (
-        _cached_artifact_review(
-            artifact_reviewer,
-            str(artifact_path),
-            _mtime(artifact_path),
-            expected_sha256,
+        cached_artifact_review(
+            artifact_path,
+            expected_sha256=expected_sha256,
+            reviewer=artifact_reviewer,
         )
         if may_load
         else ArtifactReview(
@@ -219,7 +218,7 @@ def evaluate_ml_promotion(
         dataset_review = _cached_dataset_review(
             dataset_reviewer,
             str(manifest_path),
-            _mtime(manifest_path),
+            _dataset_stamp(manifest_path),
             settings.ml_promotion_min_total_rows,
             settings.ml_promotion_min_rows_per_class,
         )
