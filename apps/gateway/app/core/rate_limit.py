@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections import OrderedDict, deque
 from collections.abc import Callable
+import secrets
 from time import monotonic
 
 from fastapi import FastAPI, Request
@@ -16,6 +17,18 @@ from app.core import config
 from app.core.client_ip import client_ip
 
 WINDOW_SECONDS = 60.0
+
+
+def _is_operator(request: Request) -> bool:
+    """True for a valid operator API key: the dashboard server calls the
+    gateway for every operator from one address, so one bucket would be shared.
+    """
+    expected = config.settings.api_key
+    supplied = request.headers.get("x-mirage-api-key")
+    if not expected or supplied is None:
+        return False
+    # Bytes: compare_digest rejects non-ASCII str, and headers are attacker input.
+    return secrets.compare_digest(supplied.encode(), expected.encode())
 
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
@@ -48,7 +61,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
-        if self.limit <= 0 or not request.url.path.startswith("/api/v1"):
+        if (
+            self.limit <= 0
+            or not request.url.path.startswith("/api/v1")
+            or _is_operator(request)
+        ):
             return await call_next(request)
 
         client = client_ip(request)

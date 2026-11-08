@@ -112,3 +112,22 @@ async def test_keys_on_client_ip(monkeypatch):
     assert await _hit(app, "10.0.0.2", {"x-forwarded-for": "203.0.113.1"}) == 200
     assert await _hit(app, "10.0.0.2", {"x-forwarded-for": "203.0.113.2"}) == 200
     assert await _hit(app, "10.0.0.2", {"x-forwarded-for": "203.0.113.1"}) == 429
+
+
+async def test_valid_operator_api_key_is_not_limited(monkeypatch):
+    monkeypatch.setattr(
+        config, "settings", dataclasses.replace(config.settings, api_key="operator-key")
+    )
+    app, _ = _build(limit=1)
+    operator = {"x-mirage-api-key": "operator-key"}
+    # The dashboard server calls the gateway for every operator from one IP.
+    assert [await _hit(app, "10.0.0.9", operator) for _ in range(3)] == [200, 200, 200]
+    assert await _hit(app, "10.0.0.9", {"x-mirage-api-key": "wrong"}) == 200
+    assert await _hit(app, "10.0.0.9", {"x-mirage-api-key": "wrong"}) == 429
+
+
+async def test_api_key_header_is_limited_when_no_key_is_configured(monkeypatch):
+    monkeypatch.setattr(config, "settings", dataclasses.replace(config.settings, api_key=None))
+    app, _ = _build(limit=1)
+    assert await _hit(app, "10.0.0.9", {"x-mirage-api-key": ""}) == 200
+    assert await _hit(app, "10.0.0.9", {"x-mirage-api-key": ""}) == 429
