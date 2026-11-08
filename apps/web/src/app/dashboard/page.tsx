@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import Header from "@/components/layout/Header";
 import MetricCard from "@/components/ui/MetricCard";
 import ThreatFeed from "@/components/dashboard/ThreatFeed";
@@ -17,7 +18,8 @@ import type { ActorCaseSummary, ActorCaseWorkflow, ActorCaseWorkflowSummary, Act
 import { useDashboardStream } from "@/hooks/useDashboardStream";
 import { pollIntervalFor } from "@/lib/dashboard-stream";
 import { selectNewAlerts } from "@/lib/alert-toasts";
-import { Globe, ShieldAlert, ArrowRightLeft, Bell, BrainCircuit, Database, Download, KeyRound, Loader2, WifiOff, Volume2, VolumeX, X } from "lucide-react";
+import { SessionExpiredError } from "@/lib/http-failure";
+import { Globe, ShieldAlert, ArrowRightLeft, Bell, BrainCircuit, Database, Download, KeyRound, Loader2, AlertTriangle, Volume2, VolumeX, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Charts use Recharts ResponsiveContainer — must be client-only to avoid SSR dimension warnings
@@ -108,6 +110,7 @@ function playAlertSound(severity: string) {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [overview, setOverview] = useState<OverviewMetrics | null>(null);
   const [events, setEvents] = useState<FeedEvent[]>([]);
   const [alerts, setAlerts] = useState<FeedAlert[]>([]);
@@ -152,6 +155,16 @@ export default function DashboardPage() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  // An expired session surfaces as 401 from our own /api routes: send the
+  // operator back to sign in instead of reporting the backend as down.
+  const reportError = useCallback((err: unknown, fallback: string) => {
+    if (err instanceof SessionExpiredError) {
+      router.replace("/login?next=/dashboard");
+      return;
+    }
+    setError(err instanceof Error ? err.message : fallback);
+  }, [router]);
+
   const handleAlertsUpdate = useCallback((newAlerts: FeedAlert[]) => {
     const { fresh, watermark } = selectNewAlerts(newAlerts, alertWatermarkRef.current);
     alertWatermarkRef.current = watermark;
@@ -191,11 +204,11 @@ export default function DashboardPage() {
       );
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to label event");
+      reportError(err, "Failed to label event");
     } finally {
       setLabelingEventId(null);
     }
-  }, []);
+  }, [reportError]);
 
   const handleTrainingExport = useCallback(async () => {
     setExportingTrainingData(true);
@@ -211,11 +224,11 @@ export default function DashboardPage() {
       URL.revokeObjectURL(url);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to export training data");
+      reportError(err, "Failed to export training data");
     } finally {
       setExportingTrainingData(false);
     }
-  }, []);
+  }, [reportError]);
 
   const handleRetraining = useCallback(async () => {
     setRetraining(true);
@@ -224,11 +237,11 @@ export default function DashboardPage() {
       setRetrainingRun(result);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to run retraining");
+      reportError(err, "Failed to run retraining");
     } finally {
       setRetraining(false);
     }
-  }, []);
+  }, [reportError]);
 
   const handleOpenActorCase = useCallback(async (caseId: string) => {
     setWorkingActorCaseId(caseId);
@@ -245,11 +258,11 @@ export default function DashboardPage() {
       }));
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to open actor case");
+      reportError(err, "Failed to open actor case");
     } finally {
       setWorkingActorCaseId(null);
     }
-  }, []);
+  }, [reportError]);
 
   const handleUpdateActorCase = useCallback(
     async (caseId: string, status: ActorCaseWorkflow["status"]) => {
@@ -271,12 +284,12 @@ export default function DashboardPage() {
         }));
         setError(null);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to update actor case");
+        reportError(err, "Failed to update actor case");
       } finally {
         setWorkingActorCaseId(null);
       }
     },
-    [],
+    [reportError],
   );
 
   const handleRevokeCanaryAssignment = useCallback(async (assignmentId: string) => {
@@ -295,11 +308,11 @@ export default function DashboardPage() {
       }));
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to revoke canary assignment");
+      reportError(err, "Failed to revoke canary assignment");
     } finally {
       setWorkingCanaryAssignmentId(null);
     }
-  }, []);
+  }, [reportError]);
 
   const load = useCallback(async () => {
     try {
@@ -339,11 +352,11 @@ export default function DashboardPage() {
       setActorCaseWorkflows(workflows);
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch data");
+      reportError(err, "Failed to fetch data");
     } finally {
       setLoading(false);
     }
-  }, [handleAlertsUpdate]);
+  }, [handleAlertsUpdate, reportError]);
 
   const handleStreamMessage = useCallback(
     (data: DashboardStreamMessage) => {
@@ -567,14 +580,8 @@ export default function DashboardPage() {
         {/* Error banner */}
         {error && (
           <div className="mb-6 flex items-center gap-3 p-4 rounded-lg border border-amber-500/20 bg-amber-500/5 text-[11px] font-mono text-amber-400">
-            <WifiOff className="w-4 h-4 shrink-0" />
-            <div>
-              <span className="font-bold">Backend unreachable</span>
-              <span className="text-white/40 ml-2">
-                — {error}. Start the gateway with{" "}
-                <code className="text-white/60">uvicorn app.main:app --reload</code>
-              </span>
-            </div>
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span role="alert">{error}</span>
           </div>
         )}
 

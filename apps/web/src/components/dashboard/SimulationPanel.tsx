@@ -129,9 +129,6 @@ export default function SimulationPanel({ onRefresh }: SimulationPanelProps) {
       {error && (
         <div className="mt-3 p-3 rounded-md border border-amber-500/20 bg-amber-500/5 text-[10px] font-mono text-amber-400">
           {error}
-          <span className="text-white/30 ml-2">
-            — make sure the backend is running on port 8000
-          </span>
         </div>
       )}
     </GlassPanel>

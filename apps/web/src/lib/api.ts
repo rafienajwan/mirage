@@ -65,6 +65,7 @@ import type {
   TrafficPoint,
   TrainingDataSummary,
 } from "./api-types";
+import { describeHttpFailure, SessionExpiredError } from "./http-failure";
 
 const API_PREFIX = "/api/gateway";
 
@@ -72,7 +73,9 @@ const API_PREFIX = "/api/gateway";
 async function gatewayRequest(path: string, init?: RequestInit): Promise<Response> {
   const res = await fetch(`${API_PREFIX}${path}`, { cache: "no-store", ...init });
   if (!res.ok) {
-    throw new Error(`API error: ${res.status} ${res.statusText}`);
+    const failure = describeHttpFailure(res.status, await res.text().catch(() => ""));
+    if (failure.sessionExpired) throw new SessionExpiredError();
+    throw new Error(failure.message);
   }
   return res;
 }

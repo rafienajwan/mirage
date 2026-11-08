@@ -27,6 +27,8 @@
     "src/lib/api-map.ts",
     "src/lib/api-map.test.ts",
     "src/lib/alert-toasts.ts",
-    "src/lib/alert-toasts.test.ts"
+    "src/lib/alert-toasts.test.ts",
+    "src/lib/http-failure.ts",
+    "src/lib/http-failure.test.ts"
   ]
 }
