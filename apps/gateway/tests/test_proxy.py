@@ -330,3 +330,38 @@ async def test_payload_detection_runs_off_the_event_loop(client, monkeypatch):
     monkeypatch.setattr(proxy_route, "run_in_threadpool", recording_threadpool)
     await _route(client, monkeypatch, "POST", "/api/v1/proxy/api/products", content="x" * 1000)
     assert "detect_payload_indicators" in calls
+
+
+async def test_proxy_logs_forwarded_client_ip(client, monkeypatch):
+    import dataclasses
+
+    from app.core import config
+
+    monkeypatch.setattr(
+        config,
+        "settings",
+        dataclasses.replace(config.settings, trusted_proxies="127.0.0.0/8"),
+    )
+    captured = {}
+
+    async def fake_inspect(metadata, **_kwargs):
+        captured["ip"] = metadata.ip_address
+        return SimpleNamespace(
+            decision=Decision.ALLOW,
+            fingerprint_hash="fingerprint",
+            risk_score=0.0,
+            decoy_type=None,
+        )
+
+    async def fake_forward(_request, **_kwargs):
+        return JSONResponse({"status": "ok"})
+
+    monkeypatch.setattr(proxy_route, "inspect_and_log", fake_inspect)
+    monkeypatch.setattr(proxy_route, "forward_request", fake_forward)
+    response = await client.get(
+        "/api/v1/proxy/api/products",
+        headers={"x-forwarded-for": "203.0.113.9"},
+    )
+
+    assert response.status_code == 200
+    assert captured["ip"] == "203.0.113.9"

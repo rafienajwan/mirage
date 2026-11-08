@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
 
+from app.core.client_ip import client_ip
 from app.core.config import settings
 from app.schemas.decision import Decision
 from app.schemas.request import InspectRequest
@@ -46,7 +47,7 @@ async def proxy_request(target_path: str, request: Request) -> Response:
     body = await _read_limited_body(request)
 
     path = "/" + target_path.lstrip("/")
-    source_ip = request.client.host if request.client else "unknown"
+    source_ip = client_ip(request)
     request_count = await traffic_tracker.record(source_ip)
     # Inspecting a large body is CPU-bound (~0.4 s per MiB); keep it off the
     # event loop so other requests are not stalled behind it.
