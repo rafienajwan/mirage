@@ -590,3 +590,34 @@ async def test_concurrent_requests_from_one_actor_are_all_logged(client, monkeyp
     profiles = (await get_actor_profiles(limit=5)).profiles
     assert [profile.request_count for profile in profiles] == [20]
     assert len(await store.get_canary_assignments()) == 1
+
+
+async def test_path_exemption_does_not_cover_attacks_in_headers(client, monkeypatch):
+    import dataclasses
+
+    from app.core import config
+
+    monkeypatch.setattr(
+        config,
+        "settings",
+        dataclasses.replace(config.settings, payload_exemptions="POST /api/posts:sql-like"),
+    )
+    captured = await _route(
+        client,
+        monkeypatch,
+        "POST",
+        "/api/v1/proxy/api/posts",
+        content="hello",
+        headers={"user-agent": "x' UNION SELECT password FROM users--"},
+    )
+    assert captured["is_decoy"] is True
+
+
+def test_header_credentials_never_appear_in_repr_or_json():
+    from app.schemas.request import InspectRequest
+
+    request = InspectRequest(
+        ip_address="198.51.100.1", method="GET", path="/", header_text="Bearer SECRET"
+    )
+    assert "SECRET" not in repr(request)
+    assert "SECRET" not in request.model_dump_json()

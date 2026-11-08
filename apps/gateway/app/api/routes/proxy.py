@@ -58,9 +58,17 @@ async def proxy_request(target_path: str, request: Request) -> Response:
         request.url.query,
         body,
         content_type=request.headers.get("content-type"),
+    )
+    # Route exemptions cover what the route accepts (path, query, body), never
+    # attacks carried in headers, so header findings are added afterwards.
+    indicators, exempted = apply_exemptions(request.method, path, indicators)
+    header_indicators = detect_payload_indicators(
+        "",
+        "",
+        b"",
         headers=(request.headers.get("user-agent", ""), request.headers.get("referer", "")),
     )
-    indicators, exempted = apply_exemptions(request.method, path, indicators)
+    indicators = sorted(set(indicators) | set(header_indicators))
     payload_excerpt = build_payload_excerpt(
         request.url.query,
         body[: settings.proxy_max_body_bytes].decode("utf-8", errors="ignore"),

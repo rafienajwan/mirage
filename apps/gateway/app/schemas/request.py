@@ -52,6 +52,7 @@ class InspectRequest(BaseModel):
         description="Small bounded request excerpt used for decoy/honeytoken matching",
     )
     header_text: str = Field(
+        repr=False,
         default="",
         max_length=8192,
         # Holds credentials (Authorization, Cookie): matched, never serialized.
