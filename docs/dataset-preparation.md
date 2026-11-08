@@ -274,27 +274,14 @@ python scripts/review_dataset.py \
 These thresholds validate the 40-row pilot pipeline only. They do not replace
 the configured promotion minimums for representative training data.
 
-The older collector below assigns deterministic scenario labels automatically.
-Use it only to validate API, labeling, and export plumbing, never as independent
-human-reviewed model-quality evidence:
-
-```bash
-cd apps/gateway
-python scripts/collect_api_domain_training_data.py \
-  --base-url http://localhost:8000 \
-  --api-key YOUR_LOCAL_MIRAGE_API_KEY \
-  --normal-count 10 \
-  --suspicious-count 10 \
-  --output data/raw/runtime/api-domain-training-events.jsonl \
-  --summary-output data/raw/runtime/api-domain-training-summary.json
-```
-
 The generated files should stay in ignored local `data/` paths unless they have
-been reviewed and explicitly approved for publication. Both collector outputs
-use `--source mirage-jsonl` because they already contain MIRAGE feature vectors.
+been reviewed and explicitly approved for publication. Collector exports use
+`--source mirage-jsonl` because they already contain MIRAGE feature vectors.
 
 When a running gateway is not available, use the deterministic API-domain
-fixture generator to exercise the same custom API-log adapter path locally:
+fixture generator to exercise the custom API-log adapter path locally. Its
+labels come from generated scenarios, not analyst review, so use it only to
+validate pipeline plumbing, never as model-quality evidence:
 
 ```bash
 cd apps/gateway
