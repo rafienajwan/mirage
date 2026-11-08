@@ -36,6 +36,14 @@ def test_train_and_load_classifier():
         artifact.unlink(missing_ok=True)
 
 
+def test_classifier_scores_single_rows_without_a_thread_pool(tmp_path):
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(20)]
+    artifact = tmp_path / "risk-model.joblib"
+    train_risk_classifier(rows, artifact)
+
+    assert RiskClassifier(artifact).model.n_jobs == 1
+
+
 def test_training_artifact_embeds_dataset_lineage(tmp_path):
     source = tmp_path / "source.jsonl"
     source.write_text(
