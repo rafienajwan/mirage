@@ -7,7 +7,7 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
-RUN npm run build
+RUN npm run build && npm prune --omit=dev
 
 FROM node:20-alpine AS runtime
 ENV NODE_ENV=production
@@ -15,8 +15,7 @@ WORKDIR /app
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/package-lock.json ./package-lock.json
 COPY --from=builder --chown=node:node /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=dependencies /app/node_modules ./node_modules
+COPY --from=builder /app/node_modules ./node_modules
 USER node
 EXPOSE 3000
 CMD ["npm", "run", "start"]
