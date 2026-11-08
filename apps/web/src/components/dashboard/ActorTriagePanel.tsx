@@ -1,7 +1,7 @@
 "use client";
 
 import GlassPanel from "@/components/ui/GlassPanel";
-import type { ActorCaseSummary, ActorCaseWorkflow, ActorCaseWorkflowSummary, ActorClusterSummary } from "@/lib/api";
+import type { ActorCaseSummary, ActorCaseWorkflow, ActorCaseWorkflowSummary, ActorClusterSummary } from "@/lib/api-types";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, Boxes, CheckCircle2, FolderSearch, GitBranch, Inbox, KeyRound, Loader2, Play, UsersRound } from "lucide-react";
 

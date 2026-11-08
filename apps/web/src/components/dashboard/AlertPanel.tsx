@@ -2,8 +2,7 @@
 
 import React from "react";
 import GlassPanel from "@/components/ui/GlassPanel";
-import type { AlertSeverity } from "@/lib/mock-data";
-import type { FeedAlert } from "@/lib/api";
+import type { AlertSeverity, FeedAlert } from "@/lib/api-types";
 import { cn } from "@/lib/utils";
 import { Bell, Info, AlertTriangle, ShieldAlert, Inbox } from "lucide-react";
 

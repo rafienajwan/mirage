@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import GlassPanel from "@/components/ui/GlassPanel";
 import { simulateRequest } from "@/lib/api";
-import type { SimulationResult } from "@/lib/api";
+import type { SimulationResult } from "@/lib/api-types";
 import { cn } from "@/lib/utils";
 import { Play, Zap, Loader2, CheckCircle, XCircle } from "lucide-react";
 

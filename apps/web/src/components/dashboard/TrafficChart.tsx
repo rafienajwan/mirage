@@ -10,7 +10,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import GlassPanel from "@/components/ui/GlassPanel";
-import type { TrafficPoint } from "@/lib/api";
+import type { TrafficPoint } from "@/lib/api-types";
 
 // SSR-safe mount detection — no setState needed
 const subscribe = () => () => {};

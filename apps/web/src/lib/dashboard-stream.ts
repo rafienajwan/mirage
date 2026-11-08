@@ -1,4 +1,4 @@
-import type { DashboardStreamMessage } from "@/lib/api";
+import type { DashboardStreamMessage } from "@/lib/api-types";
 
 export type DashboardConnectionStatus =
   | "connecting"

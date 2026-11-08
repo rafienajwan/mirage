@@ -1,8 +1,7 @@
 "use client";
 
 import GlassPanel from "@/components/ui/GlassPanel";
-import type { ThreatSeverity, ThreatStatus } from "@/lib/mock-data";
-import type { AnalystLabel, FeedEvent } from "@/lib/api";
+import type { AnalystLabel, FeedEvent, ThreatSeverity, ThreatStatus } from "@/lib/api-types";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, Inbox } from "lucide-react";
 

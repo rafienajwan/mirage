@@ -2,7 +2,7 @@
 
 import React from "react";
 import GlassPanel from "@/components/ui/GlassPanel";
-import type { DecoyStatusData } from "@/lib/api";
+import type { DecoyStatusData } from "@/lib/api-types";
 import { cn } from "@/lib/utils";
 import { Shield } from "lucide-react";
 

@@ -1,7 +1,7 @@
 "use client";
 
 import GlassPanel from "@/components/ui/GlassPanel";
-import type { ActorProfileSummary } from "@/lib/api";
+import type { ActorProfileSummary } from "@/lib/api-types";
 import { cn } from "@/lib/utils";
 import { Fingerprint, ShieldCheck, UsersRound } from "lucide-react";
 

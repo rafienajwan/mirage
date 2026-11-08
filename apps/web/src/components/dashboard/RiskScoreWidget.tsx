@@ -2,7 +2,7 @@
 
 import React, { useSyncExternalStore } from "react";
 import GlassPanel from "@/components/ui/GlassPanel";
-import type { RiskHistoryPoint } from "@/lib/api";
+import type { RiskHistoryPoint } from "@/lib/api-types";
 import {
   AreaChart,
   Area,
