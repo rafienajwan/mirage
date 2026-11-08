@@ -6,7 +6,6 @@ from collections import Counter
 import csv
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-import hashlib
 import json
 import math
 from pathlib import Path
@@ -16,6 +15,7 @@ import shutil
 from typing import Iterable, Literal
 from urllib.parse import urlsplit
 
+from app.ml.artifact_integrity import sha256_file
 from app.ml.csic_http import (
     CSIC_DISTRIBUTION_URL,
     CSIC_FILE_LABELS,
@@ -754,15 +754,6 @@ def write_jsonl(path: Path, rows: Iterable[PreparedTrainingRow]) -> None:
         for row in rows:
             target.write(json.dumps(_row_to_json(row), sort_keys=True))
             target.write("\n")
-
-
-def sha256_file(path: Path) -> str:
-    """Return the SHA-256 digest for a local dataset or manifest file."""
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def prepare_dataset(

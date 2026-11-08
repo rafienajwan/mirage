@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from app.core.config import settings as app_settings
-from app.ml.artifact_integrity import UNPINNED_BLOCKER, pinned_digest
+from app.ml.artifact_integrity import UNPINNED_BLOCKER, pinned_digest, sha256_file
 from app.ml.artifacts import (
     ArtifactReview,
     cached_artifact_review,
@@ -20,7 +20,6 @@ from app.ml.datasets import (
     DatasetReview,
     DatasetValidationError,
     review_prepared_dataset,
-    sha256_file,
 )
 from app.schemas.dashboard import MLPromotionGate, MLPromotionReadiness, MLShadowSummary
 

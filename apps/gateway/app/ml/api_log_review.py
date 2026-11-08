@@ -11,6 +11,7 @@ from pathlib import Path
 import re
 from typing import Any
 
+from app.ml.artifact_integrity import sha256_file
 from app.ml.errors import DatasetValidationError
 from app.schemas.request import InspectRequest
 from app.services.feature_extraction import (
@@ -66,14 +67,6 @@ class ReviewedAPILogRow:
     features: FeatureVector
     label: int
     record_id: str
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _metadata_blockers(metadata: dict[str, Any]) -> list[str]:
@@ -242,7 +235,7 @@ def _hashed_record_id(
 
 def load_reviewed_api_log_rows(path: Path) -> list[ReviewedAPILogRow]:
     """Load deduplicated API-log rows without persisting raw identifiers."""
-    input_sha256 = _sha256_file(path)
+    input_sha256 = sha256_file(path)
     labels_by_identity: dict[str, int] = {}
     rows_by_identity: dict[str, ReviewedAPILogRow] = {}
 
@@ -381,7 +374,7 @@ def review_api_log_source(
         source_kind="reviewed-api-log-jsonl",
         generated_at=datetime.now(timezone.utc).isoformat(),
         input_file=path.name,
-        input_sha256=_sha256_file(path),
+        input_sha256=sha256_file(path),
         feature_contract_version=FEATURE_CONTRACT_VERSION,
         metadata=metadata,
         total_rows=total_rows,
@@ -429,7 +422,7 @@ def validate_api_log_source_review(review_path: Path, input_path: Path) -> dict:
         )
 
     expected_sha256 = str(review["input_sha256"])
-    if _sha256_file(input_path) != expected_sha256:
+    if sha256_file(input_path) != expected_sha256:
         raise DatasetValidationError(
             "API log source review SHA-256 does not match input"
         )
