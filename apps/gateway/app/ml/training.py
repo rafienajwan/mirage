@@ -9,9 +9,9 @@ from typing import Iterable
 import joblib
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
 from sklearn.model_selection import train_test_split
 
+from app.ml.artifacts import classification_metrics
 from app.services.feature_extraction import (
     FEATURE_CONTRACT_VERSION,
     FEATURE_NAMES,
@@ -85,13 +85,8 @@ def train_risk_classifier(
         n_jobs=-1,
     )
     model.fit(x_train, y_train)
-    predictions = model.predict(x_test)
-    tn, fp, _, _ = confusion_matrix(y_test, predictions, labels=[0, 1]).ravel()
     metrics = TrainingMetrics(
-        precision=float(precision_score(y_test, predictions, zero_division=0)),
-        recall=float(recall_score(y_test, predictions, zero_division=0)),
-        f1_score=float(f1_score(y_test, predictions, zero_division=0)),
-        false_positive_rate=float(fp / (fp + tn)) if fp + tn else 0.0,
+        **classification_metrics(y_test, model.predict(x_test)),
         training_rows=len(y_train),
         test_rows=len(y_test),
     )
