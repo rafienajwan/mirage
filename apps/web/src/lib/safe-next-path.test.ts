@@ -13,6 +13,9 @@ describe("safeNextPath", () => {
   for (const target of [
     "/\\evil.com",
     "//evil.com",
+    "/.//evil.com",
+    "/a/..//evil.com",
+    "/%2e//evil.com",
     "https://evil.com",
     "javascript:alert(1)",
     "",

@@ -11,6 +11,9 @@ export function safeNextPath(target: string | null, origin: string): string {
     const base = new URL(origin);
     const resolved = new URL(target, base);
     if (resolved.origin !== base.origin) return FALLBACK;
+    // "/.//evil.com" resolves to the pathname "//evil.com", which the router
+    // would treat as a protocol-relative URL to another host.
+    if (resolved.pathname.startsWith("//")) return FALLBACK;
     return `${resolved.pathname}${resolved.search}${resolved.hash}`;
   } catch {
     return FALLBACK;
