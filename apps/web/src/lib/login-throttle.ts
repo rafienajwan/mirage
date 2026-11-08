@@ -17,6 +17,10 @@ export interface ThrottleDecision {
 
 export interface LoginThrottle {
   check(key: string): ThrottleDecision;
+  // Check and, if allowed, count the attempt as a failure in one synchronous
+  // step, so concurrent requests cannot all pass before any is recorded.
+  // Call recordSuccess when the password turns out to be right.
+  attempt(key: string): ThrottleDecision;
   recordFailure(key: string): void;
   recordSuccess(key: string): void;
 }
@@ -40,7 +44,13 @@ export function createLoginThrottle({
   const blockedUntil = (failures: number[], limit: number) =>
     failures.length >= limit ? failures[failures.length - limit] + windowMs : 0;
 
-  return {
+  const throttle: LoginThrottle = {
+    attempt(key) {
+      const decision = throttle.check(key);
+      if (decision.allowed) throttle.recordFailure(key);
+      return decision;
+    },
+
     check(key) {
       const at = now();
       global = recent(global, at);
@@ -75,17 +85,21 @@ export function createLoginThrottle({
     },
 
     recordSuccess(key) {
+      // Undo the attempt this success was charged as.
+      if (clients.has(key)) global.pop();
       clients.delete(key);
     },
   };
+  return throttle;
 }
 
 // Next.js route handlers expose no socket address, so forwarded headers are
-// honored only when a trusted reverse proxy sets them.
+// honored only when a trusted reverse proxy sets them. That proxy appends the
+// address it saw; everything to its left was written by the client.
 export function loginClientKey(headers: Headers, trustProxyHeaders: boolean): string {
   if (!trustProxyHeaders) return "direct";
-  const first = headers.get("x-forwarded-for")?.split(",", 1)[0]?.trim();
-  return first || "direct";
+  const hops = headers.get("x-forwarded-for")?.split(",") ?? [];
+  return hops[hops.length - 1]?.trim() || "direct";
 }
 
 export const loginThrottle = createLoginThrottle();

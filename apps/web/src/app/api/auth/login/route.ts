@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     request.headers,
     process.env.MIRAGE_TRUST_PROXY_HEADERS === "true",
   );
-  const throttle = loginThrottle.check(clientKey);
+  const throttle = loginThrottle.attempt(clientKey);
   if (!throttle.allowed) {
     return NextResponse.json(
       { detail: "Too many login attempts" },
@@ -61,7 +61,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ detail: "Invalid request body" }, { status: 400 });
   }
   if (typeof candidate !== "string" || !passwordMatches(candidate, password)) {
-    loginThrottle.recordFailure(clientKey);
     return NextResponse.json({ detail: "Invalid credentials" }, { status: 401 });
   }
   loginThrottle.recordSuccess(clientKey);

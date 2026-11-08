@@ -64,11 +64,35 @@ describe("login throttle", () => {
   });
 });
 
+describe("login attempts", () => {
+  it("counts attempts before their outcome is known", () => {
+    const throttle = createLoginThrottle({ now: clock().now });
+    for (let i = 0; i < 5; i += 1) {
+      assert.equal(throttle.attempt("a").allowed, true);
+    }
+    assert.equal(throttle.attempt("a").allowed, false);
+  });
+
+  it("does not charge successful attempts to the global budget", () => {
+    const throttle = createLoginThrottle({ now: clock().now, globalLimit: 2 });
+    throttle.attempt("a");
+    throttle.recordSuccess("a");
+    assert.equal(throttle.attempt("b").allowed, true);
+    assert.equal(throttle.attempt("c").allowed, true);
+    assert.equal(throttle.attempt("d").allowed, false);
+  });
+});
+
 describe("login client key", () => {
+  it("uses the hop the trusted proxy appended, not one the client wrote", () => {
+    const spoofed = new Headers({ "x-forwarded-for": "1.2.3.4, 198.51.100.7" });
+    assert.equal(loginClientKey(spoofed, true), "198.51.100.7");
+  });
+
   it("ignores forwarded headers unless trusted", () => {
     const headers = new Headers({ "x-forwarded-for": "203.0.113.9, 10.0.0.1" });
     assert.equal(loginClientKey(headers, false), "direct");
-    assert.equal(loginClientKey(headers, true), "203.0.113.9");
+    assert.equal(loginClientKey(headers, true), "10.0.0.1");
     assert.equal(loginClientKey(new Headers(), true), "direct");
   });
 });
