@@ -7,6 +7,7 @@ import logging
 from pathlib import Path
 
 from app.core.config import settings
+from app.ml.artifact_integrity import UNPINNED_BLOCKER, pinned_digest
 from app.ml.artifacts import review_model_artifact
 from app.ml.inference import RiskClassifier
 from app.schemas.decision import Decision
@@ -27,7 +28,10 @@ def _load_classifier() -> RiskClassifier | None:
         logger.warning("ML shadow artifact does not exist: %s", artifact_path)
         return None
 
-    expected_sha256 = settings.ml_model_artifact_sha256
+    expected_sha256, may_load = pinned_digest(settings)
+    if not may_load:
+        logger.warning("ML shadow artifact ignored: %s", UNPINNED_BLOCKER)
+        return None
     if expected_sha256 is None:
         logger.warning("MIRAGE_MODEL_ARTIFACT_SHA256 not set; loading unpinned artifact")
 

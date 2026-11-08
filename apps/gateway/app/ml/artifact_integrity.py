@@ -19,6 +19,19 @@ class ArtifactIntegrityError(ValueError):
     """The artifact does not match its pinned digest, or the digest is invalid."""
 
 
+UNPINNED_BLOCKER = "MIRAGE_MODEL_ARTIFACT_SHA256 is not set"
+
+
+def pinned_digest(settings: object) -> tuple[str | None, bool]:
+    """Return (expected digest, may_load) for the configured artifact.
+
+    Outside development an artifact without a pinned digest is never loaded.
+    """
+    digest = getattr(settings, "ml_model_artifact_sha256", None)
+    development = getattr(settings, "app_env", "development") == "development"
+    return digest, digest is not None or development
+
+
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
