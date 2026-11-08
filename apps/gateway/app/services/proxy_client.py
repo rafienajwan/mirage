@@ -52,7 +52,6 @@ _MIRAGE_INTERNAL_HEADERS = {
     "x-mirage-api-key",
     "x-mirage-actor-hint",
     "x-mirage-risk-score",
-    "x-mirage-decoy-type",
 }
 
 

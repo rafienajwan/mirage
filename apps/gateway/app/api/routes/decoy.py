@@ -43,5 +43,6 @@ async def decoy_respond(request: DecoyResponseRequest):
         actor_hint=request.actor_hint,
         decoy_type=response.decoy_type,
         source_path=request.path,
+        response_text=response.model_dump_json(),
     )
     return response

@@ -19,12 +19,12 @@ class HoneytokenMatch:
     evidence: str
 
 
-_ISSUED_TOKEN_PATTERN = re.compile(
+ISSUED_TOKEN_PATTERN = re.compile(
     r"\bmirage-issued-(login|oauth|service|database)-canary-[a-f0-9]{12}\b",
     re.IGNORECASE,
 )
 
-_ISSUED_TOKEN_LABELS: dict[str, tuple[HoneytokenKind, str]] = {
+ISSUED_TOKEN_LABELS: dict[str, tuple[HoneytokenKind, str]] = {
     "login": ("login_token", "Issued decoy login token"),
     "oauth": ("oauth_token", "Issued decoy OAuth token"),
     "service": ("service_token", "Issued decoy service token"),
@@ -73,9 +73,9 @@ def detect_honeytokens(request: InspectRequest) -> list[HoneytokenMatch]:
                 )
             )
     seen_kinds = {match.token_kind for match in matches}
-    for issued in _ISSUED_TOKEN_PATTERN.finditer(text):
+    for issued in ISSUED_TOKEN_PATTERN.finditer(text):
         issued_kind = issued.group(1).lower()
-        token_kind, token_label = _ISSUED_TOKEN_LABELS[issued_kind]
+        token_kind, token_label = ISSUED_TOKEN_LABELS[issued_kind]
         if token_kind in seen_kinds:
             continue
         matches.append(

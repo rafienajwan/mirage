@@ -87,7 +87,6 @@ async def proxy_request(target_path: str, request: Request) -> Response:
         {
             "x-mirage-actor-hint": inspection.fingerprint_hash,
             "x-mirage-risk-score": f"{inspection.risk_score:.1f}",
-            "x-mirage-decoy-type": inspection.decoy_type or "auto",
         }
         if is_decoy
         else None
@@ -102,9 +101,11 @@ async def proxy_request(target_path: str, request: Request) -> Response:
         decoy_context=decoy_context,
     )
     if is_decoy:
+        # Record what the decoy really issued, not what the gateway would issue.
         await record_canary_assignments(
             actor_hint=inspection.fingerprint_hash,
             decoy_type=inspection.decoy_type or "auto",
             source_path=metadata.path,
+            response_text=response.body.decode("utf-8", errors="ignore"),
         )
     return response

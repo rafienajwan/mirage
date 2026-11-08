@@ -61,7 +61,6 @@ async def test_suspicious_request_is_forwarded_to_decoy(client, monkeypatch):
     assert captured["is_decoy"] is True
     assert captured["decoy_context"]["x-mirage-actor-hint"]
     assert captured["decoy_context"]["x-mirage-risk-score"]
-    assert captured["decoy_context"]["x-mirage-decoy-type"] == "config"
 
 
 @pytest.mark.asyncio
@@ -292,7 +291,7 @@ async def test_forward_request_keeps_repeated_response_headers(monkeypatch):
         lambda **kwargs: original_client(transport=transport, **kwargs),
     )
     request = Request(
-        {"type": "http", "method": "GET", "path": "/api/v1/proxy/x", "query_string": b"", "headers": []}
+        {"type": "http", "method": "GET", "path": "/x", "query_string": b"", "headers": []}
     )
 
     response = await forward_request(
@@ -511,6 +510,35 @@ async def test_oversized_user_agent_and_path_are_routed_and_logged(client, monke
     alert = (await store.get_alerts(limit=1))[0]
     assert alert.title.startswith("Decoy redirect: /.env/")
     assert len(alert.title) <= 256
+
+
+@pytest.mark.parametrize(
+    "decoy_body,expected_kinds",
+    [
+        ({"access_token": "mirage-issued-oauth-canary-0123456789ab"}, ["oauth_token"]),
+        ({"status": "ok"}, []),
+    ],
+)
+async def test_proxy_records_the_canary_tokens_the_decoy_returned(
+    client, monkeypatch, decoy_body, expected_kinds
+):
+    import hashlib
+
+    from app.storage import store
+
+    async def fake_forward(_request, **_kwargs):
+        return JSONResponse(decoy_body)
+
+    monkeypatch.setattr(proxy_route, "forward_request", fake_forward)
+    response = await client.get("/api/v1/proxy/.env", headers={"user-agent": "sqlmap/1.8"})
+
+    assert response.status_code == 200
+    assignments = await store.get_canary_assignments()
+    assert [item.token_kind for item in assignments] == expected_kinds
+    if expected_kinds:
+        token = decoy_body["access_token"]
+        assert assignments[0].token_hash == hashlib.sha256(token.encode()).hexdigest()
+        assert assignments[0].source_path == "/.env"
 
 
 async def test_concurrent_requests_from_one_actor_are_all_logged(client, monkeypatch):
