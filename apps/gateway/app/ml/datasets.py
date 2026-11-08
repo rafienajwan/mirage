@@ -646,7 +646,8 @@ def _csic_http_rows(loaded: LoadedCSICHTTP) -> list[PreparedTrainingRow]:
             payload_indicators=indicators,
             payload_excerpt=build_payload_excerpt(
                 record.query,
-                record.body.decode("latin-1"),
+                # Same decoding as the proxy, so train and serve features match.
+                record.body.decode("utf-8", errors="ignore"),
             ),
             destination_port=record.destination_port,
         )
