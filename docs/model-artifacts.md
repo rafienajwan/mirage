@@ -85,44 +85,26 @@ behavior, label quality, and false-positive tradeoffs manually.
 
 ## Local HTTP CSIC 2010 Review
 
-The ignored HTTP CSIC 2010 split was regenerated for feature contract version 2
-with train/test SHA-256 values, trained with manifest-bound lineage, and
-evaluated against its external holdout. Dataset review passed with 34,604 rows:
-25,953 training rows and 8,651 holdout rows. The enriched candidate improves
-substantially over the version 1 baseline, but it still does not pass the
-conservative promotion-quality gates.
-
-Training command:
+The ignored HTTP CSIC 2010 split was regenerated under feature contract
+version 3 with the grouped split and trained with manifest-bound lineage, so
+its metrics come from the prepared holdout:
 
 ```bash
 python scripts/train_model.py \
-  --input data/prepared/csic-http-2010-v2/train.jsonl \
-  --output artifacts/csic-http-2010-risk-model-v2.joblib \
-  --manifest data/prepared/csic-http-2010-v2/manifest.json
+  --input data/prepared/csic-http-2010-v3/train.jsonl \
+  --output artifacts/csic-http-2010-risk-model-v3.joblib \
+  --manifest data/prepared/csic-http-2010-v3/manifest.json
+
+python scripts/review_model_artifact.py \
+  --artifact artifacts/csic-http-2010-risk-model-v3.joblib
 ```
 
-| Candidate and check | Precision | Recall | F1 | False-positive rate |
-| --- | ---: | ---: | ---: | ---: |
-| Version 1 holdout baseline, 8,651 rows | 0.639824 | 0.328489 | 0.434106 | 0.158369 |
-| Version 2 internal validation, 6,489 rows | 0.836122 | 0.734469 | 0.782006 | 0.123319 |
-| Version 2 prepared holdout, 8,651 rows | 0.818670 | 0.725132 | 0.769067 | 0.137554 |
-
-The version 2 artifact still fails the required `0.9` precision, recall, and F1
-gates and the maximum `0.05` false-positive-rate gate. Its default local
-artifact review reports `shadow_ready` because all four metrics satisfy the
-default review thresholds (`0.5` minimums and `0.5` maximum FPR). That status
-only permits observation: a smoke
-run still produced one false positive on the normal request, agreement was
-`0.5`, and heuristic routing remained unchanged.
-
-Feature contract version 2 increases the training split from 163 to 17,294
-unique feature vectors. Label-conflicting vectors now cover 4,574 rows instead
-of 24,737. Payload entropy, non-alphanumeric ratio, payload length,
-percent-encoded count, and parameter count are the five most important model
-inputs in this candidate. This confirms that generic payload shape reduces the
-earlier structural information loss, but the remaining false-positive rate and
-legacy CSIC domain gap still require reviewed production-like custom API logs.
-Thresholds were not lowered and this artifact must not control live routing.
+On 8,686 holdout rows it reaches precision 0.750, recall 0.728, F1 0.739 and a
+false-positive rate of 0.210. The default review blocks it (`Precision 0.750 is
+below 0.900`, `False-positive rate 0.210 is above 0.020`), so it must not be
+used for shadow or live routing. Dataset counts, `conflicting_feature_groups`
+and the artifact SHA-256 are recorded in `docs/dataset-preparation.md`. The CSIC
+domain gap still requires reviewed production-like custom API logs.
 
 ## Smoke-Test Shadow Scoring
 

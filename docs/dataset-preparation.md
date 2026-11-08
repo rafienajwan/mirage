@@ -327,13 +327,13 @@ cd apps/gateway
 python scripts/prepare_dataset.py \
   --source csic-http-dir \
   --input data/csic-2010 \
-  --output-dir data/prepared/csic-http-2010-v2 \
+  --output-dir data/prepared/csic-http-2010-v3 \
   --dataset-name csic-http-2010 \
-  --dataset-version redata-rwuusv-v2 \
+  --dataset-version redata-rwuusv-v3 \
   --checksums data/csic-2010/sha256.json
 
 python scripts/review_dataset.py \
-  --manifest data/prepared/csic-http-2010-v2/manifest.json \
+  --manifest data/prepared/csic-http-2010-v3/manifest.json \
   --min-total-rows 10000 \
   --min-train-rows 7000 \
   --min-test-rows 2000 \
@@ -352,6 +352,45 @@ either split changes without regenerating the manifest, even when its row count
 remains unchanged, or when the feature contract is outdated. Prepared
 directories created before split hashes or feature-contract version 3 were
 introduced must be regenerated before training a promotion-eligible artifact.
+
+### Contract v3 training run (2026-11-09)
+
+Prepared from the verified local release with the command above under feature
+contract version 3 and the current payload detector, reviewed, trained with
+`scripts/train_model.py --manifest` and reviewed with the default artifact
+thresholds. Datasets and artifacts stay in ignored local directories.
+
+| Signal | Value |
+| --- | ---: |
+| Raw requests | 97,065 |
+| Repeated request identities removed | 62,461 |
+| Rows after deduplication | 34,604 (18,640 normal, 15,964 suspicious) |
+| Training rows | 25,918 (13,988 normal, 11,930 suspicious) |
+| Holdout rows | 8,686 (4,652 normal, 4,034 suspicious) |
+| Distinct feature vectors, train / holdout | 16,693 / 6,041 (none shared) |
+| `conflicting_feature_groups` | 263 |
+| Dataset review | ready, no blockers |
+
+Holdout metrics on the grouped 8,686-row test split:
+
+| Precision | Recall | F1 | False-positive rate |
+| ---: | ---: | ---: | ---: |
+| 0.750000 | 0.728061 | 0.738868 | 0.210447 |
+
+Artifact review with the default thresholds: **failed** (`shadow_ready: false`).
+Blockers, verbatim:
+
+- `Precision 0.750 is below 0.900`
+- `False-positive rate 0.210 is above 0.020`
+
+Artifact `artifacts/csic-http-2010-risk-model-v3.joblib`, SHA-256
+`e226ef23c975de6482807597c298fed899949aae0e61017568aeab5853e62e2a`.
+
+The gate is doing its job: about one normal CSIC request in five would be sent
+to the decoy. The artifact must not be configured for shadow or live routing.
+The earlier contract version 2 figures (precision 0.82, false-positive rate
+0.14) came from a row-level split in which identical feature vectors could sit
+on both sides, so they are not directly comparable.
 
 CSIC traffic was generated for a 2010 e-commerce application. It is useful for
 reproducible parser, payload-signal, and model benchmarking, but it is not
