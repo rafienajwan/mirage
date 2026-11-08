@@ -8,7 +8,7 @@ from pathlib import Path
 
 from app.core.config import settings
 from app.ml.artifact_integrity import UNPINNED_BLOCKER, pinned_digest
-from app.ml.artifacts import review_model_artifact
+from app.ml.artifacts import review_and_load_artifact
 from app.ml.inference import RiskClassifier
 from app.schemas.decision import Decision
 from app.schemas.ml import MLShadowScore
@@ -35,8 +35,10 @@ def _load_classifier() -> RiskClassifier | None:
     if expected_sha256 is None:
         logger.warning("MIRAGE_MODEL_ARTIFACT_SHA256 not set; loading unpinned artifact")
 
-    review = review_model_artifact(artifact_path, expected_sha256=expected_sha256)
-    if not review.shadow_ready:
+    review, artifact = review_and_load_artifact(
+        artifact_path, expected_sha256=expected_sha256
+    )
+    if not review.shadow_ready or artifact is None:
         logger.warning(
             "ML shadow artifact failed review: %s",
             "; ".join(review.blockers),
@@ -44,8 +46,8 @@ def _load_classifier() -> RiskClassifier | None:
         return None
 
     try:
-        return RiskClassifier(artifact_path, expected_sha256=expected_sha256)
-    except (KeyError, ValueError, OSError) as exc:
+        return RiskClassifier.from_artifact(artifact)
+    except (KeyError, ValueError) as exc:
         logger.warning("ML shadow artifact could not be loaded: %s", exc)
         return None
 

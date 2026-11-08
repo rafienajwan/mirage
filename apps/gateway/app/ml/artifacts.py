@@ -10,10 +10,9 @@ from pathlib import Path
 import re
 from typing import Any
 
-import joblib
 from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
 
-from app.ml.artifact_integrity import ArtifactIntegrityError, verify_artifact_digest
+from app.ml.artifact_integrity import ArtifactIntegrityError, load_verified_artifact
 from app.services.feature_extraction import FEATURE_CONTRACT_VERSION, FEATURE_NAMES
 
 REQUIRED_METRICS = (
@@ -103,9 +102,7 @@ def load_checked_artifact(
     the payload (``{}`` if it is not a dictionary) and its contract blockers.
     """
     try:
-        if expected_sha256 is not None:
-            verify_artifact_digest(artifact_path, expected_sha256)
-        artifact = joblib.load(artifact_path)
+        artifact = load_verified_artifact(artifact_path, expected_sha256)
     except ArtifactIntegrityError:
         return None, ["Artifact SHA-256 does not match MIRAGE_MODEL_ARTIFACT_SHA256"]
     except FileNotFoundError:
@@ -172,6 +169,13 @@ def threshold_blockers(
 
 
 def review_model_artifact(
+    artifact_path: Path, **kwargs: Any
+) -> ArtifactReview:
+    """Validate an artifact before enabling model-only shadow scoring."""
+    return review_and_load_artifact(artifact_path, **kwargs)[0]
+
+
+def review_and_load_artifact(
     artifact_path: Path,
     *,
     expected_sha256: str | None = None,
@@ -181,8 +185,11 @@ def review_model_artifact(
     max_false_positive_rate: float = REVIEW_MAX_FALSE_POSITIVE_RATE,
     min_training_rows: int = REVIEW_MIN_TRAINING_ROWS,
     min_test_rows: int = REVIEW_MIN_TEST_ROWS,
-) -> ArtifactReview:
-    """Validate an artifact before enabling model-only shadow scoring."""
+) -> tuple[ArtifactReview, dict[str, Any] | None]:
+    """Review an artifact and return the loaded payload so callers need not reload it.
+
+    The payload is None when the file could not be loaded.
+    """
     warnings: list[str] = []
     metrics: dict[str, float | int] = {}
 
@@ -197,7 +204,7 @@ def review_model_artifact(
             metrics={},
             blockers=blockers,
             warnings=[],
-        )
+        ), None
 
     artifact_version = artifact.get("artifact_version")
     if not isinstance(artifact_version, int):
@@ -257,7 +264,7 @@ def review_model_artifact(
         warnings=warnings,
         feature_contract_version=feature_contract_version,
         dataset_lineage=dataset_lineage,
-    )
+    ), artifact
 
 
 def file_stamp(path: Path) -> tuple[int, int]:

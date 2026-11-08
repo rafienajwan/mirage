@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
-import joblib
-
-from app.ml.artifact_integrity import verify_artifact_digest
+from app.ml.artifact_integrity import load_verified_artifact
 from app.services.feature_extraction import (
     FEATURE_CONTRACT_VERSION,
     FEATURE_NAMES,
@@ -16,9 +15,16 @@ from app.services.feature_extraction import (
 
 class RiskClassifier:
     def __init__(self, artifact_path: Path, *, expected_sha256: str | None = None) -> None:
-        if expected_sha256 is not None:
-            verify_artifact_digest(artifact_path, expected_sha256)
-        artifact = joblib.load(artifact_path)
+        self._use(load_verified_artifact(artifact_path, expected_sha256))
+
+    @classmethod
+    def from_artifact(cls, artifact: dict[str, Any]) -> RiskClassifier:
+        """Build a classifier from an artifact that was already loaded and checked."""
+        classifier = cls.__new__(cls)
+        classifier._use(artifact)
+        return classifier
+
+    def _use(self, artifact: dict[str, Any]) -> None:
         if artifact.get("feature_contract_version") != FEATURE_CONTRACT_VERSION:
             raise ValueError(
                 "Model feature contract version does not match the gateway"

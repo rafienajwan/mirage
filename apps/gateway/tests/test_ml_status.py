@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-from app.ml import artifacts
+from app.ml import artifact_integrity
 from app.ml.training import LabeledFeatures, train_risk_classifier
 from app.services import ml_status
 from app.services.feature_extraction import FEATURE_NAMES
@@ -68,9 +68,9 @@ def test_ml_shadow_status_reuses_review_of_unchanged_artifact(monkeypatch, tmp_p
     train_risk_classifier(rows, artifact)
     monkeypatch.setattr(ml_status, "settings", _settings(str(artifact)))
     loads = []
-    real_load = artifacts.joblib.load
+    real_load = artifact_integrity.joblib.load
     monkeypatch.setattr(
-        artifacts.joblib, "load", lambda *a, **k: loads.append(a) or real_load(*a, **k)
+        artifact_integrity.joblib, "load", lambda *a, **k: loads.append(a) or real_load(*a, **k)
     )
 
     first = ml_status.get_ml_shadow_status()
