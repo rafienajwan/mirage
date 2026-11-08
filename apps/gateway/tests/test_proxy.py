@@ -347,6 +347,29 @@ async def test_traffic_tracker_bounds_distinct_sources():
     assert "192.0.2.1" not in tracker.requests
 
 
+async def test_traffic_tracker_sweeps_stale_sources_once_per_window(monkeypatch):
+    now = [1000.0]
+    tracker = TrafficTracker(window_seconds=60, clock=lambda: now[0])
+    sweeps = 0
+    original_prune = tracker._prune_sources
+
+    def counting_prune(cutoff: float) -> None:
+        nonlocal sweeps
+        sweeps += 1
+        original_prune(cutoff)
+
+    monkeypatch.setattr(tracker, "_prune_sources", counting_prune)
+    for index in range(100):
+        await tracker.record(f"192.0.2.{index}")
+    assert sweeps == 0
+
+    now[0] += 61
+    await tracker.record("198.51.100.1")
+    await tracker.record("198.51.100.2")
+    assert sweeps == 1
+    assert set(tracker.requests) == {"198.51.100.1", "198.51.100.2"}
+
+
 BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0 Safari/537.36"
 
 
