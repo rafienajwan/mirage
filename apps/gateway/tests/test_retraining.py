@@ -40,7 +40,7 @@ async def test_retraining_rejects_unready_training_data(client, tmp_path, monkey
     monkeypatch.setattr(
         retraining,
         "settings",
-        SimpleNamespace(retraining_artifact_dir=str(tmp_path)),
+        SimpleNamespace(retraining_artifact_dir=str(tmp_path), ml_model_artifact=None),
     )
 
     response = await client.post("/api/v1/dashboard/training-data/retrain")
@@ -56,8 +56,9 @@ async def test_retraining_trains_and_reviews_local_artifact(client, tmp_path, mo
     monkeypatch.setattr(
         retraining,
         "settings",
-        SimpleNamespace(retraining_artifact_dir=str(tmp_path)),
+        SimpleNamespace(retraining_artifact_dir=str(tmp_path), ml_model_artifact=None),
     )
+    _seven_artifacts(tmp_path)
     for index in range(10):
         await _create_labeled_event(client, index, "normal")
         await _create_labeled_event(client, index + 10, "suspicious")
@@ -69,6 +70,7 @@ async def test_retraining_trains_and_reviews_local_artifact(client, tmp_path, mo
     artifact = Path(data["artifact_path"])
 
     assert artifact.exists()
+    assert len(list(tmp_path.glob("risk_model_*.joblib"))) == 5
     assert artifact.parent == tmp_path
     assert data["training_summary"]["ready_for_training"] is True
     assert data["metrics"]["training_rows"] == 15
@@ -83,7 +85,7 @@ async def test_retraining_trains_off_the_event_loop(client, tmp_path, monkeypatc
     monkeypatch.setattr(
         retraining,
         "settings",
-        SimpleNamespace(retraining_artifact_dir=str(tmp_path)),
+        SimpleNamespace(retraining_artifact_dir=str(tmp_path), ml_model_artifact=None),
     )
     loop_thread = threading.get_ident()
     train_threads: list[int] = []
@@ -108,7 +110,67 @@ def test_retraining_artifact_paths_do_not_collide_within_a_second(tmp_path, monk
     monkeypatch.setattr(
         retraining,
         "settings",
-        SimpleNamespace(retraining_artifact_dir=str(tmp_path)),
+        SimpleNamespace(retraining_artifact_dir=str(tmp_path), ml_model_artifact=None),
     )
 
     assert retraining._artifact_path() != retraining._artifact_path()
+
+
+def _seven_artifacts(directory: Path) -> list[Path]:
+    import os
+
+    directory.mkdir(parents=True, exist_ok=True)
+    paths = []
+    for index in range(7):
+        path = directory / f"risk_model_2026110{index}T000000Z_{index:08x}.joblib"
+        path.write_bytes(b"artifact")
+        os.utime(path, (1_700_000_000 + index, 1_700_000_000 + index))
+        paths.append(path)
+    return paths  # oldest first
+
+
+def test_prune_keeps_the_five_newest_artifacts(tmp_path):
+    paths = _seven_artifacts(tmp_path)
+    unrelated = tmp_path / "notes.txt"
+    unrelated.write_text("keep", encoding="utf-8")
+    other_model = tmp_path / "custom.joblib"
+    other_model.write_bytes(b"keep")
+
+    deleted = retraining.prune_retraining_artifacts(tmp_path, protected=None)
+
+    assert sorted(deleted) == sorted(paths[:2])
+    assert all(path.exists() for path in paths[2:])
+    assert unrelated.exists()
+    assert other_model.exists()
+
+
+def test_prune_never_deletes_the_configured_artifact(tmp_path, monkeypatch):
+    directory = tmp_path / "artifacts"
+    paths = _seven_artifacts(directory)
+    monkeypatch.chdir(tmp_path)
+
+    deleted = retraining.prune_retraining_artifacts(
+        directory, protected=Path("artifacts") / paths[0].name
+    )
+
+    assert deleted == [paths[1]]
+    assert paths[0].exists()
+    assert len(list(directory.glob("risk_model_*.joblib"))) == 6
+
+
+def test_prune_logs_deletion_errors(tmp_path, monkeypatch, caplog):
+    paths = _seven_artifacts(tmp_path)
+    real_unlink = Path.unlink
+
+    def failing_unlink(self, *args, **kwargs):
+        if self == paths[0]:
+            raise PermissionError("locked")
+        return real_unlink(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", failing_unlink)
+
+    deleted = retraining.prune_retraining_artifacts(tmp_path, protected=None)
+
+    assert deleted == [paths[1]]
+    assert paths[0].exists()
+    assert "locked" in caplog.text

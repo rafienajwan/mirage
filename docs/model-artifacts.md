@@ -349,6 +349,11 @@ The endpoint stores the artifact in `MIRAGE_RETRAINING_ARTIFACT_DIR`, returns
 the training metrics, and includes the same artifact review result used before
 shadow-mode activation. It does not update `MIRAGE_MODEL_ARTIFACT`.
 
+After each successful run only the five newest `risk_model_*.joblib` files in
+that directory are kept. The file configured as `MIRAGE_MODEL_ARTIFACT` is never
+deleted, even when it is older. Files that cannot be deleted are logged and
+left in place.
+
 ## Enable Shadow Mode
 
 Only after review, point the gateway to the artifact:
