@@ -1,8 +1,10 @@
 """Dashboard API endpoints."""
 
+from pathlib import PurePath
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
-from app.core.security import require_admin, require_operator
+from app.core.security import Operator, require_admin, require_operator
 from app.schemas.actor import (
     ActorCaseOpenRequest,
     ActorCaseUpdateRequest,
@@ -39,10 +41,29 @@ from app.services.dashboard_stream import schedule_dashboard_snapshot_refresh
 from app.services.ml_promotion import evaluate_ml_promotion
 from app.services.ml_shadow_summary import get_ml_shadow_summary
 from app.services.ml_status import get_ml_shadow_status
+from app.services.operators import audit, normalize_username
 from app.services.retraining import train_from_labeled_events
 from app.services.threat_analysis import get_threat_summary
 from app.services.training_export import events_to_jsonl, training_data_summary
 from app.storage import store
+
+
+async def _resolve_assignee(value: str | None) -> str | None:
+    """Normalize a non-empty assignee and require an enabled operator."""
+    if not value:
+        return value
+    try:
+        username = normalize_username(value)
+    except ValueError:
+        username = None
+    found = await store.get_operator(username) if username else None
+    if found is None or found.disabled:
+        raise HTTPException(
+            status_code=422,
+            detail="Unknown assignee",
+        )
+    return username
+
 
 router = APIRouter(
     prefix="/dashboard",
@@ -73,14 +94,21 @@ async def dashboard_events(limit: int = Query(default=50, ge=1, le=200)):
 @router.patch(
     "/events/{event_id}/label",
 )
-async def label_dashboard_event(event_id: str, payload: EventLabelRequest):
+async def label_dashboard_event(
+    event_id: str,
+    payload: EventLabelRequest,
+    operator: Operator = Depends(require_operator),
+):
     """Apply an analyst label to an existing event."""
-    updated = await store.update_event_label(event_id, payload.label, payload.note)
+    updated = await store.update_event_label(
+        event_id, payload.label, payload.note, labeled_by=operator.username
+    )
     if updated is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Event not found",
         )
+    await audit(operator, "label_event", event_id, payload.label.value)
     schedule_dashboard_snapshot_refresh()
     return updated.model_dump(mode="json")
 
@@ -113,13 +141,15 @@ async def training_data_readiness(limit: int = Query(default=10000, ge=1, le=500
 @router.post(
     "/training-data/retrain",
     response_model=RetrainingRun,
-    dependencies=[Depends(require_admin)],
 )
 async def retrain_from_training_data(
     limit: int = Query(default=10000, ge=20, le=50000),
+    operator: Operator = Depends(require_admin),
 ):
     """Train a local shadow-mode candidate from analyst-labeled events."""
-    return await train_from_labeled_events(limit=limit)
+    run = await train_from_labeled_events(limit=limit)
+    await audit(operator, "retrain", PurePath(run.artifact_path).name)
+    return run
 
 
 @router.get("/ml-shadow/status", response_model=MLShadowStatus)
@@ -177,11 +207,11 @@ async def dashboard_canary_assignments(
 
 @router.post(
     "/canary-assignments/{assignment_id}/revoke",
-    dependencies=[Depends(require_admin)],
 )
 async def revoke_dashboard_canary_assignment(
     assignment_id: str,
     payload: CanaryAssignmentRevokeRequest,
+    operator: Operator = Depends(require_admin),
 ):
     """Revoke a persisted synthetic canary assignment."""
     revoked = await store.revoke_canary_assignment(assignment_id, payload.reason)
@@ -190,6 +220,7 @@ async def revoke_dashboard_canary_assignment(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Canary assignment not found",
         )
+    await audit(operator, "canary_revoke", assignment_id)
     schedule_dashboard_snapshot_refresh()
     return revoked.model_dump(mode="json")
 
@@ -229,14 +260,24 @@ async def dashboard_actor_case_workflows(
 @router.post(
     "/actor-cases/{case_id}/open",
 )
-async def open_dashboard_actor_case(case_id: str, payload: ActorCaseOpenRequest):
+async def open_dashboard_actor_case(
+    case_id: str,
+    payload: ActorCaseOpenRequest,
+    operator: Operator = Depends(require_operator),
+):
     """Open a recommended actor case as a persisted workflow record."""
-    opened = await open_actor_case_from_recommendation(case_id, payload)
+    payload = payload.model_copy(
+        update={"assigned_to": await _resolve_assignee(payload.assigned_to)}
+    )
+    opened = await open_actor_case_from_recommendation(
+        case_id, payload, updated_by=operator.username
+    )
     if opened is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Recommended actor case not found",
         )
+    await audit(operator, "case_open", case_id, opened.status)
     schedule_dashboard_snapshot_refresh()
     return opened.model_dump(mode="json")
 
@@ -244,14 +285,24 @@ async def open_dashboard_actor_case(case_id: str, payload: ActorCaseOpenRequest)
 @router.patch(
     "/actor-case-workflows/{case_id}",
 )
-async def update_dashboard_actor_case(case_id: str, payload: ActorCaseUpdateRequest):
+async def update_dashboard_actor_case(
+    case_id: str,
+    payload: ActorCaseUpdateRequest,
+    operator: Operator = Depends(require_operator),
+):
     """Update a persisted actor case workflow status."""
-    updated = await update_actor_case_workflow(case_id, payload)
+    payload = payload.model_copy(
+        update={"assigned_to": await _resolve_assignee(payload.assigned_to)}
+    )
+    updated = await update_actor_case_workflow(
+        case_id, payload, updated_by=operator.username
+    )
     if updated is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Actor case workflow not found",
         )
+    await audit(operator, "case_update", case_id, updated.status)
     schedule_dashboard_snapshot_refresh()
     return updated.model_dump(mode="json")
 

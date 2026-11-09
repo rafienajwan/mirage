@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.api.routes import dashboard as dashboard_routes
-from app.services import honeytoken
+from app.services import honeytoken, operators
 
 
 def _settings() -> SimpleNamespace:
@@ -127,6 +127,7 @@ async def test_actor_cases_recommend_investigations_from_clusters(client, monkey
 
 @pytest.mark.asyncio
 async def test_actor_case_workflows_open_and_update_recommended_case(client, monkeypatch):
+    await operators.create_operator("rafie", "long enough pw", "analyst")
     refreshes = 0
 
     def schedule_refresh() -> None:

@@ -192,6 +192,7 @@ async def get_filtered_actor_case_workflows(
 async def open_actor_case_from_recommendation(
     case_id: str,
     payload: ActorCaseOpenRequest,
+    updated_by: str | None = None,
 ) -> ActorCaseWorkflow | None:
     """Persist a recommended actor case if it still exists."""
     recommendations = await get_actor_cases(limit=100)
@@ -205,12 +206,14 @@ async def open_actor_case_from_recommendation(
         recommendation,
         payload.note,
         payload.assigned_to,
+        updated_by=updated_by,
     )
 
 
 async def update_actor_case_workflow(
     case_id: str,
     payload: ActorCaseUpdateRequest,
+    updated_by: str | None = None,
 ) -> ActorCaseWorkflow | None:
     """Update an existing persisted actor case workflow."""
     if not hasattr(store, "update_actor_case"):
@@ -220,4 +223,5 @@ async def update_actor_case_workflow(
         payload.status,
         payload.note,
         payload.assigned_to,
+        updated_by=updated_by,
     )
