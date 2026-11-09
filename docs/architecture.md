@@ -46,7 +46,10 @@ simulation, dashboard, and decoy-management routes remain separate APIs.
 - Every dashboard API endpoint requires `X-Mirage-API-Key` in Docker
   deployments. Browser calls pass through session-protected Next.js bridges, so
   the key never enters the browser bundle.
-- The dashboard uses an eight-hour signed `HttpOnly`, `SameSite=Strict` session.
+- The dashboard uses an eight-hour signed `HttpOnly`, `SameSite=Strict` session
+  that names the operator. The bridge rebuilds outgoing headers, so only the
+  session decides the `X-Mirage-Operator` the gateway sees; the gateway refuses
+  unknown or disabled operators.
 - Each WebSocket connection receives a new 60-second HMAC ticket. The gateway
   validates its signature, audience, lifetime, and configured browser origin;
   it never accepts `MIRAGE_API_KEY` as a stream credential.

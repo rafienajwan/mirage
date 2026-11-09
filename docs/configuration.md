@@ -20,7 +20,6 @@ appropriate example and this reference in the same change.
 | --- | --- | --- | --- |
 | `MIRAGE_INTERNAL_API_URL` | No | Web server | Internal gateway URL used by all dashboard API bridges |
 | `MIRAGE_API_KEY` | Yes | Gateway and web server | Protects dashboard APIs and authenticates server-side bridges |
-| `MIRAGE_OPERATOR_PASSWORD` | Yes | Web server | Operator login password; minimum 16 characters |
 | `MIRAGE_OPERATOR_SESSION_SECRET` | Yes | Web server | HMAC secret for eight-hour operator sessions; minimum 32 random characters |
 | `MIRAGE_DASHBOARD_TICKET_SECRET` | Yes | Gateway and web server | Shared HMAC secret for 60-second stream tickets; minimum 32 random characters |
 | `MIRAGE_DASHBOARD_WS_URL` | Yes | Web server | Browser-reachable `ws://` or `wss://` dashboard stream URL |
@@ -109,8 +108,25 @@ minutes) lives in the memory of one Node.js process. On Vercel each serverless
 instance has its own memory and instances start and stop freely, so the limit
 is not enforced across instances and an attacker can get more password
 attempts than the throttle suggests. Run the dashboard as a single long-lived Node.js process
-(the Docker image or `npm run start`) if you rely on the throttle, and use a
-long random `MIRAGE_OPERATOR_PASSWORD` on any target.
+(the Docker image or `npm run start`) if you rely on the throttle, and give
+every operator account a long random password on any target. The throttle keys
+on client address plus username, so guessing one account does not lock out
+the others behind the same address; the overall limit still applies.
+
+## Operator Accounts
+
+Operator accounts, their roles and the audit log live in the gateway database
+(migration `0011`). Manage them with `scripts/manage_operators.py` from
+`apps/gateway`, or inside the gateway container; see "Operator Accounts" in
+the README for the first-admin command.
+
+The gateway trusts the `X-Mirage-Operator` header from any caller that holds
+`MIRAGE_API_KEY`. The dashboard bridge sets it from the signed session and
+discards any value the browser sent, but anything else holding the key can name
+any enabled operator, and a request with the key and no header acts as the
+built-in `api-key` admin. Attribution and roles therefore separate analysts
+who sign in through the dashboard; they do not limit a holder of the API key.
+Keep the key on the web server and the gateway only.
 
 For Supabase, copy the connection string from the project dashboard and change
 the scheme to `postgresql+asyncpg://`. A persistent Railway gateway should use

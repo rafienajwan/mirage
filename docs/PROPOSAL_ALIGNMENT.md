@@ -53,6 +53,8 @@ MIRAGE can accurately claim that it:
   decoy routing, logging, alerting, and dashboard flow;
 - keeps dashboard API credentials server-side and uses signed operator sessions
   plus short-lived WebSocket tickets;
+- signs analysts in individually and records who labeled each event, changed
+  each case, retrained a model or revoked a canary;
 - prepares, trains, evaluates, and reviews Random Forest artifacts with
   precision, recall, F1, false-positive rate, and dataset lineage;
 - runs reviewed artifacts in shadow mode without changing routing by default;

@@ -17,7 +17,6 @@ COMPOSE_FILE = Path(__file__).with_name("docker-compose.yml")
 
 REQUIRED = (
     "MIRAGE_API_KEY",
-    "MIRAGE_OPERATOR_PASSWORD",
     "MIRAGE_OPERATOR_SESSION_SECRET",
     "MIRAGE_DASHBOARD_TICKET_SECRET",
     "DATABASE_URL",

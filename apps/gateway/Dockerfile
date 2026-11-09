@@ -9,6 +9,7 @@ COPY pyproject.toml ./
 COPY app ./app
 COPY migrations ./migrations
 COPY alembic.ini ./
+COPY scripts/manage_operators.py ./scripts/
 RUN pip install --no-cache-dir ".[ml,postgres]"
 RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin mirage
 USER mirage

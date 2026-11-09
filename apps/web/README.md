@@ -21,7 +21,6 @@ Open `http://localhost:3000` or `http://localhost:3000/dashboard`.
 | --- | --- | --- |
 | `MIRAGE_INTERNAL_API_URL` | Server only | Internal gateway URL used by dashboard bridges |
 | `MIRAGE_API_KEY` | Server only | Authenticates all dashboard calls to the gateway |
-| `MIRAGE_OPERATOR_PASSWORD` | Server only | Operator password; minimum 16 characters |
 | `MIRAGE_OPERATOR_SESSION_SECRET` | Server only | Signs eight-hour operator sessions |
 | `MIRAGE_DASHBOARD_TICKET_SECRET` | Server only | Signs 60-second WebSocket tickets |
 | `MIRAGE_DASHBOARD_WS_URL` | Server only | Browser-reachable dashboard WebSocket URL |

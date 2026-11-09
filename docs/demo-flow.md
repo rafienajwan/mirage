@@ -35,8 +35,8 @@ Expected result: synthetic configuration data from the static decoy service.
 
 ## 5. Observe
 
-Open `http://localhost:3000/dashboard` and enter the configured
-`MIRAGE_OPERATOR_PASSWORD`. The authenticated WebSocket sends immediate
+Open `http://localhost:3000/dashboard` and sign in with an operator account
+(see "Operator Accounts" in the README). The authenticated WebSocket sends immediate
 events/alerts and complete snapshots for metrics, decoys, honeytokens, actor
 triage, and case workflows. HTTP polling reconciles every 60 seconds while
 connected and falls back to every 10 seconds while disconnected.
