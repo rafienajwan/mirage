@@ -13,7 +13,13 @@ const NAV_ITEMS = [
   { name: "Dashboard", href: "/dashboard" },
 ];
 
-export default function Header({ showLogout = false }: { showLogout?: boolean }) {
+export default function Header({
+  showLogout = false,
+  operatorName,
+}: {
+  showLogout?: boolean;
+  operatorName?: string;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const router = useRouter();
@@ -71,6 +77,11 @@ export default function Header({ showLogout = false }: { showLogout?: boolean })
 
         {/* CTA Button */}
         <div className="hidden lg:flex items-center space-x-4">
+          {showLogout && operatorName && (
+            <span className="font-mono text-[10px] text-white/45">
+              Signed in as {operatorName}
+            </span>
+          )}
           {showLogout && (
             <button
               type="button"
@@ -144,6 +155,11 @@ export default function Header({ showLogout = false }: { showLogout?: boolean })
               transition={{ delay: 0.3 }}
               className="mt-16 w-full max-w-xs flex flex-col space-y-4"
             >
+              {showLogout && operatorName && (
+                <span className="text-center font-mono text-xs text-white/45">
+                  Signed in as {operatorName}
+                </span>
+              )}
               {showLogout && (
                 <button
                   type="button"

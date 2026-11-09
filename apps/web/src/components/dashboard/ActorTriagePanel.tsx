@@ -1,7 +1,7 @@
 "use client";
 
 import GlassPanel from "@/components/ui/GlassPanel";
-import type { ActorCaseSummary, ActorCaseWorkflow, ActorCaseWorkflowSummary, ActorClusterSummary } from "@/lib/api-types";
+import type { ActorCaseSummary, ActorCaseWorkflow, ActorCaseWorkflowSummary, ActorClusterSummary, OperatorSummary } from "@/lib/api-types";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, Boxes, CheckCircle2, FolderSearch, GitBranch, Inbox, KeyRound, Loader2, Play, UsersRound } from "lucide-react";
 
@@ -24,8 +24,13 @@ interface ActorTriagePanelProps {
   cases: ActorCaseSummary | null;
   workflows: ActorCaseWorkflowSummary | null;
   workingCaseId: string | null;
+  operators: OperatorSummary[];
   onOpenCase: (caseId: string) => void;
-  onUpdateCase: (caseId: string, status: ActorCaseWorkflow["status"]) => void;
+  onUpdateCase: (
+    caseId: string,
+    status: ActorCaseWorkflow["status"],
+    assignedTo?: string,
+  ) => void;
 }
 
 export default function ActorTriagePanel({
@@ -33,6 +38,7 @@ export default function ActorTriagePanel({
   cases,
   workflows,
   workingCaseId,
+  operators,
   onOpenCase,
   onUpdateCase,
 }: ActorTriagePanelProps) {
@@ -159,7 +165,7 @@ export default function ActorTriagePanel({
                             {item.title}
                           </p>
                         <p className="mt-1 truncate font-mono text-[8px] text-white/30">
-                            {item.status} | {item.assignedTo || "unassigned"} | {item.id}
+                            {item.status} | {item.id}
                         </p>
                         </div>
                         <span
@@ -173,6 +179,24 @@ export default function ActorTriagePanel({
                       </div>
 
                       <div className="mt-3 flex flex-wrap gap-1.5">
+                        <select
+                          aria-label={`Assignee for ${item.title}`}
+                          value={item.assignedTo}
+                          disabled={workingCaseId === `${item.id}:assign`}
+                          onChange={(change) =>
+                            onUpdateCase(item.id, item.status, change.target.value)
+                          }
+                          className="w-fit max-w-full rounded border border-white/10 bg-bg-dark-navy px-2 py-1 text-[8px] font-mono uppercase text-white/70 outline-none scheme-dark transition-colors hover:border-white/20 focus-visible:ring-2 focus-visible:ring-brand-cyan/60 disabled:cursor-wait disabled:opacity-40"
+                        >
+                          <option value="" className="bg-bg-dark-navy text-white/70">
+                            Unassigned
+                          </option>
+                          {assigneeOptions(operators, item.assignedTo).map((username) => (
+                            <option key={username} value={username} className="bg-bg-dark-navy text-white">
+                              {username}
+                            </option>
+                          ))}
+                        </select>
                         {item.status !== "investigating" ? (
                           <WorkflowButton
                             label="Investigate"
@@ -295,4 +319,11 @@ function EmptyLine({ label }: { label: string }) {
       {label}
     </div>
   );
+}
+
+// Enabled operators, plus the current assignee if it is no longer among them,
+// so the select still shows who holds the case.
+function assigneeOptions(operators: OperatorSummary[], current: string): string[] {
+  const names = operators.map((operator) => operator.username);
+  return current && !names.includes(current) ? [...names, current] : names;
 }

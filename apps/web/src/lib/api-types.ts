@@ -29,6 +29,7 @@ export interface BackendEvent {
   analyst_label: AnalystLabel | null;
   analyst_note: string;
   labeled_at: string | null;
+  labeled_by?: string | null;
 }
 
 export interface BackendMlShadow {
@@ -246,6 +247,7 @@ export interface BackendActorCaseWorkflow {
   analyst_note: string;
   opened_at: string;
   updated_at: string;
+  updated_by?: string | null;
   last_seen: string;
 }
 
@@ -307,6 +309,7 @@ export interface FeedEvent {
   analystLabel: AnalystLabel | null;
   analystNote: string;
   labeledAt: string | null;
+  labeledBy: string | null;
 }
 
 export type AnalystLabel =
@@ -541,7 +544,20 @@ export interface ActorCaseWorkflow {
   analystNote: string;
   openedAt: string;
   updatedAt: string;
+  updatedBy: string | null;
   lastSeen: string;
+}
+
+export type OperatorRole = "analyst" | "admin";
+
+export interface OperatorSummary {
+  username: string;
+  role: OperatorRole;
+}
+
+export interface OperatorSession {
+  username: string;
+  role: OperatorRole;
 }
 
 export interface ActorCaseWorkflowSummary {

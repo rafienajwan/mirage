@@ -81,6 +81,7 @@ export function mapDashboardEvent(e: BackendEvent): FeedEvent {
     analystLabel: e.analyst_label,
     analystNote: e.analyst_note,
     labeledAt: e.labeled_at,
+    labeledBy: e.labeled_by ?? null,
   };
 }
 
@@ -309,6 +310,7 @@ export function mapActorCaseWorkflow(item: BackendActorCaseWorkflow): ActorCaseW
     analystNote: item.analyst_note,
     openedAt: item.opened_at,
     updatedAt: item.updated_at,
+    updatedBy: item.updated_by ?? null,
     lastSeen: item.last_seen,
   };
 }

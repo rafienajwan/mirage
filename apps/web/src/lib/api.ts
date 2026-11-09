@@ -58,6 +58,8 @@ import type {
   MLPromotionReadinessData,
   MLShadowStatusData,
   MLShadowSummaryData,
+  OperatorSession,
+  OperatorSummary,
   OverviewMetrics,
   RetrainingRun,
   RiskHistoryPoint,
@@ -90,6 +92,22 @@ function sendJson(method: "POST" | "PATCH", body?: unknown): RequestInit {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body ?? {}),
   };
+}
+
+/** The signed-in operator, read from the dashboard session. */
+export async function fetchSession(): Promise<OperatorSession> {
+  const res = await fetch("/api/auth/session", { cache: "no-store" });
+  if (!res.ok) {
+    const failure = describeHttpFailure(res.status, await res.text().catch(() => ""));
+    if (failure.sessionExpired) throw new SessionExpiredError();
+    throw new Error(failure.message);
+  }
+  return res.json();
+}
+
+/** Enabled operators, for the case assignee picker. */
+export async function fetchOperators(): Promise<OperatorSummary[]> {
+  return (await apiFetch<{ operators: OperatorSummary[] }>("/operators")).operators;
 }
 
 /** Fetch dashboard overview metrics. */

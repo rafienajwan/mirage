@@ -130,6 +130,11 @@ export default function ThreatFeed({
                       ))}
                     </select>
                   ) : null}
+                  {event.analystLabel ? (
+                    <span className="text-[8px] font-mono text-white/30">
+                      by {event.labeledBy ?? "unknown"}
+                    </span>
+                  ) : null}
                 </div>
 
                 {/* Source IP */}

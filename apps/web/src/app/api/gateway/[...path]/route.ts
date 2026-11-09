@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { gatewayTargetPath, isAllowedBridgeRequest } from "@/lib/gateway-bridge";
+import {
+  bridgeHeaders,
+  gatewayTargetPath,
+  isAllowedBridgeRequest,
+} from "@/lib/gateway-bridge";
+import { OPERATOR_SESSION_COOKIE, readOperatorSession } from "@/lib/operator-auth";
 
 type BridgeContext = { params: Promise<{ path: string[] }> };
 
@@ -17,23 +22,35 @@ async function forward(request: NextRequest, context: BridgeContext) {
 
   const gatewayUrl = process.env.MIRAGE_INTERNAL_API_URL;
   const apiKey = process.env.MIRAGE_API_KEY;
-  if (!gatewayUrl || !apiKey) {
+  const sessionSecret = process.env.MIRAGE_OPERATOR_SESSION_SECRET;
+  if (!gatewayUrl || !apiKey || !sessionSecret) {
     return NextResponse.json(
       { detail: "Gateway bridge is not configured" },
       { status: 503, headers: NO_STORE },
     );
   }
 
+  const session = request.cookies.get(OPERATOR_SESSION_COOKIE)?.value;
+  const operator = session
+    ? await readOperatorSession(session, sessionSecret, Math.floor(Date.now() / 1000))
+    : null;
+  if (!operator) {
+    return NextResponse.json(
+      { detail: "Not authenticated" },
+      { status: 401, headers: NO_STORE },
+    );
+  }
+
   const target = new URL(gatewayTargetPath(path), `${gatewayUrl.replace(/\/$/, "")}/`);
   target.search = request.nextUrl.search;
 
-  const headers: Record<string, string> = { "X-Mirage-API-Key": apiKey };
-  let body: string | undefined;
-  if (request.method !== "GET") {
-    body = await request.text();
-    const contentType = request.headers.get("content-type");
-    if (contentType) headers["Content-Type"] = contentType;
-  }
+  const isRead = request.method === "GET";
+  const body = isRead ? undefined : await request.text();
+  const headers = bridgeHeaders({
+    apiKey,
+    operator: operator.sub,
+    contentType: isRead ? null : request.headers.get("content-type"),
+  });
 
   try {
     const response = await fetch(target, {

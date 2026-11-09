@@ -23,13 +23,33 @@ function isSafeSegment(segment: string) {
 export function isAllowedBridgeRequest(method: string, segments: string[]): boolean {
   if (segments.length === 0 || !segments.every(isSafeSegment)) return false;
   const verb = method.toUpperCase();
-  if (verb === "GET") return true;
+  // The operator roster is readable; login and the audit log are not bridged.
+  if (verb === "GET") return segments[0] !== "operators" || segments.length === 1;
   return WRITE_ROUTES.some(
     (route) =>
       route.method === verb &&
       route.pattern.length === segments.length &&
       route.pattern.every((part, i) => part === ID || part === segments[i]),
   );
+}
+
+// Outgoing headers are built from scratch so nothing the browser sent, such as
+// its own X-Mirage-Operator, reaches the gateway.
+export function bridgeHeaders({
+  apiKey,
+  operator,
+  contentType,
+}: {
+  apiKey: string;
+  operator: string;
+  contentType: string | null;
+}): Record<string, string> {
+  const headers: Record<string, string> = {
+    "X-Mirage-API-Key": apiKey,
+    "X-Mirage-Operator": operator,
+  };
+  if (contentType) headers["Content-Type"] = contentType;
+  return headers;
 }
 
 export function gatewayTargetPath(segments: string[]): string {
