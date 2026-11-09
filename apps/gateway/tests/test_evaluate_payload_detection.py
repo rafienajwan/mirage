@@ -17,7 +17,6 @@ def _record(body: bytes, label: int) -> CSICHTTPRequest:
         query="",
         user_agent="Mozilla/5.0",
         body=body,
-        destination_port=8080,
         label=label,
         source_file="fixture",
         record_id=f"r{label}",

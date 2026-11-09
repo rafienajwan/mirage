@@ -155,12 +155,14 @@ class DatabaseStore:
                 labeled_at=row.labeled_at,
             )
 
-    async def get_labeled_events(self, limit: int = 10000) -> list[EventRecord]:
+    async def get_labeled_events(
+        self, limit: int = 10000, *, newest_first: bool = False
+    ) -> list[EventRecord]:
         async with get_session() as session:
             stmt = (
                 select(EventModel)
                 .where(EventModel.analyst_label.is_not(None))
-                .order_by(EventModel.id.asc())
+                .order_by(EventModel.id.desc() if newest_first else EventModel.id.asc())
                 .limit(limit)
             )
             result = await session.execute(stmt)

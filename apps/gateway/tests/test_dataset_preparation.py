@@ -17,8 +17,6 @@ from app.ml.datasets import (
     DatasetValidationError,
     PreparedTrainingRow,
     load_api_log_jsonl,
-    load_cicids_csv,
-    load_dataset,
     load_mirage_jsonl,
     prepare_dataset,
     stratified_split,
@@ -114,7 +112,6 @@ def test_load_api_log_jsonl_extracts_request_features(tmp_path):
                     "request_count": "30",
                     "payload_indicators": "path-traversal,sql-like",
                     "payload_excerpt": "SERVICE_TOKEN=mirage-service-canary",
-                    "destination_port": "443",
                 },
             },
         ],
@@ -128,7 +125,6 @@ def test_load_api_log_jsonl_extracts_request_features(tmp_path):
     assert rows[1].features["method_post"] == 1.0
     assert rows[1].features["sensitive_path"] == 1.0
     assert rows[1].features["high_risk_indicator_count"] == 2.0
-    assert rows[1].features["destination_port"] == 443.0
 
 
 def test_load_api_log_jsonl_combines_query_and_body_features(tmp_path):
@@ -175,7 +171,6 @@ def test_load_api_log_jsonl_accepts_access_log_aliases(tmp_path):
                     "flowPacketsPerSecond": "120.5",
                     "packetLengthMean": "512",
                     "synFlagCount": "8",
-                    "destinationPort": "443",
                     "averagePacketSize": "640",
                 },
             },
@@ -200,7 +195,6 @@ def test_load_api_log_jsonl_accepts_access_log_aliases(tmp_path):
     assert rows[0].features["suspicious_user_agent"] == 1.0
     assert rows[0].features["high_risk_indicator_count"] == 1.0
     assert rows[0].features["medium_risk_indicator_count"] == 1.0
-    assert rows[0].features["destination_port"] == 443.0
     assert rows[1].features["path_depth"] == 2.0
 
 
@@ -231,6 +225,7 @@ def test_prepare_reviewed_api_logs_binds_safe_provenance_and_hashes_ids(tmp_path
             "source_ip": f"203.0.113.{index + 10}",
             "method": "GET",
             "path": f"/api/orders/{index}",
+            "request_count": index + 1,
             "user_agent": "private-client/1.0",
         }
         for index in range(14)
@@ -241,6 +236,7 @@ def test_prepare_reviewed_api_logs_binds_safe_provenance_and_hashes_ids(tmp_path
             "source_ip": f"198.51.100.{index + 10}",
             "method": "POST",
             "path": f"/api/search/{index}",
+            "request_count": index + 1,
             "payload_excerpt": f"password=private-{index}&query=' or 1=1",
             "payload_indicators": ["sql-like"],
         }
@@ -377,7 +373,7 @@ def test_dataset_review_blocks_tampered_api_log_source_review(tmp_path):
 def test_dataset_review_blocks_manifest_paths_outside_prepared_directory(tmp_path):
     source = tmp_path / "source.jsonl"
     rows = [
-        {"label": label, "features": _features(float(index))}
+        {"label": label, "features": _features(float(label * 1000 + index))}
         for label in (0, 1)
         for index in range(12)
     ]
@@ -406,38 +402,6 @@ def test_dataset_review_blocks_manifest_paths_outside_prepared_directory(tmp_pat
     assert "manifest train file must stay in the prepared directory" in review.blockers
 
 
-def test_load_cicids_csv_directory_combines_sorted_csv_files(tmp_path):
-    cicids_dir = tmp_path / "cicids"
-    cicids_dir.mkdir()
-    (cicids_dir / "b.csv").write_text(
-        "Flow Duration,Flow Packets/s,Destination Port,Label\n"
-        "20,4,80,DDoS\n",
-        encoding="utf-8",
-    )
-    (cicids_dir / "a.csv").write_text(
-        "Flow Duration,Flow Packets/s,Destination Port,Label\n"
-        "10,2,443,BENIGN\n",
-        encoding="utf-8",
-    )
-
-    rows = load_dataset(cicids_dir, source_kind="cicids-csv-dir")
-
-    assert [row.label for row in rows] == [0, 1]
-    assert [row.source for row in rows] == ["cicids-csv-dir", "cicids-csv-dir"]
-    assert rows[0].record_id == "a.csv:2"
-    assert rows[1].record_id == "b.csv:2"
-    assert rows[0].features["flow_duration_ms"] == 10.0
-    assert rows[1].features["destination_port"] == 80.0
-
-
-def test_load_cicids_csv_directory_rejects_empty_directories(tmp_path):
-    cicids_dir = tmp_path / "empty-cicids"
-    cicids_dir.mkdir()
-
-    with pytest.raises(DatasetValidationError, match="no CSV files"):
-        load_dataset(cicids_dir, source_kind="cicids-csv-dir")
-
-
 def test_stratified_split_requires_two_rows_per_class():
     rows = [
         *load_rows(label=0, count=19),
@@ -451,7 +415,7 @@ def test_stratified_split_requires_two_rows_per_class():
 def test_prepare_dataset_writes_split_and_manifest(tmp_path):
     source = tmp_path / "training_events.jsonl"
     rows = [
-        {"label": label, "features": _features(float(index))}
+        {"label": label, "features": _features(float(label * 1000 + index))}
         for label in (0, 1)
         for index in range(10)
     ]
@@ -475,8 +439,9 @@ def test_prepare_dataset_writes_split_and_manifest(tmp_path):
     assert manifest.total_rows == 20
     assert manifest.train_rows == 16
     assert manifest.test_rows == 4
-    assert manifest_data["feature_contract_version"] == 2
+    assert manifest_data["feature_contract_version"] == 3
     assert manifest_data["label_counts"] == {"0": 10, "1": 10}
+    assert manifest_data["conflicting_feature_groups"] == 0
     assert manifest_data["file_sha256"] == {
         "train": hashlib.sha256((output_dir / "train.jsonl").read_bytes()).hexdigest(),
         "test": hashlib.sha256((output_dir / "test.jsonl").read_bytes()).hexdigest(),
@@ -488,7 +453,7 @@ def test_prepare_dataset_writes_split_and_manifest(tmp_path):
 def test_review_prepared_dataset_marks_valid_split_ready(tmp_path):
     source = tmp_path / "training_events.jsonl"
     rows = [
-        {"label": label, "features": _features(float(index))}
+        {"label": label, "features": _features(float(label * 1000 + index))}
         for label in (0, 1)
         for index in range(14)
     ]
@@ -517,7 +482,7 @@ def test_review_prepared_dataset_marks_valid_split_ready(tmp_path):
 def _prepare_counts(tmp_path, normal: int, suspicious: int):
     source = tmp_path / "training_events.jsonl"
     rows = [
-        {"label": label, "features": _features(float(index))}
+        {"label": label, "features": _features(float(label * 1000 + index))}
         for label, count in ((0, normal), (1, suspicious))
         for index in range(count)
     ]
@@ -555,7 +520,7 @@ def test_review_prepared_dataset_requires_trainer_minimum_train_rows(tmp_path):
 def test_review_prepared_dataset_blocks_manifest_row_mismatch(tmp_path):
     source = tmp_path / "training_events.jsonl"
     rows = [
-        {"label": label, "features": _features(float(index))}
+        {"label": label, "features": _features(float(label * 1000 + index))}
         for label in (0, 1)
         for index in range(10)
     ]
@@ -581,7 +546,7 @@ def test_review_prepared_dataset_blocks_manifest_row_mismatch(tmp_path):
 def test_review_prepared_dataset_blocks_split_hash_mismatch(tmp_path):
     source = tmp_path / "training_events.jsonl"
     rows = [
-        {"label": label, "features": _features(float(index))}
+        {"label": label, "features": _features(float(label * 1000 + index))}
         for label in (0, 1)
         for index in range(10)
     ]
@@ -610,7 +575,7 @@ def test_review_prepared_dataset_blocks_split_hash_mismatch(tmp_path):
 def test_review_prepared_dataset_blocks_feature_contract_version_mismatch(tmp_path):
     source = tmp_path / "training_events.jsonl"
     rows = [
-        {"label": label, "features": _features(float(index))}
+        {"label": label, "features": _features(float(label * 1000 + index))}
         for label in (0, 1)
         for index in range(12)
     ]
@@ -637,7 +602,7 @@ def test_review_prepared_dataset_blocks_feature_contract_version_mismatch(tmp_pa
 def test_build_dataset_lineage_rejects_unrelated_training_file(tmp_path):
     source = tmp_path / "training_events.jsonl"
     rows = [
-        {"label": label, "features": _features(float(index))}
+        {"label": label, "features": _features(float(label * 1000 + index))}
         for label in (0, 1)
         for index in range(14)
     ]
@@ -660,7 +625,7 @@ def test_build_dataset_lineage_rejects_unrelated_training_file(tmp_path):
 def test_review_prepared_dataset_blocks_malformed_counts(tmp_path):
     source = tmp_path / "training_events.jsonl"
     rows = [
-        {"label": label, "features": _features(float(index))}
+        {"label": label, "features": _features(float(label * 1000 + index))}
         for label in (0, 1)
         for index in range(10)
     ]
@@ -683,90 +648,104 @@ def test_review_prepared_dataset_blocks_malformed_counts(tmp_path):
     assert "manifest label_counts.0 must be an integer" in review.blockers
 
 
-def test_load_cicids_csv_maps_known_columns(tmp_path):
-    source = tmp_path / "cicids.csv"
-    source.write_text(
-        "\n".join(
-            [
-                "Destination Port,Flow Duration,Flow Packets/s,Packet Length Mean,"
-                "SYN Flag Count,Average Packet Size,Label",
-                "443,1200,15.5,42.0,2,64.0,BENIGN",
-                "8080,5000,95.0,128.0,4,256.0,DDoS",
-            ]
-        ),
-        encoding="utf-8",
-    )
-
-    rows = load_cicids_csv(source)
-
-    assert [row.label for row in rows] == [0, 1]
-    assert rows[0].features["destination_port"] == 443.0
-    assert rows[1].features["flow_packets_per_second"] == 95.0
-
-
-def test_load_cicids_csv_accepts_headers_with_extra_spaces(tmp_path):
-    source = tmp_path / "cicids.csv"
-    source.write_text(
-        "\n".join(
-            [
-                " Destination Port, Flow Duration, Flow Packets/s, Packet Length Mean,"
-                " SYN Flag Count, Average Packet Size, Label",
-                "443,1200,15.5,42.0,2,64.0,BENIGN",
-                "8080,5000,95.0,128.0,4,256.0,DDoS",
-            ]
-        ),
-        encoding="utf-8",
-    )
-
-    rows = load_cicids_csv(source)
-
-    assert rows[0].features["destination_port"] == 443.0
-    assert rows[0].features["flow_duration_ms"] == 1200.0
-    assert rows[1].features["syn_flag_count"] == 4.0
-
-
-def test_load_cicids_csv_accepts_cse_cic_ids2018_aliases(tmp_path):
-    source = tmp_path / "cicids.csv"
-    source.write_text(
-        "\n".join(
-            [
-                "Dst Port,Flow Duration,Avg Packet Size,label",
-                "443,1200,64.0,Benign",
-                "8080,5000,256.0,DDoS",
-            ]
-        ),
-        encoding="utf-8",
-    )
-
-    rows = load_cicids_csv(source)
-
-    assert [row.label for row in rows] == [0, 1]
-    assert rows[0].features["destination_port"] == 443.0
-    assert rows[1].features["average_packet_size"] == 256.0
-
-
-def test_load_cicids_csv_zeroes_non_finite_values(tmp_path):
-    source = tmp_path / "cicids.csv"
-    source.write_text(
-        "\n".join(
-            [
-                "Destination Port,Flow Duration,Flow Packets/s,Packet Length Mean,"
-                "SYN Flag Count,Average Packet Size,Label",
-                "443,Infinity,Infinity,42.0,2,64.0,BENIGN",
-                "8080,5000,95.0,128.0,4,256.0,DDoS",
-            ]
-        ),
-        encoding="utf-8",
-    )
-
-    rows = load_cicids_csv(source)
-
-    assert rows[0].features["flow_duration_ms"] == 0.0
-    assert rows[0].features["flow_packets_per_second"] == 0.0
-
-
 def load_rows(label: int, count: int):
     return [
         PreparedTrainingRow(features=_features(float(i)), label=label)
         for i in range(count)
     ]
+
+
+def test_prepare_dataset_rejects_cicids_source(tmp_path, monkeypatch):
+    from pathlib import Path
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from prepare_dataset import parse_args
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "prepare_dataset.py",
+            "--input",
+            str(tmp_path),
+            "--output-dir",
+            str(tmp_path / "out"),
+            "--source",
+            "cicids-csv",
+            "--dataset-name",
+            "x",
+            "--dataset-version",
+            "1",
+        ],
+    )
+
+    with pytest.raises(SystemExit) as excinfo:
+        parse_args()
+
+    assert excinfo.value.code != 0
+
+
+def _vector_key(row: PreparedTrainingRow) -> tuple[float, ...]:
+    return tuple(row.features[name] for name in FEATURE_NAMES)
+
+
+def _varied_rows() -> list[PreparedTrainingRow]:
+    return [
+        PreparedTrainingRow(features=_features(float(i)), label=label)
+        for label in (0, 1)
+        for i in range(label * 100, label * 100 + 20)
+    ]
+
+
+def test_identical_rows_stay_on_one_side():
+    copy = _features(500.0)
+    rows = [PreparedTrainingRow(features=dict(copy), label=1) for _ in range(10)]
+    rows += _varied_rows()
+
+    for seed in range(10):
+        split = stratified_split(rows, random_seed=seed)
+        in_train = sum(_vector_key(row) == tuple(copy.values()) for row in split.train)
+        in_test = sum(_vector_key(row) == tuple(copy.values()) for row in split.test)
+        assert {in_train, in_test} == {0, 10}
+        train_keys = {_vector_key(row) for row in split.train}
+        assert not train_keys & {_vector_key(row) for row in split.test}
+
+
+def test_grouped_split_is_reproducible():
+    rows = _varied_rows()
+
+    first = stratified_split(rows, random_seed=7)
+    second = stratified_split(rows, random_seed=7)
+
+    assert first == second
+    assert first.conflicting_feature_groups == 0
+
+
+def test_conflicting_groups_counted_and_assigned_by_majority():
+    shared = _features(900.0)
+    rows = _varied_rows() + [
+        PreparedTrainingRow(features=dict(shared), label=1, record_id="a"),
+        PreparedTrainingRow(features=dict(shared), label=1, record_id="b"),
+        PreparedTrainingRow(features=dict(shared), label=0, record_id="c"),
+    ]
+
+    split = stratified_split(rows, random_seed=3)
+
+    assert split.conflicting_feature_groups == 1
+    shared_rows = [
+        row for row in [*split.train, *split.test] if row.features == shared
+    ]
+    assert sorted(row.record_id for row in shared_rows) == ["a", "b", "c"]
+    side = split.train if shared_rows[0] in split.train else split.test
+    assert all(row in side for row in shared_rows)
+
+
+def test_single_group_class_is_rejected():
+    same = _features(700.0)
+    rows = [
+        PreparedTrainingRow(features=_features(float(i)), label=0) for i in range(20)
+    ] + [PreparedTrainingRow(features=dict(same), label=1) for _ in range(10)]
+
+    with pytest.raises(DatasetValidationError, match="groups"):
+        stratified_split(rows)

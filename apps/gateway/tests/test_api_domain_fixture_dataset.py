@@ -51,8 +51,8 @@ def test_fixture_jsonl_can_be_prepared_with_api_log_adapter(tmp_path: Path):
     )
 
     assert manifest.total_rows == 40
-    assert manifest.train_rows == 30
-    assert manifest.test_rows == 10
+    assert manifest.train_rows + manifest.test_rows == 40
+    assert manifest.test_rows >= 10
     assert manifest.label_counts == {"0": 20, "1": 20}
     first_train_row = json.loads((output_dir / "train.jsonl").read_text().splitlines()[0])
     assert set(first_train_row) >= {"features", "label", "source", "record_id"}

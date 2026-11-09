@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import logging
 from pathlib import Path
 import uuid
 
@@ -11,11 +12,40 @@ from starlette.concurrency import run_in_threadpool
 
 from app.core.config import settings
 from app.ml.artifact_integrity import sha256_file
-from app.ml.artifacts import review_model_artifact
+from app.ml.artifacts import file_stamp, review_model_artifact
+from app.ml.errors import DatasetValidationError
 from app.ml.training import LabeledFeatures, train_risk_classifier
 from app.schemas.retraining import RetrainingRun
 from app.services.training_export import event_to_training_row, training_data_summary
 from app.storage import store
+
+logger = logging.getLogger(__name__)
+RETAINED_ARTIFACTS = 5
+
+
+def prune_retraining_artifacts(
+    directory: Path, *, keep: int = RETAINED_ARTIFACTS, protected: Path | None
+) -> list[Path]:
+    """Delete all but the newest ``keep`` retraining artifacts; return what was deleted.
+
+    The ``protected`` artifact (the configured MIRAGE_MODEL_ARTIFACT) is never
+    deleted. Deletion errors are logged, never raised.
+    """
+    protected_path = protected.resolve() if protected else None
+    artifacts = sorted(
+        directory.glob("risk_model_*.joblib"), key=file_stamp, reverse=True
+    )
+    deleted: list[Path] = []
+    for path in artifacts[keep:]:
+        if path.resolve() == protected_path:
+            continue
+        try:
+            path.unlink()
+        except OSError as exc:
+            logger.warning("Could not delete old retraining artifact %s: %s", path, exc)
+        else:
+            deleted.append(path)
+    return deleted
 
 
 def _artifact_path() -> Path:
@@ -53,10 +83,21 @@ async def train_from_labeled_events(limit: int = 10000) -> RetrainingRun:
 
     def train_and_review():
         metrics = train_risk_classifier(rows, output_path)
-        return metrics, review_model_artifact(output_path), sha256_file(output_path)
+        result = metrics, review_model_artifact(output_path), sha256_file(output_path)
+        configured = settings.ml_model_artifact
+        prune_retraining_artifacts(
+            output_path.parent, protected=Path(configured) if configured else None
+        )
+        return result
 
     # Training takes seconds; keep the event loop serving traffic meanwhile.
-    metrics, review, artifact_sha256 = await run_in_threadpool(train_and_review)
+    try:
+        metrics, review, artifact_sha256 = await run_in_threadpool(train_and_review)
+    except DatasetValidationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"message": str(exc), "training_summary": summary},
+        ) from exc
     metrics_dict = metrics.__dict__
 
     return RetrainingRun(

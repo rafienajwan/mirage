@@ -10,10 +10,9 @@ from pathlib import Path
 import re
 from typing import Any
 
-import joblib
 from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
 
-from app.ml.artifact_integrity import ArtifactIntegrityError, verify_artifact_digest
+from app.ml.artifact_integrity import ArtifactIntegrityError, load_verified_artifact
 from app.services.feature_extraction import FEATURE_CONTRACT_VERSION, FEATURE_NAMES
 
 REQUIRED_METRICS = (
@@ -24,6 +23,13 @@ REQUIRED_METRICS = (
     "training_rows",
     "test_rows",
 )
+# A false positive sends a real user to the decoy, so the bar is strict.
+REVIEW_MIN_PRECISION = 0.90
+REVIEW_MIN_RECALL = 0.60
+REVIEW_MIN_F1_SCORE = 0.70
+REVIEW_MAX_FALSE_POSITIVE_RATE = 0.02
+REVIEW_MIN_TRAINING_ROWS = 100
+REVIEW_MIN_TEST_ROWS = 30
 DATASET_LINEAGE_FIELDS = (
     "dataset_name",
     "dataset_version",
@@ -96,9 +102,7 @@ def load_checked_artifact(
     the payload (``{}`` if it is not a dictionary) and its contract blockers.
     """
     try:
-        if expected_sha256 is not None:
-            verify_artifact_digest(artifact_path, expected_sha256)
-        artifact = joblib.load(artifact_path)
+        artifact = load_verified_artifact(artifact_path, expected_sha256)
     except ArtifactIntegrityError:
         return None, ["Artifact SHA-256 does not match MIRAGE_MODEL_ARTIFACT_SHA256"]
     except FileNotFoundError:
@@ -119,14 +123,17 @@ def load_checked_artifact(
     return artifact, blockers
 
 
-def classification_metrics(y_true: Any, predictions: Any) -> dict[str, float]:
-    """Precision, recall, F1 and false-positive rate for binary labels."""
+def classification_metrics(y_true: Any, predictions: Any) -> dict[str, float | None]:
+    """Precision, recall, F1 and false-positive rate for binary labels.
+
+    The false-positive rate is None when there are no negatives to measure it on.
+    """
     tn, fp, _, _ = confusion_matrix(y_true, predictions, labels=[0, 1]).ravel()
     return {
         "precision": float(precision_score(y_true, predictions, zero_division=0)),
         "recall": float(recall_score(y_true, predictions, zero_division=0)),
         "f1_score": float(f1_score(y_true, predictions, zero_division=0)),
-        "false_positive_rate": float(fp / (fp + tn)) if fp + tn else 0.0,
+        "false_positive_rate": float(fp / (fp + tn)) if fp + tn else None,
     }
 
 
@@ -138,7 +145,11 @@ def threshold_blockers(
     min_f1_score: float,
     max_false_positive_rate: float,
 ) -> list[str]:
-    """Blockers for metrics outside the thresholds; absent metrics are skipped."""
+    """Blockers for metrics outside the thresholds.
+
+    Absent precision, recall or F1 are skipped; an absent false-positive rate
+    blocks, because without negatives nothing shows the decoy spares real users.
+    """
     blockers: list[str] = []
     for key, name, minimum in (
         ("precision", "Precision", min_precision),
@@ -148,7 +159,9 @@ def threshold_blockers(
         if key in metrics and metrics[key] < minimum:
             blockers.append(f"{name} {metrics[key]:.3f} is below {minimum:.3f}")
     rate = metrics.get("false_positive_rate")
-    if rate is not None and rate > max_false_positive_rate:
+    if rate is None:
+        blockers.append("False-positive rate is unavailable")
+    elif rate > max_false_positive_rate:
         blockers.append(
             f"False-positive rate {rate:.3f} is above {max_false_positive_rate:.3f}"
         )
@@ -156,17 +169,27 @@ def threshold_blockers(
 
 
 def review_model_artifact(
+    artifact_path: Path, **kwargs: Any
+) -> ArtifactReview:
+    """Validate an artifact before enabling model-only shadow scoring."""
+    return review_and_load_artifact(artifact_path, **kwargs)[0]
+
+
+def review_and_load_artifact(
     artifact_path: Path,
     *,
     expected_sha256: str | None = None,
-    min_precision: float = 0.5,
-    min_recall: float = 0.5,
-    min_f1_score: float = 0.5,
-    max_false_positive_rate: float = 0.5,
-    min_training_rows: int = 15,
-    min_test_rows: int = 5,
-) -> ArtifactReview:
-    """Validate an artifact before enabling model-only shadow scoring."""
+    min_precision: float = REVIEW_MIN_PRECISION,
+    min_recall: float = REVIEW_MIN_RECALL,
+    min_f1_score: float = REVIEW_MIN_F1_SCORE,
+    max_false_positive_rate: float = REVIEW_MAX_FALSE_POSITIVE_RATE,
+    min_training_rows: int = REVIEW_MIN_TRAINING_ROWS,
+    min_test_rows: int = REVIEW_MIN_TEST_ROWS,
+) -> tuple[ArtifactReview, dict[str, Any] | None]:
+    """Review an artifact and return the loaded payload so callers need not reload it.
+
+    The payload is None when the file could not be loaded.
+    """
     warnings: list[str] = []
     metrics: dict[str, float | int] = {}
 
@@ -181,7 +204,7 @@ def review_model_artifact(
             metrics={},
             blockers=blockers,
             warnings=[],
-        )
+        ), None
 
     artifact_version = artifact.get("artifact_version")
     if not isinstance(artifact_version, int):
@@ -241,7 +264,7 @@ def review_model_artifact(
         warnings=warnings,
         feature_contract_version=feature_contract_version,
         dataset_lineage=dataset_lineage,
-    )
+    ), artifact
 
 
 def file_stamp(path: Path) -> tuple[int, int]:

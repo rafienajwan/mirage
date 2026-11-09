@@ -27,7 +27,6 @@ class CSICHTTPRequest:
     query: str
     user_agent: str
     body: bytes
-    destination_port: int
     label: int
     source_file: str
     record_id: str
@@ -124,15 +123,6 @@ def parse_csic_http_requests(
         path = parsed_target.path or "/"
         query = parsed_target.query
         host = parsed_target.hostname or headers.get("host", "").split(":", 1)[0]
-        try:
-            port = parsed_target.port
-        except ValueError:
-            port = None
-        if port is None and ":" in headers.get("host", ""):
-            try:
-                port = int(headers["host"].rsplit(":", 1)[1])
-            except ValueError:
-                port = None
         if not host:
             raise DatasetValidationError(f"HTTP request is missing Host in {source_file}")
 
@@ -143,7 +133,6 @@ def parse_csic_http_requests(
                 query=query,
                 user_agent=headers.get("user-agent", ""),
                 body=body,
-                destination_port=port or (443 if parsed_target.scheme == "https" else 80),
                 label=label,
                 source_file=source_file,
                 record_id=_request_identity(method, target, headers.get("user-agent", ""), body),

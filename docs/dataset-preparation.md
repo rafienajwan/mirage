@@ -1,8 +1,8 @@
 # Dataset Preparation Workflow
 
 Project MIRAGE can train a local Random Forest risk model from validated JSON
-Lines records. The proposal target includes CICIDS2017-style traffic data and
-custom API logs, so raw data should be prepared before training rather than fed
+Lines records. Training sources are analyst-labeled MIRAGE exports, custom API
+logs and HTTP CSIC 2010, so raw data should be prepared before training rather than fed
 directly into the trainer.
 
 ## Supported Sources
@@ -12,8 +12,6 @@ directly into the trainer.
 | Analyst-labeled MIRAGE export | `mirage-jsonl` | Ready |
 | Custom API JSONL fixtures | `api-log-jsonl` | Flexible adapter for local experiments |
 | Reviewed custom API JSONL logs | `reviewed-api-log-jsonl` | Requires a hash-bound sanitized source review |
-| CICIDS2017-style CSV | `cicids-csv` | Basic adapter for one compatible CSV |
-| CICIDS2017-style CSV directory | `cicids-csv-dir` | Loads all immediate `*.csv` files in stable filename order |
 | HTTP CSIC 2010 directory | `csic-http-dir` | Parses the three official raw HTTP request files with provenance and deduplication |
 
 Raw and prepared datasets should stay under local ignored `data/` directories.
@@ -49,6 +47,12 @@ extractor uses at most 4,096 characters from the combined query and request
 body. The proxy, custom API-log adapter, and HTTP CSIC adapter all construct this
 excerpt in the same query-then-body order.
 
+Feature contract version 3 removes the six network-flow features
+(flow duration, packets per second, mean packet length, SYN flag count,
+destination port and average packet size). The gateway works
+at the HTTP layer and never observes them, so they were always 0 at serving
+time. Version 2 datasets and artifacts are rejected and must be regenerated.
+
 ## Prepare Custom API Logs
 
 Use this adapter when you have labeled request logs that have not already been
@@ -58,8 +62,8 @@ object:
 
 ```json
 {"id":"req-1","label":"normal","source_ip":"10.0.0.10","method":"GET","path":"/api/products","user_agent":"Mozilla/5.0","request_count":3}
-{"id":"req-2","label":"suspicious","request":{"client_ip":"10.0.0.66","http_method":"POST","endpoint":"/.env","ua":"curl/8.0","payload_indicators":["path-traversal","sql-like"],"destination_port":443}}
-{"request_id":"req-3","decision":"redirected","httpRequest":{"remote_addr":"203.0.113.10","request_method":"GET","url":"https://target.example/.env?debug=true","headers":{"User-Agent":"sqlmap/1.8"},"tags":["sql-like","encoded"],"query_string":"debug=true","destinationPort":443}}
+{"id":"req-2","label":"suspicious","request":{"client_ip":"10.0.0.66","http_method":"POST","endpoint":"/.env","ua":"curl/8.0","payload_indicators":["path-traversal","sql-like"]}}
+{"request_id":"req-3","decision":"redirected","httpRequest":{"remote_addr":"203.0.113.10","request_method":"GET","url":"https://target.example/.env?debug=true","headers":{"User-Agent":"sqlmap/1.8"},"tags":["sql-like","encoded"],"query_string":"debug=true"}}
 ```
 
 Supported label fields are `label`, `analyst_label`, `class`, `decision`,
@@ -159,7 +163,9 @@ python scripts/train_model.py \
 
 With `--manifest`, the model fits on the whole train split and the artifact
 metrics come from the prepared `test.jsonl`. Without it, the trainer holds out
-25% of the input itself.
+about 25% of the input itself, grouping rows with identical feature vectors the
+same way dataset preparation does, so a duplicate never lands on both sides.
+Training fails if a class has fewer than two distinct feature vectors.
 
 Review `data/prepared/runtime-v1/manifest.json` before training or enabling an
 artifact in shadow mode. It records row counts, label balance, split ratio,
@@ -301,46 +307,9 @@ The fixture records are synthetic, balanced, and deterministic. They are useful
 for adapter, split, training, and shadow-smoke checks, but they are not a
 substitute for reviewed production-like API logs.
 
-## Prepare CICIDS-Style CSV
-
-Place the raw CSV in an ignored local dataset path and run:
-
-```bash
-cd apps/gateway
-python scripts/prepare_dataset.py \
-  --source cicids-csv \
-  --input data/raw/cicids2017/sample.csv \
-  --output-dir data/prepared/cicids2017-v1 \
-  --dataset-name cicids2017 \
-  --dataset-version v1
-```
-
-The current adapter maps common CICIDS columns such as `Flow Duration`,
-`Flow Packets/s`, `Packet Length Mean`, `SYN Flag Count`,
-`Destination Port`, and `Average Packet Size`. Columns without a MIRAGE
-equivalent are intentionally not used yet.
-
-When the full CICIDS2017 CSV set is available in one ignored local directory,
-prepare it as a single reviewed split with the directory adapter:
-
-```bash
-cd apps/gateway
-python scripts/prepare_dataset.py \
-  --source cicids-csv-dir \
-  --input data \
-  --output-dir data/prepared/cicids2017-full-v1 \
-  --dataset-name cicids2017-full \
-  --dataset-version v1
-```
-
-The directory adapter reads only immediate `*.csv` files, sorted by filename.
-Each prepared row keeps a source record id in the form `filename.csv:line` so
-reviewers can trace rows back to the raw CSV without committing raw data.
-
 ## Prepare HTTP CSIC 2010
 
-HTTP CSIC 2010 supplements the network-flow CICIDS2017 data with labeled,
-application-layer HTTP requests. Use the [official IMPACT catalog](https://www.impactcybertrust.org/dataset_view?idDataset=940)
+HTTP CSIC 2010 provides labeled, application-layer HTTP requests. Use the [official IMPACT catalog](https://www.impactcybertrust.org/dataset_view?idDataset=940)
 for dataset context and the [ReData distribution DOI](https://doi.org/10.60895/redata/RWUUSV)
 for the three files distributed under CC BY 4.0:
 
@@ -360,13 +329,13 @@ cd apps/gateway
 python scripts/prepare_dataset.py \
   --source csic-http-dir \
   --input data/csic-2010 \
-  --output-dir data/prepared/csic-http-2010-v2 \
+  --output-dir data/prepared/csic-http-2010-v3 \
   --dataset-name csic-http-2010 \
-  --dataset-version redata-rwuusv-v2 \
+  --dataset-version redata-rwuusv-v3 \
   --checksums data/csic-2010/sha256.json
 
 python scripts/review_dataset.py \
-  --manifest data/prepared/csic-http-2010-v2/manifest.json \
+  --manifest data/prepared/csic-http-2010-v3/manifest.json \
   --min-total-rows 10000 \
   --min-train-rows 7000 \
   --min-test-rows 2000 \
@@ -383,8 +352,47 @@ Prepared manifests also record SHA-256 values for `train.jsonl` and
 `test.jsonl` plus the current feature-contract version. Dataset review fails if
 either split changes without regenerating the manifest, even when its row count
 remains unchanged, or when the feature contract is outdated. Prepared
-directories created before split hashes or feature-contract version 2 were
+directories created before split hashes or feature-contract version 3 were
 introduced must be regenerated before training a promotion-eligible artifact.
+
+### Contract v3 training run (2026-11-09)
+
+Prepared from the verified local release with the command above under feature
+contract version 3 and the current payload detector, reviewed, trained with
+`scripts/train_model.py --manifest` and reviewed with the default artifact
+thresholds. Datasets and artifacts stay in ignored local directories.
+
+| Signal | Value |
+| --- | ---: |
+| Raw requests | 97,065 |
+| Repeated request identities removed | 62,461 |
+| Rows after deduplication | 34,604 (18,640 normal, 15,964 suspicious) |
+| Training rows | 25,918 (13,988 normal, 11,930 suspicious) |
+| Holdout rows | 8,686 (4,652 normal, 4,034 suspicious) |
+| Distinct feature vectors, train / holdout | 16,693 / 6,041 (none shared) |
+| `conflicting_feature_groups` | 263 |
+| Dataset review | ready, no blockers |
+
+Holdout metrics on the grouped 8,686-row test split:
+
+| Precision | Recall | F1 | False-positive rate |
+| ---: | ---: | ---: | ---: |
+| 0.750000 | 0.728061 | 0.738868 | 0.210447 |
+
+Artifact review with the default thresholds: **failed** (`shadow_ready: false`).
+Blockers, verbatim:
+
+- `Precision 0.750 is below 0.900`
+- `False-positive rate 0.210 is above 0.020`
+
+Artifact `artifacts/csic-http-2010-risk-model-v3.joblib`, SHA-256
+`e226ef23c975de6482807597c298fed899949aae0e61017568aeab5853e62e2a`.
+
+The gate is doing its job: about one normal CSIC request in five would be sent
+to the decoy. The artifact must not be configured for shadow or live routing.
+The earlier contract version 2 figures (precision 0.82, false-positive rate
+0.14) came from a row-level split in which identical feature vectors could sit
+on both sides, so they are not directly comparable.
 
 CSIC traffic was generated for a 2010 e-commerce application. It is useful for
 reproducible parser, payload-signal, and model benchmarking, but it is not
@@ -432,7 +440,15 @@ Preparation fails unless:
 
 - at least 20 rows are present;
 - both binary classes are present;
-- each class has at least two rows, matching the trainer's stratified split.
+- each class has at least two rows, matching the trainer's stratified split;
+- each class has at least two distinct feature vectors (groups).
+
+The split groups rows by the SHA-256 of their feature vector. A group goes
+wholly to train or wholly to test, so repeated requests cannot appear on both
+sides and inflate holdout metrics. A group whose rows carry both labels follows
+its majority label (ties count as suspicious) and is counted in the manifest's
+`conflicting_feature_groups`. Because whole groups move together, the train and
+test row counts only approximate `--train-ratio`.
 
 These rules match the dashboard training readiness indicator and prevent a
 dataset from being marked ready when the trainer would fail immediately.

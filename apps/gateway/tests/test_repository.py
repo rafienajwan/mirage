@@ -75,3 +75,21 @@ async def test_stored_timestamps_read_back_as_utc():
     await store.add_event(_event())
     event = (await store.get_recent_events(limit=1))[0]
     assert event.timestamp.tzinfo is not None
+
+
+@pytest.mark.parametrize("backend", [store, MemoryStore()], ids=["database", "memory"])
+async def test_labeled_events_newest_first_keeps_the_newest(backend):
+    from app.schemas.event import AnalystLabel
+
+    ids = []
+    for _ in range(3):
+        event = _event()
+        await backend.add_event(event)
+        await backend.update_event_label(event.event_id, AnalystLabel.NORMAL)
+        ids.append(event.event_id)
+
+    oldest = await backend.get_labeled_events(limit=2)
+    newest = await backend.get_labeled_events(limit=2, newest_first=True)
+
+    assert [event.event_id for event in oldest] == ids[:2]
+    assert [event.event_id for event in newest] == [ids[2], ids[1]]

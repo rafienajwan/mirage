@@ -19,17 +19,17 @@ def _row(label: int, offset: float) -> LabeledFeatures:
 
 def test_review_model_artifact_marks_valid_shadow_ready(tmp_path):
     artifact = tmp_path / "risk_model.joblib"
-    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(20)]
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(70)]
     train_risk_classifier(rows, artifact)
 
     review = review_model_artifact(artifact)
 
     assert review.shadow_ready is True
     assert review.artifact_version == 1
-    assert review.feature_contract_version == 2
+    assert review.feature_contract_version == 3
     assert review.blockers == []
-    assert review.metrics["training_rows"] == 30
-    assert review.metrics["test_rows"] == 10
+    assert review.metrics["training_rows"] == 104
+    assert review.metrics["test_rows"] == 36
 
 
 def test_review_model_artifact_rejects_feature_contract_mismatch(tmp_path):
@@ -59,7 +59,7 @@ def test_review_model_artifact_rejects_feature_contract_mismatch(tmp_path):
 
 def test_review_model_artifact_rejects_feature_contract_version_mismatch(tmp_path):
     artifact = tmp_path / "bad_contract_version.joblib"
-    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(20)]
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(70)]
     train_risk_classifier(rows, artifact)
     payload = joblib.load(artifact)
     payload["feature_contract_version"] = 1
@@ -109,7 +109,7 @@ def test_review_model_artifact_rejects_non_finite_metrics(tmp_path):
 
 def test_review_model_artifact_exposes_valid_dataset_lineage(tmp_path):
     artifact = tmp_path / "risk_model.joblib"
-    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(20)]
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(70)]
     lineage = {
         "dataset_name": "csic-http-2010",
         "dataset_version": "redata-rwuusv-v1",
@@ -129,7 +129,7 @@ def test_review_model_artifact_exposes_valid_dataset_lineage(tmp_path):
 
 def test_review_model_artifact_rejects_invalid_dataset_lineage(tmp_path):
     artifact = tmp_path / "risk_model.joblib"
-    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(20)]
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(70)]
     train_risk_classifier(
         rows,
         artifact,
@@ -147,3 +147,72 @@ def test_review_model_artifact_rejects_invalid_dataset_lineage(tmp_path):
 
     assert review.shadow_ready is False
     assert "Artifact dataset lineage manifest_sha256 is invalid" in review.blockers
+
+
+GOOD_METRICS = {
+    "precision": 0.95,
+    "recall": 0.8,
+    "f1_score": 0.87,
+    "false_positive_rate": 0.01,
+    "training_rows": 100,
+    "test_rows": 30,
+}
+
+
+def _metrics_artifact(tmp_path, **metric_overrides):
+    from app.services.feature_extraction import FEATURE_CONTRACT_VERSION
+
+    metrics = {**GOOD_METRICS, **metric_overrides}
+    metrics = {key: value for key, value in metrics.items() if value is not None}
+    artifact = tmp_path / "thresholds.joblib"
+    joblib.dump(
+        {
+            "artifact_version": 1,
+            "feature_contract_version": FEATURE_CONTRACT_VERSION,
+            "feature_names": FEATURE_NAMES,
+            "metrics": metrics,
+            "model": object(),
+        },
+        artifact,
+    )
+    return artifact
+
+
+def test_review_passes_artifact_meeting_all_thresholds(tmp_path):
+    review = review_model_artifact(_metrics_artifact(tmp_path))
+
+    assert review.blockers == []
+    assert review.shadow_ready is True
+
+
+def test_review_blocks_fpr_above_two_percent(tmp_path):
+    review = review_model_artifact(
+        _metrics_artifact(tmp_path, false_positive_rate=0.05)
+    )
+
+    assert review.shadow_ready is False
+    assert "False-positive rate 0.050 is above 0.020" in review.blockers
+
+
+def test_review_blocks_small_training_set(tmp_path):
+    review = review_model_artifact(_metrics_artifact(tmp_path, training_rows=99))
+
+    assert review.shadow_ready is False
+    assert "Training rows 99 is below 100" in review.blockers
+
+
+def test_review_blocks_undefined_false_positive_rate(tmp_path):
+    review = review_model_artifact(
+        _metrics_artifact(tmp_path, false_positive_rate=None)
+    )
+
+    assert review.shadow_ready is False
+    assert "False-positive rate is unavailable" in review.blockers
+
+
+def test_holdout_without_negatives_has_no_false_positive_rate():
+    from app.ml.artifacts import classification_metrics
+
+    metrics = classification_metrics([1, 1, 1], [1, 0, 1])
+
+    assert metrics["false_positive_rate"] is None

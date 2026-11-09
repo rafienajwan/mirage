@@ -9,9 +9,9 @@ from typing import Iterable
 import joblib
 import numpy as np
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
 
 from app.ml.artifacts import classification_metrics
+from app.ml.datasets import PreparedTrainingRow, stratified_split
 from app.services.feature_extraction import (
     FEATURE_CONTRACT_VERSION,
     FEATURE_NAMES,
@@ -35,7 +35,9 @@ class TrainingMetrics:
     test_rows: int
 
 
-def _matrix(rows: list[LabeledFeatures]) -> tuple[np.ndarray, np.ndarray]:
+def _matrix(
+    rows: list[LabeledFeatures] | list[PreparedTrainingRow],
+) -> tuple[np.ndarray, np.ndarray]:
     x = np.asarray(
         [[row.features.get(name, 0.0) for name in FEATURE_NAMES] for row in rows],
         dtype=float,
@@ -55,7 +57,8 @@ def train_risk_classifier(
     """Train a deterministic binary classifier and save a versioned artifact.
 
     With ``test_rows`` (a prepared held-out split) the model fits on every
-    training row and is scored on those rows; otherwise 25% is held out here.
+    training row and is scored on those rows; otherwise about 25% is held out
+    here, keeping rows with identical feature vectors on the same side.
     """
     records = list(rows)
     if len(records) < 20:
@@ -64,14 +67,19 @@ def train_risk_classifier(
         raise ValueError("Training data must contain both normal and suspicious labels")
 
     if test_rows is None:
-        x, y = _matrix(records)
-        x_train, x_test, y_train, y_test = train_test_split(
-            x,
-            y,
-            test_size=0.25,
-            stratify=y,
-            random_state=random_state,
+        split = stratified_split(
+            [
+                PreparedTrainingRow(
+                    features={name: row.features.get(name, 0.0) for name in FEATURE_NAMES},
+                    label=row.label,
+                )
+                for row in records
+            ],
+            train_ratio=0.75,
+            random_seed=random_state,
         )
+        x_train, y_train = _matrix(split.train)
+        x_test, y_test = _matrix(split.test)
     else:
         held_out = list(test_rows)
         if {row.label for row in held_out} != {0, 1}:

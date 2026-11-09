@@ -115,7 +115,6 @@ def test_csic_training_features_match_serving_for_non_utf8_bodies():
             payload_excerpt=build_payload_excerpt(
                 "", body.decode("utf-8", errors="ignore")
             ),
-            destination_port=8080,
         )
     )
 
@@ -132,7 +131,7 @@ def test_parser_rejects_truncated_content_length():
         parse_csic_http_requests(payload, source_file="anomalousTrafficTest.txt", label=1)
 
 
-def test_parser_falls_back_to_host_header_for_malformed_target_port():
+def test_parser_accepts_malformed_target_port():
     payload = _request("GET", "http://localhost:8080.old")
 
     records = parse_csic_http_requests(
@@ -142,7 +141,6 @@ def test_parser_falls_back_to_host_header_for_malformed_target_port():
     )
 
     assert records[0].path == "/"
-    assert records[0].destination_port == 8080
 
 
 def test_directory_loader_records_hashes_and_removes_same_label_duplicates(tmp_path):

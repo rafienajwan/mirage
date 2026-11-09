@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from functools import lru_cache
 import json
 from pathlib import Path
@@ -19,6 +20,9 @@ from app.ml.artifacts import (
 from app.ml.dataset_review import DatasetReview, review_prepared_dataset
 from app.ml.errors import DatasetValidationError
 from app.schemas.dashboard import MLPromotionGate, MLPromotionReadiness, MLShadowSummary
+from app.schemas.decision import Decision
+from app.schemas.event import EventRecord
+from app.services.training_export import LABEL_TO_BINARY
 
 ArtifactReviewer = Callable[..., ArtifactReview]
 DatasetReviewer = Callable[..., DatasetReview]
@@ -92,9 +96,113 @@ def _artifact_matches_dataset(
     )
 
 
+@dataclass(frozen=True)
+class ClassifierRates:
+    """Rates are None when their denominator is zero (undefined, not 0)."""
+
+    precision: float | None
+    recall: float | None
+    false_positive_rate: float | None
+
+
+@dataclass(frozen=True)
+class LabeledComparison:
+    events: int
+    model: ClassifierRates
+    heuristic: ClassifierRates
+    positives: int = 0
+    negatives: int = 0
+
+
+def _rate(numerator: int, denominator: int) -> float | None:
+    return round(numerator / denominator, 6) if denominator else None
+
+
+def _rates(pairs: list[tuple[bool, bool]]) -> ClassifierRates:
+    """Rates from (is_suspicious, predicted_redirect) pairs."""
+    tp = sum(truth and predicted for truth, predicted in pairs)
+    fp = sum(predicted and not truth for truth, predicted in pairs)
+    fn = sum(truth and not predicted for truth, predicted in pairs)
+    tn = sum(not truth and not predicted for truth, predicted in pairs)
+    return ClassifierRates(
+        precision=_rate(tp, tp + fp),
+        recall=_rate(tp, tp + fn),
+        false_positive_rate=_rate(fp, fp + tn),
+    )
+
+
+def labeled_shadow_comparison(
+    events: Iterable[EventRecord], *, artifact: str
+) -> LabeledComparison:
+    """Compare model and heuristic redirects against analyst labels.
+
+    Only events shadow-scored by ``artifact`` (the configured artifact's file
+    name, as ``ml_shadow`` records it) count.
+    """
+    redirect = Decision.REDIRECT_TO_DECOY.value
+    model: list[tuple[bool, bool]] = []
+    heuristic: list[tuple[bool, bool]] = []
+    for event in events:
+        if (
+            event.analyst_label is None
+            or event.ml_shadow is None
+            or event.ml_shadow.artifact != artifact
+        ):
+            continue
+        truth = LABEL_TO_BINARY[event.analyst_label] == 1
+        heuristic_decision = event.ml_shadow.heuristic_decision or event.decision.value
+        model.append((truth, event.ml_shadow.shadow_decision == redirect))
+        heuristic.append((truth, heuristic_decision == redirect))
+    positives = sum(truth for truth, _ in model)
+    return LabeledComparison(
+        events=len(model),
+        model=_rates(model),
+        heuristic=_rates(heuristic),
+        positives=positives,
+        negatives=len(model) - positives,
+    )
+
+
+def _labeled_gate(comparison: LabeledComparison, minimum: int) -> MLPromotionGate:
+    model, heuristic = comparison.model, comparison.heuristic
+    on_events = f"on {comparison.events} analyst-labeled events"
+    if not (comparison.positives and comparison.negatives):
+        passed = False
+        message = (
+            "Analyst labels must include at least one suspicious and one normal "
+            f"event; found {comparison.positives} suspicious and "
+            f"{comparison.negatives} normal {on_events}"
+        )
+    elif not model.recall:
+        # Recall is defined (positives exist), so 0 means no true positive.
+        passed = False
+        message = f"Model redirected none of the suspicious events {on_events}"
+    else:
+        # Model precision is defined here; an undefined heuristic precision
+        # (it never redirected) counts as 0.
+        passed = (
+            comparison.events >= minimum
+            and (model.precision or 0.0) >= (heuristic.precision or 0.0)
+            and model.recall >= (heuristic.recall or 0.0)
+        )
+        message = (
+            f"Model precision {model.precision} vs heuristic {heuristic.precision}, "
+            f"model recall {model.recall} vs heuristic {heuristic.recall} "
+            f"{on_events}"
+        )
+    return _gate(
+        "labeled_model_vs_heuristic",
+        passed,
+        message,
+        actual=comparison.events,
+        required=minimum,
+    )
+
+
 def evaluate_ml_promotion(
     *,
     shadow_summary: MLShadowSummary | Any,
+    labeled_events: Iterable[EventRecord] = (),
     settings: Any = app_settings,
     artifact_reviewer: ArtifactReviewer = review_model_artifact,
     dataset_reviewer: DatasetReviewer = review_prepared_dataset,
@@ -158,11 +266,11 @@ def evaluate_ml_promotion(
             1,
         ),
         (
-            "invalid_min_agreement_rate",
-            0 <= settings.ml_promotion_min_agreement_rate <= 1,
-            "Minimum agreement rate must be between 0 and 1",
-            settings.ml_promotion_min_agreement_rate,
-            "0..1",
+            "invalid_min_labeled_events",
+            settings.ml_promotion_min_labeled_events >= 1,
+            "Minimum labeled events must be at least 1",
+            settings.ml_promotion_min_labeled_events,
+            1,
         ),
     )
     for code, passed, message, actual, required in threshold_checks:
@@ -257,6 +365,16 @@ def evaluate_ml_promotion(
         )
     )
 
+    comparison = labeled_shadow_comparison(labeled_events, artifact=artifact_path.name)
+    labeled_gate = _labeled_gate(comparison, settings.ml_promotion_min_labeled_events)
+    # Enough labels of both classes and the model still loses: more watching
+    # will not fix it.
+    comparison_failed = (
+        not labeled_gate.passed
+        and comparison.events >= settings.ml_promotion_min_labeled_events
+        and comparison.positives > 0
+        and comparison.negatives > 0
+    )
     shadow_events = shadow_summary.shadow_events
     agreement_rate = shadow_summary.agreement_rate
     gates.extend(
@@ -270,15 +388,14 @@ def evaluate_ml_promotion(
                 actual=shadow_events,
                 required=settings.ml_promotion_min_shadow_events,
             ),
+            # Informational: agreeing with the heuristic is not the goal.
             _gate(
                 "shadow_agreement_rate",
-                agreement_rate >= settings.ml_promotion_min_agreement_rate,
-                "Shadow agreement is within the compatibility threshold"
-                if agreement_rate >= settings.ml_promotion_min_agreement_rate
-                else "Shadow agreement needs operator investigation",
+                True,
+                "Shadow agreement with the heuristic (informational only)",
                 actual=agreement_rate,
-                required=settings.ml_promotion_min_agreement_rate,
             ),
+            labeled_gate,
         ]
     )
 
@@ -290,9 +407,9 @@ def evaluate_ml_promotion(
     observation_failed = any(
         not gate.passed
         for gate in gates
-        if gate.code in {"shadow_event_count", "shadow_agreement_rate"}
+        if gate.code in {"shadow_event_count", "labeled_model_vs_heuristic"}
     )
-    if review_failed:
+    if review_failed or comparison_failed:
         status = "blocked"
     elif observation_failed:
         status = "needs_observation"

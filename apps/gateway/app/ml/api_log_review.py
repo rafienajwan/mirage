@@ -162,15 +162,6 @@ def _api_payload_indicators(value: object, *, line_number: int) -> list[str]:
     )
 
 
-def _optional_float(value: object) -> float | None:
-    if value in (None, ""):
-        return None
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
-
 def _optional_int(value: object) -> int | None:
     if value in (None, ""):
         return None
@@ -249,51 +240,6 @@ def _api_log_request(record: dict, *, line_number: int) -> InspectRequest:
             ),
             payload_excerpt=_payload_excerpt(request_data),
             timestamp=request_data.get("timestamp"),
-            flow_duration_ms=_optional_float(
-                _first_object_value(
-                    request_data,
-                    "flow_duration_ms",
-                    "duration_ms",
-                    "durationMs",
-                    "latency_ms",
-                )
-            ),
-            flow_packets_per_second=_optional_float(
-                _first_object_value(
-                    request_data,
-                    "flow_packets_per_second",
-                    "flowPacketsPerSecond",
-                    "packets_per_second",
-                )
-            ),
-            packet_length_mean=_optional_float(
-                _first_object_value(
-                    request_data,
-                    "packet_length_mean",
-                    "packetLengthMean",
-                    "avg_packet_length",
-                )
-            ),
-            syn_flag_count=_optional_int(
-                _first_object_value(request_data, "syn_flag_count", "synFlagCount")
-            ),
-            destination_port=_optional_int(
-                _first_object_value(
-                    request_data,
-                    "destination_port",
-                    "destinationPort",
-                    "dst_port",
-                    "port",
-                )
-            ),
-            average_packet_size=_optional_float(
-                _first_object_value(
-                    request_data,
-                    "average_packet_size",
-                    "averagePacketSize",
-                    "avg_packet_size",
-                )
-            ),
         )
     except ValueError as exc:
         raise DatasetValidationError(

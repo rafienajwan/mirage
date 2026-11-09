@@ -101,3 +101,25 @@ def test_evaluate_model_artifact_blocks_feature_contract_version_mismatch(tmp_pa
     assert "Artifact feature contract version does not match the gateway" in (
         evaluation.blockers
     )
+
+
+def test_evaluate_model_artifact_defaults_to_review_thresholds(tmp_path):
+    artifact = tmp_path / "risk_model.joblib"
+    holdout = tmp_path / "test.jsonl"
+    rows = [_row(label, float(index + 1)) for label in (0, 1) for index in range(30)]
+    train_risk_classifier(rows, artifact)
+    # One normal row that looks suspicious: FPR 1/20 = 0.05, everything else
+    # comfortably above the old 0.5 defaults.
+    holdout_rows = [
+        {"label": label, "features": _features(label, float(index + 100))}
+        for label in (0, 1)
+        for index in range(20)
+    ]
+    holdout_rows[0] = {"label": 0, "features": _features(1, 100.0)}
+    _write_jsonl(holdout, holdout_rows)
+
+    evaluation = evaluate_model_artifact(artifact, holdout)
+
+    assert evaluation.metrics["false_positive_rate"] == 0.05
+    assert evaluation.holdout_ready is False
+    assert any("False-positive" in blocker for blocker in evaluation.blockers)

@@ -1,15 +1,20 @@
 """Pin model artifacts to a SHA-256 digest before they are unpickled.
 
 ``joblib.load`` executes code embedded in the file, so a swapped artifact is
-code execution in the gateway. Verify the bytes first, then load.
+code execution in the gateway. Read the file once, verify those bytes, then
+unpickle the same bytes, so a file swapped after the check is never loaded.
 """
 
 from __future__ import annotations
 
 import hashlib
 import hmac
+import io
 from pathlib import Path
 import re
+from typing import Any
+
+import joblib
 
 _DIGEST = re.compile(r"[0-9a-f]{64}")
 _CHUNK = 1024 * 1024
@@ -40,9 +45,20 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def verify_artifact_digest(path: Path, expected_sha256: str) -> None:
-    expected = expected_sha256.strip().lower()
-    if not _DIGEST.fullmatch(expected):
-        raise ArtifactIntegrityError("Expected SHA-256 must be 64 hexadecimal characters")
-    if not hmac.compare_digest(sha256_file(path), expected):
-        raise ArtifactIntegrityError("Artifact SHA-256 does not match the pinned digest")
+def load_verified_artifact(path: Path, expected_sha256: str | None) -> Any:
+    """Unpickle the artifact from the exact bytes whose digest was checked.
+
+    Without an expected digest (development only) the bytes are loaded unchecked.
+    """
+    data = path.read_bytes()
+    if expected_sha256 is not None:
+        expected = expected_sha256.strip().lower()
+        if not _DIGEST.fullmatch(expected):
+            raise ArtifactIntegrityError(
+                "Expected SHA-256 must be 64 hexadecimal characters"
+            )
+        if not hmac.compare_digest(hashlib.sha256(data).hexdigest(), expected):
+            raise ArtifactIntegrityError(
+                "Artifact SHA-256 does not match the pinned digest"
+            )
+    return joblib.load(io.BytesIO(data))

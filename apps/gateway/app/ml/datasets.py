@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from collections import Counter
-import csv
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -45,8 +45,6 @@ DatasetSource = Literal[
     "mirage-jsonl",
     "api-log-jsonl",
     "reviewed-api-log-jsonl",
-    "cicids-csv",
-    "cicids-csv-dir",
     "csic-http-dir",
 ]
 
@@ -86,6 +84,7 @@ class DatasetManifest:
     input_sha256: dict[str, str] = field(default_factory=dict)
     duplicate_rows_removed: int = 0
     rejected_rows: int = 0
+    conflicting_feature_groups: int = 0
 
 
 def normalize_features(features: object, *, line_number: int | None = None) -> FeatureVector:
@@ -167,31 +166,6 @@ def load_mirage_jsonl(path: Path) -> list[PreparedTrainingRow]:
     return rows
 
 
-def _first_present(row: dict[str, str], *names: str) -> str | None:
-    normalized_row = {key.strip(): value for key, value in row.items()}
-    for name in names:
-        value = normalized_row.get(name)
-        if value not in (None, ""):
-            return value
-    return None
-
-
-def _float_field(row: dict[str, str], *names: str) -> float:
-    value = _first_present(row, *names)
-    if value is None:
-        return 0.0
-    try:
-        return float(value)
-    except ValueError:
-        return 0.0
-
-
-def _label_from_cicids(value: str | None) -> int:
-    if value is None:
-        raise DatasetValidationError("CICIDS row is missing Label")
-    return 0 if value.strip().upper() == "BENIGN" else 1
-
-
 def load_api_log_jsonl(path: Path) -> list[PreparedTrainingRow]:
     """Load labeled custom API logs and extract MIRAGE production features."""
     rows: list[PreparedTrainingRow] = []
@@ -242,99 +216,6 @@ def load_reviewed_api_log_jsonl(path: Path) -> list[PreparedTrainingRow]:
     ]
 
 
-def _load_cicids_csv_rows(
-    path: Path,
-    *,
-    source_kind: DatasetSource,
-    record_prefix: str | None = None,
-) -> list[PreparedTrainingRow]:
-    """Load CICIDS-style CSV rows into the MIRAGE feature schema.
-
-    CICIDS has no HTTP request data, so every request and payload feature is
-    explicitly 0; only the flow features come from the CSV.
-    """
-    rows: list[PreparedTrainingRow] = []
-    with path.open(newline="", encoding="utf-8-sig") as source:
-        reader = csv.DictReader(source)
-        for line_number, record in enumerate(reader, start=2):
-            label = _label_from_cicids(_first_present(record, "Label", "label"))
-            features: FeatureVector = {
-                **dict.fromkeys(FEATURE_NAMES, 0.0),
-                "flow_duration_ms": _float_field(
-                    record,
-                    "Flow Duration",
-                    "Flow Duration_ms",
-                    "flow_duration_ms",
-                ),
-                "flow_packets_per_second": _float_field(
-                    record,
-                    "Flow Packets/s",
-                    "Flow Packets Per Second",
-                    "flow_packets_per_second",
-                ),
-                "packet_length_mean": _float_field(
-                    record,
-                    "Packet Length Mean",
-                    "packet_length_mean",
-                ),
-                "syn_flag_count": _float_field(
-                    record,
-                    "SYN Flag Count",
-                    "syn_flag_count",
-                ),
-                "destination_port": _float_field(
-                    record,
-                    "Destination Port",
-                    "Dst Port",
-                    "destination_port",
-                ),
-                "average_packet_size": _float_field(
-                    record,
-                    "Average Packet Size",
-                    "Avg Packet Size",
-                    "average_packet_size",
-                ),
-            }
-            rows.append(
-                PreparedTrainingRow(
-                    features=normalize_features(features, line_number=line_number),
-                    label=label,
-                    source=source_kind,
-                    record_id=(
-                        f"{record_prefix}:{line_number}"
-                        if record_prefix
-                        else str(line_number)
-                    ),
-                )
-            )
-    return rows
-
-
-def load_cicids_csv(path: Path) -> list[PreparedTrainingRow]:
-    """Load one CICIDS-style CSV into the MIRAGE feature schema."""
-    return _load_cicids_csv_rows(path, source_kind="cicids-csv")
-
-
-def load_cicids_csv_directory(path: Path) -> list[PreparedTrainingRow]:
-    """Load all CICIDS-style CSV files from a directory in stable name order."""
-    csv_files = sorted(
-        item for item in path.iterdir() if item.suffix.lower() == ".csv"
-    )
-    if not csv_files:
-        raise DatasetValidationError(f"no CSV files found in directory: {path}")
-
-    rows: list[PreparedTrainingRow] = []
-    for csv_file in csv_files:
-        rows.extend(
-            _load_cicids_csv_rows(
-                csv_file,
-                source_kind="cicids-csv-dir",
-                record_prefix=csv_file.name,
-            )
-        )
-    return rows
-
-
 def _csic_http_rows(loaded: LoadedCSICHTTP) -> list[PreparedTrainingRow]:
     rows: list[PreparedTrainingRow] = []
     for record in loaded.records:
@@ -354,7 +235,6 @@ def _csic_http_rows(loaded: LoadedCSICHTTP) -> list[PreparedTrainingRow]:
                 # Same decoding as the proxy, so train and serve features match.
                 record.body.decode("utf-8", errors="ignore"),
             ),
-            destination_port=record.destination_port,
         )
         rows.append(
             PreparedTrainingRow(
@@ -380,10 +260,6 @@ def load_dataset(path: Path, source_kind: DatasetSource) -> list[PreparedTrainin
         return load_api_log_jsonl(path)
     if source_kind == "reviewed-api-log-jsonl":
         return load_reviewed_api_log_jsonl(path)
-    if source_kind == "cicids-csv":
-        return load_cicids_csv(path)
-    if source_kind == "cicids-csv-dir":
-        return load_cicids_csv_directory(path)
     if source_kind == "csic-http-dir":
         return load_csic_http_rows(path)
     raise DatasetValidationError(f"Unsupported dataset source kind: {source_kind}")
@@ -407,35 +283,75 @@ def validate_training_rows(rows: Iterable[PreparedTrainingRow]) -> list[Prepared
     return validated
 
 
+@dataclass(frozen=True)
+class DatasetSplit:
+    """Train/test rows plus the number of feature vectors seen with both labels."""
+
+    train: list[PreparedTrainingRow]
+    test: list[PreparedTrainingRow]
+    conflicting_feature_groups: int
+
+
+def _feature_group_key(row: PreparedTrainingRow) -> str:
+    values = json.dumps([row.features[name] for name in FEATURE_NAMES])
+    return hashlib.sha256(values.encode("utf-8")).hexdigest()
+
+
 def stratified_split(
     rows: Iterable[PreparedTrainingRow],
     *,
     train_ratio: float = 0.75,
     random_seed: int = 42,
-) -> tuple[list[PreparedTrainingRow], list[PreparedTrainingRow]]:
-    """Create a deterministic stratified train/test split."""
+) -> DatasetSplit:
+    """Create a deterministic stratified split that keeps identical vectors together.
+
+    Rows with the same feature vector form one group, and a group goes wholly to
+    train or wholly to test, so duplicated requests cannot inflate holdout
+    metrics. A group holding both labels follows its majority label (ties count
+    as suspicious) and is counted in ``conflicting_feature_groups``.
+    """
     if not 0 < train_ratio < 1:
         raise DatasetValidationError("train_ratio must be between 0 and 1")
 
-    grouped: dict[int, list[PreparedTrainingRow]] = {0: [], 1: []}
+    groups: dict[str, list[PreparedTrainingRow]] = {}
     for row in validate_training_rows(rows):
-        grouped[row.label].append(row)
+        groups.setdefault(_feature_group_key(row), []).append(row)
+
+    by_label: dict[int, list[list[PreparedTrainingRow]]] = {0: [], 1: []}
+    conflicting = 0
+    for key in sorted(groups):
+        group = groups[key]
+        suspicious = sum(row.label for row in group)
+        if 0 < suspicious < len(group):
+            conflicting += 1
+        by_label[int(suspicious * 2 >= len(group))].append(group)
+
+    for label, label_groups in by_label.items():
+        if len(label_groups) < 2:
+            raise DatasetValidationError(
+                f"Label {label} has fewer than 2 distinct feature groups; "
+                "identical rows cannot be split into train and test"
+            )
 
     train: list[PreparedTrainingRow] = []
     test: list[PreparedTrainingRow] = []
     rng = random.Random(random_seed)  # noqa: S311 - seeded, reproducible split; not security-sensitive
 
-    for label_rows in grouped.values():
-        shuffled = list(label_rows)
-        rng.shuffle(shuffled)
-        split_at = round(len(shuffled) * train_ratio)
-        split_at = min(max(split_at, 1), len(shuffled) - 1)
-        train.extend(shuffled[:split_at])
-        test.extend(shuffled[split_at:])
+    for label_groups in by_label.values():
+        rng.shuffle(label_groups)
+        test_target = sum(len(group) for group in label_groups) * (1 - train_ratio)
+        test_rows = 0
+        for index, group in enumerate(label_groups):
+            is_last = index == len(label_groups) - 1
+            if test_rows < test_target and not is_last:
+                test.extend(group)
+                test_rows += len(group)
+            else:
+                train.extend(group)
 
     rng.shuffle(train)
     rng.shuffle(test)
-    return train, test
+    return DatasetSplit(train=train, test=test, conflicting_feature_groups=conflicting)
 
 
 def _row_to_json(row: PreparedTrainingRow) -> dict:
@@ -512,11 +428,12 @@ def prepare_dataset(
                 "source_review_path is only supported for reviewed-api-log-jsonl"
             )
         rows = load_dataset(input_path, source_kind)
-    train_rows, test_rows = stratified_split(
+    split = stratified_split(
         rows,
         train_ratio=train_ratio,
         random_seed=random_seed,
     )
+    train_rows, test_rows = split.train, split.test
 
     output_dir.mkdir(parents=True, exist_ok=True)
     train_path = output_dir / "train.jsonl"
@@ -582,6 +499,7 @@ def prepare_dataset(
         input_sha256=input_sha256,
         duplicate_rows_removed=duplicate_rows_removed,
         rejected_rows=rejected_rows,
+        conflicting_feature_groups=split.conflicting_feature_groups,
     )
 
     manifest_path.write_text(

@@ -49,13 +49,11 @@ shadow mode:
 ```bash
 python scripts/evaluate_model_artifact.py \
   --artifact artifacts/risk_model.joblib \
-  --input data/prepared/runtime-v1/test.jsonl \
-  --min-precision 0.5 \
-  --min-recall 0.5 \
-  --min-f1-score 0.5 \
-  --max-false-positive-rate 0.5
+  --input data/prepared/runtime-v1/test.jsonl
 ```
 
+Its thresholds default to the artifact review's (precision `0.90`, recall
+`0.60`, F1 `0.70`, false-positive rate at most `0.02`; `--help` shows them).
 The command exits with code `1` when holdout thresholds fail. This is separate
 from the training script's internal validation and should be treated as the
 operator-facing check for a prepared dataset split.
@@ -67,11 +65,7 @@ Review the artifact payload before enabling it:
 ```bash
 cd apps/gateway
 python scripts/review_model_artifact.py \
-  --artifact artifacts/risk_model.joblib \
-  --min-precision 0.5 \
-  --min-recall 0.5 \
-  --min-f1-score 0.5 \
-  --max-false-positive-rate 0.5
+  --artifact artifacts/risk_model.joblib
 ```
 
 The command exits with code `1` when blockers are found. It checks that the
@@ -79,232 +73,36 @@ artifact can be loaded, the feature contract matches the gateway, required
 metrics exist, dataset lineage is structurally valid when present, and the
 selected metric thresholds are satisfied.
 
-The default thresholds are intentionally modest for local prototypes. For a
-real demonstration or deployment, raise them and review dataset provenance,
-holdout behavior, label quality, and false-positive tradeoffs manually.
-
-## Local CICIDS2017 DDoS Review
-
-A local ignored CICIDS2017 DDoS split has been reviewed and used to train a
-shadow-ready artifact. The raw CSV files, prepared split, and `.joblib` artifact
-remain ignored local files and should not be committed.
-
-Dataset review:
-
-```bash
-cd apps/gateway
-python scripts/review_dataset.py \
-  --manifest data/prepared/cicids2017-ddos-v1/manifest.json \
-  --min-total-rows 20 \
-  --min-train-rows 15 \
-  --min-test-rows 5
-```
-
-Review result:
-
-| Metric | Value |
-| --- | ---: |
-| Total rows | 225745 |
-| Train rows | 169308 |
-| Test rows | 56437 |
-| Normal rows | 97718 |
-| Suspicious rows | 128027 |
-| Blockers | 0 |
-| Warnings | 0 |
-
-Training command:
-
-```bash
-python scripts/train_model.py \
-  --input data/prepared/cicids2017-ddos-v1/train.jsonl \
-  --output artifacts/cicids2017-ddos-risk-model.joblib \
-  --manifest data/prepared/cicids2017-ddos-v1/manifest.json
-```
-
-Internal training-script validation:
-
-| Metric | Value |
-| --- | ---: |
-| Precision | 0.9994169581875729 |
-| Recall | 0.9997083940845657 |
-| F1 score | 0.9995626548930587 |
-| False-positive rate | 0.0007641087217552669 |
-| Training rows | 126981 |
-| Test rows | 42327 |
-
-Holdout evaluation command:
-
-```bash
-python scripts/evaluate_model_artifact.py \
-  --artifact artifacts/cicids2017-ddos-risk-model.joblib \
-  --input data/prepared/cicids2017-ddos-v1/test.jsonl \
-  --min-precision 0.9 \
-  --min-recall 0.9 \
-  --min-f1-score 0.9 \
-  --max-false-positive-rate 0.05 \
-  --min-rows 1000
-```
-
-Holdout evaluation:
-
-| Metric | Value |
-| --- | ---: |
-| Evaluated rows | 56437 |
-| Precision | 0.9993752342871424 |
-| Recall | 0.9995313525166369 |
-| F1 score | 0.9994532873053312 |
-| False-positive rate | 0.0008186655751125665 |
-| Blockers | 0 |
-
-Artifact review command:
-
-```bash
-python scripts/review_model_artifact.py \
-  --artifact artifacts/cicids2017-ddos-risk-model.joblib \
-  --min-precision 0.9 \
-  --min-recall 0.9 \
-  --min-f1-score 0.9 \
-  --max-false-positive-rate 0.05 \
-  --min-training-rows 1000 \
-  --min-test-rows 1000
-```
-
-The artifact review returned `shadow_ready: true` with no blockers or warnings.
-This supports shadow-mode observation only. It does not justify switching live
-routing from heuristics to model control.
-
-## Local CICIDS2017 Full Directory Review
-
-The local ignored full CICIDS2017 CSV directory has also been prepared with the
-`cicids-csv-dir` adapter and used to train a broader shadow-ready artifact. The
-raw CSV files, prepared split, and `.joblib` artifact remain ignored local files
-and should not be committed.
-
-Dataset preparation:
-
-```bash
-cd apps/gateway
-python scripts/prepare_dataset.py \
-  --source cicids-csv-dir \
-  --input data \
-  --output-dir data/prepared/cicids2017-full-v1 \
-  --dataset-name cicids2017-full \
-  --dataset-version v1
-```
-
-Dataset review:
-
-```bash
-python scripts/review_dataset.py \
-  --manifest data/prepared/cicids2017-full-v1/manifest.json \
-  --min-total-rows 1000 \
-  --min-train-rows 1000 \
-  --min-test-rows 1000 \
-  --min-rows-per-class 1000
-```
-
-Review result:
-
-| Metric | Value |
-| --- | ---: |
-| Total rows | 2830743 |
-| Train rows | 2123057 |
-| Test rows | 707686 |
-| Normal rows | 2273097 |
-| Suspicious rows | 557646 |
-| Blockers | 0 |
-| Warnings | 0 |
-
-Training command:
-
-```bash
-python scripts/train_model.py \
-  --input data/prepared/cicids2017-full-v1/train.jsonl \
-  --output artifacts/cicids2017-full-risk-model.joblib \
-  --manifest data/prepared/cicids2017-full-v1/manifest.json
-```
-
-Internal training-script validation:
-
-| Metric | Value |
-| --- | ---: |
-| Precision | 0.9653379712324903 |
-| Recall | 0.9820579768360447 |
-| F1 score | 0.9736261964926587 |
-| False-positive rate | 0.008650746352702684 |
-| Training rows | 1592292 |
-| Test rows | 530765 |
-
-Holdout evaluation command:
-
-```bash
-python scripts/evaluate_model_artifact.py \
-  --artifact artifacts/cicids2017-full-risk-model.joblib \
-  --input data/prepared/cicids2017-full-v1/test.jsonl \
-  --min-precision 0.9 \
-  --min-recall 0.9 \
-  --min-f1-score 0.9 \
-  --max-false-positive-rate 0.05 \
-  --min-rows 1000
-```
-
-Holdout evaluation:
-
-| Metric | Value |
-| --- | ---: |
-| Evaluated rows | 707686 |
-| Precision | 0.9661597923602099 |
-| Recall | 0.9825983416061745 |
-| F1 score | 0.9743097341356207 |
-| False-positive rate | 0.008443110189802806 |
-| Blockers | 0 |
-
-Artifact review returned `shadow_ready: true` with no blockers or warnings at
-the same 0.9 precision, recall, and F1 thresholds. Smoke testing confirmed the
-artifact loads through the runtime shadow-scoring path. Like the DDoS-specific
-artifact, this supports shadow-mode observation only; it still does not justify
-model-controlled routing.
+The default thresholds are strict because a false positive sends a real user
+to the decoy: precision at least `0.90`, recall at least `0.60`, F1 at least
+`0.70`, false-positive rate at most `0.02`, at least `100` training rows and
+`30` test rows (`--help` shows them). A test split without negatives has no
+false-positive rate and is blocked. Gateway shadow loading and dashboard
+retraining use the same defaults. Still review dataset provenance, holdout
+behavior, label quality, and false-positive tradeoffs manually.
 
 ## Local HTTP CSIC 2010 Review
 
-The ignored HTTP CSIC 2010 split was regenerated for feature contract version 2
-with train/test SHA-256 values, trained with manifest-bound lineage, and
-evaluated against its external holdout. Dataset review passed with 34,604 rows:
-25,953 training rows and 8,651 holdout rows. The enriched candidate improves
-substantially over the version 1 baseline, but it still does not pass the
-conservative promotion-quality gates.
-
-Training command:
+The ignored HTTP CSIC 2010 split was regenerated under feature contract
+version 3 with the grouped split and trained with manifest-bound lineage, so
+its metrics come from the prepared holdout:
 
 ```bash
 python scripts/train_model.py \
-  --input data/prepared/csic-http-2010-v2/train.jsonl \
-  --output artifacts/csic-http-2010-risk-model-v2.joblib \
-  --manifest data/prepared/csic-http-2010-v2/manifest.json
+  --input data/prepared/csic-http-2010-v3/train.jsonl \
+  --output artifacts/csic-http-2010-risk-model-v3.joblib \
+  --manifest data/prepared/csic-http-2010-v3/manifest.json
+
+python scripts/review_model_artifact.py \
+  --artifact artifacts/csic-http-2010-risk-model-v3.joblib
 ```
 
-| Candidate and check | Precision | Recall | F1 | False-positive rate |
-| --- | ---: | ---: | ---: | ---: |
-| Version 1 holdout baseline, 8,651 rows | 0.639824 | 0.328489 | 0.434106 | 0.158369 |
-| Version 2 internal validation, 6,489 rows | 0.836122 | 0.734469 | 0.782006 | 0.123319 |
-| Version 2 prepared holdout, 8,651 rows | 0.818670 | 0.725132 | 0.769067 | 0.137554 |
-
-The version 2 artifact still fails the required `0.9` precision, recall, and F1
-gates and the maximum `0.05` false-positive-rate gate. Its default local
-artifact review reports `shadow_ready` because all four metrics satisfy the
-default review thresholds (`0.5` minimums and `0.5` maximum FPR). That status
-only permits observation: a smoke
-run still produced one false positive on the normal request, agreement was
-`0.5`, and heuristic routing remained unchanged.
-
-Feature contract version 2 increases the training split from 163 to 17,294
-unique feature vectors. Label-conflicting vectors now cover 4,574 rows instead
-of 24,737. Payload entropy, non-alphanumeric ratio, payload length,
-percent-encoded count, and parameter count are the five most important model
-inputs in this candidate. This confirms that generic payload shape reduces the
-earlier structural information loss, but the remaining false-positive rate and
-legacy CSIC domain gap still require reviewed production-like custom API logs.
-Thresholds were not lowered and this artifact must not control live routing.
+On 8,686 holdout rows it reaches precision 0.750, recall 0.728, F1 0.739 and a
+false-positive rate of 0.210. The default review blocks it (`Precision 0.750 is
+below 0.900`, `False-positive rate 0.210 is above 0.020`), so it must not be
+used for shadow or live routing. Dataset counts, `conflicting_feature_groups`
+and the artifact SHA-256 are recorded in `docs/dataset-preparation.md`. The CSIC
+domain gap still requires reviewed production-like custom API logs.
 
 ## Smoke-Test Shadow Scoring
 
@@ -315,7 +113,7 @@ the configured database:
 ```bash
 cd apps/gateway
 python scripts/smoke_ml_shadow.py \
-  --artifact artifacts/cicids2017-ddos-risk-model.joblib \
+  --artifact artifacts/csic-http-2010-risk-model-v3.joblib \
   --memory-store \
   --monitor-threshold 0.35 \
   --redirect-threshold 0.65
@@ -323,22 +121,6 @@ python scripts/smoke_ml_shadow.py \
 
 The command exits with code `1` when the artifact is not `shadow_ready` or when
 the smoke requests do not produce shadow-scored events.
-
-Current local smoke result for the reviewed CICIDS2017 DDoS artifact:
-
-| Signal | Value |
-| --- | ---: |
-| Artifact mode | `shadow_ready` |
-| Shadow events | 2 |
-| Agreements | 1 |
-| Disagreements | 1 |
-| Agreement rate | 0.5 |
-| Average probability | 0.27 |
-
-The disagreement is expected for this smoke run: the heuristic redirects the
-high-risk `/.env` probe, while the CICIDS-trained model scores it as monitor.
-That difference is useful operator evidence that the current artifact should
-remain in shadow mode until runtime API-domain data is collected and reviewed.
 
 ## Observe Shadow Trends
 
@@ -370,46 +152,6 @@ change in shadow-scored events across the observation window.
 Use this as operational evidence only. A high agreement rate on local traffic is
 not enough to let the model control routing; it should still be reviewed against
 representative API-domain data and false-positive expectations.
-
-### Local Full-Artifact Observation
-
-A local ignored observation run was executed against a temporary gateway on
-`127.0.0.1:8010` with the full CICIDS2017 artifact configured in shadow mode.
-The gateway used a local SQLite observation database and simulated normal plus
-suspicious dashboard traffic. The observation outputs remain under ignored
-`data/observations/` files and should not be committed.
-
-Observation command:
-
-```bash
-python scripts/observe_ml_shadow.py \
-  --base-url http://127.0.0.1:8010 \
-  --samples 10 \
-  --interval-seconds 1 \
-  --limit 200 \
-  --output data/observations/ml-shadow-full-observation.jsonl \
-  --summary-output data/observations/ml-shadow-full-observation-summary.json
-```
-
-Observation summary:
-
-| Signal | Value |
-| --- | ---: |
-| Artifact mode samples | `shadow_ready`: 10 |
-| Shadow-ready samples | 10 |
-| Shadow event delta | 18 |
-| Latest shadow events | 19 |
-| Latest agreement rate | 0.526316 |
-| Latest disagreement rate | 0.473684 |
-| Latest disagreements | 9 |
-| Max disagreement rate | 0.473684 |
-
-The final snapshot showed 10 live `allow` decisions and 9 live
-`redirect_to_decoy` decisions, while the model shadow decisions were 19
-`allow`. This is useful negative evidence: the artifact loads and scores in
-shadow mode, but CICIDS flow features alone do not match MIRAGE's simulated API
-attack semantics closely enough to control routing. Keep the model shadow-only
-until reviewed custom API-domain logs are collected and trained.
 
 ## Local API-Domain Fixture Review
 
@@ -585,7 +327,14 @@ curl -X POST \
 
 The endpoint stores the artifact in `MIRAGE_RETRAINING_ARTIFACT_DIR`, returns
 the training metrics, and includes the same artifact review result used before
-shadow-mode activation. It does not update `MIRAGE_MODEL_ARTIFACT`.
+shadow-mode activation. It does not update `MIRAGE_MODEL_ARTIFACT`. Its
+internal holdout keeps identical feature vectors on one side; when a class has
+fewer than two distinct feature vectors the endpoint returns `409`.
+
+After each successful run only the five newest `risk_model_*.joblib` files in
+that directory are kept. The file configured as `MIRAGE_MODEL_ARTIFACT` is never
+deleted, even when it is older. Files that cannot be deleted are logged and
+left in place.
 
 ## Enable Shadow Mode
 
@@ -618,13 +367,27 @@ The promotion endpoint requires `X-Mirage-API-Key` and also needs a prepared
 manifest configured through `MIRAGE_MODEL_DATASET_MANIFEST`. It reports:
 
 - `unavailable` when required paths are not configured;
-- `blocked` when configuration, artifact, or dataset review fails;
-- `needs_observation` when runtime shadow evidence is insufficient;
+- `blocked` when configuration, artifact, or dataset review fails, or when, on
+  at least `ML_PROMOTION_MIN_LABELED_EVENTS` (default 100) analyst-labeled
+  shadow events covering both classes, the model caught no suspicious event or
+  its precision or recall is below the heuristic's;
+- `needs_observation` when runtime shadow evidence is insufficient: too few
+  shadow events, too few labeled events, or labels missing a class;
 - `eligible` when every configured gate passes.
 
+The labeled comparison only passes when the labels include at least one
+suspicious and one normal event and the model caught at least one suspicious
+event. A rate with nothing to divide by (for example precision for a model that
+never redirects) is undefined and never counts as matching the heuristic.
+It uses the newest 10,000 analyst-labeled events and counts only those
+shadow-scored by the configured artifact (matched by file name), so labels on
+events scored by an earlier artifact do not vouch for the current one.
+
 Only sanitized file names are returned. The report never changes the active
-artifact or heuristic routing policy. Agreement is a compatibility signal
-against current heuristics, not proof of real-world model accuracy.
+artifact or heuristic routing policy. Agreement with the heuristic is shown for
+information only and never blocks promotion: a model that copies the heuristic
+adds nothing, and one that catches what the heuristic misses must disagree.
+Analyst labels are the yardstick.
 
 ## Experimental Live Routing
 
@@ -636,7 +399,9 @@ must also be set deliberately. The default remains `heuristic`.
 Only consider that approval after the promotion report is `eligible`, the
 artifact has representative API-domain holdout results, and the shadow
 observation has an acceptable false-positive impact. Keep `ml_only` limited to
-controlled experiments because it can override explainable heuristic signals.
+controlled experiments because it can override explainable heuristic signals
+below HIGH. In every mode, a HIGH or CRITICAL heuristic risk (an attack
+signature) still redirects to the decoy, whatever the model decides.
 
 ## Safe Claims
 
