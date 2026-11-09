@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from app.core.security import require_api_key
+from app.core.security import require_operator
 from app.schemas.decision import InspectResponse
 from app.schemas.request import InspectRequest
 from app.services.inspection import inspect_and_log
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/simulate", tags=["simulate"])
 @router.post(
     "/normal",
     response_model=InspectResponse,
-    dependencies=[Depends(require_api_key)],
+    dependencies=[Depends(require_operator)],
 )
 async def simulate_normal():
     """Generate a safe normal traffic event for demo purposes."""
@@ -33,7 +33,7 @@ async def simulate_normal():
 @router.post(
     "/suspicious",
     response_model=InspectResponse,
-    dependencies=[Depends(require_api_key)],
+    dependencies=[Depends(require_operator)],
 )
 async def simulate_suspicious():
     """Generate a safe suspicious traffic event for demo purposes."""

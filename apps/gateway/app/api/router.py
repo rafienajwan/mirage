@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.routes import dashboard, decoy, health, inspect, proxy, simulate, stream
+from app.api.routes import dashboard, decoy, health, inspect, operators, proxy, simulate, stream
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -13,6 +13,7 @@ api_router.include_router(stream.router)
 api_router.include_router(decoy.router)
 api_router.include_router(simulate.router)
 api_router.include_router(proxy.router)
+api_router.include_router(operators.router)
 
 # Health check lives at root level (no /api/v1 prefix)
 root_router = APIRouter()

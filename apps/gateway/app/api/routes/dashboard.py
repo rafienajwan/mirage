@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
-from app.core.security import require_api_key
+from app.core.security import require_admin, require_operator
 from app.schemas.actor import (
     ActorCaseOpenRequest,
     ActorCaseUpdateRequest,
@@ -47,7 +47,7 @@ from app.storage import store
 router = APIRouter(
     prefix="/dashboard",
     tags=["dashboard"],
-    dependencies=[Depends(require_api_key)],
+    dependencies=[Depends(require_operator)],
 )
 
 
@@ -113,6 +113,7 @@ async def training_data_readiness(limit: int = Query(default=10000, ge=1, le=500
 @router.post(
     "/training-data/retrain",
     response_model=RetrainingRun,
+    dependencies=[Depends(require_admin)],
 )
 async def retrain_from_training_data(
     limit: int = Query(default=10000, ge=20, le=50000),
@@ -176,6 +177,7 @@ async def dashboard_canary_assignments(
 
 @router.post(
     "/canary-assignments/{assignment_id}/revoke",
+    dependencies=[Depends(require_admin)],
 )
 async def revoke_dashboard_canary_assignment(
     assignment_id: str,

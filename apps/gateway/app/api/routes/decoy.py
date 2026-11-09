@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends
 
-from app.core.security import require_api_key
+from app.core.security import require_operator
 from app.schemas.dashboard import DecoyResponse, DecoyResponseRequest, DecoyStatus
 from app.services.canary_assignments import record_canary_assignments
 from app.services.decoy_engine import FAKE_ENDPOINTS, generate_decoy_response
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/decoy", tags=["decoy"])
 @router.get(
     "/status",
     response_model=DecoyStatus,
-    dependencies=[Depends(require_api_key)],
+    dependencies=[Depends(require_operator)],
 )
 async def decoy_status():
     """Current state of decoy environments."""
@@ -29,7 +29,7 @@ async def decoy_status():
 @router.post(
     "/respond",
     response_model=DecoyResponse,
-    dependencies=[Depends(require_api_key)],
+    dependencies=[Depends(require_operator)],
 )
 async def decoy_respond(request: DecoyResponseRequest):
     """Generate a safe fake response for a suspicious request."""
