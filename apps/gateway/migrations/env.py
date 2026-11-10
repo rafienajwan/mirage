@@ -14,7 +14,8 @@ from app.storage.db import models  # noqa: F401
 from app.storage.db.database import Base
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# ConfigParser interpolates "%", and hosted passwords are URL-encoded ("%40").
+config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 target_metadata = Base.metadata

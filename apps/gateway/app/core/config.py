@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import os
 
+from app.core.database_url import normalize_database_url
+
 # Attempt to load .env file if python-dotenv is available
 try:
     from dotenv import load_dotenv
@@ -42,8 +44,8 @@ class Settings:
         default_factory=lambda: float(os.getenv("ANOMALY_REDIRECT_CONFIDENCE", "0.5"))
     )
     database_url: str = field(
-        default_factory=lambda: os.getenv(
-            "DATABASE_URL", "sqlite+aiosqlite:///./mirage.db"
+        default_factory=lambda: normalize_database_url(
+            os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./mirage.db")
         )
     )
     api_key: str | None = field(

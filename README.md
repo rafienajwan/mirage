@@ -22,7 +22,7 @@ See `docs/PROPOSAL_ALIGNMENT.md` for the complete proposal capability matrix.
 - versioned ML-ready request and bounded payload-shape features, ML shadow scoring,
   and offline/automated Random Forest training pipelines;
 - a locally reviewed CSIC 2010 benchmark plus deterministic API-domain pipeline fixtures;
-- cloud deployment scaffolding for Vercel, three Railway services, and Supabase;
+- a cloud deployment runbook for Vercel, three Railway services, and Supabase (`docs/deployment.md`) with an end-to-end HTTPS/WSS smoke test (`apps/gateway/scripts/smoke_deploy.py`);
 - analyst event labels for future training data curation;
 - JSONL export and readiness checks for analyst-labeled training records;
 - repeatable local API-domain collection and deterministic pipeline fixture (`python scripts/generate_custom_api_dataset.py`);
@@ -45,8 +45,9 @@ See `docs/PROPOSAL_ALIGNMENT.md` for the complete proposal capability matrix.
 - Decoy payloads are synthetic and can issue deterministic per-actor canary
   tokens with epoch-based rotation; assignment and revoke records exist for
   operator review, but multi-operator approval workflows are not implemented.
-- Cloud manifests are configuration scaffolding and still require provisioning,
-  environment setup, migrations, and end-to-end verification.
+- The cloud deployment has not been provisioned or verified live. The smoke
+  test passes against the local Compose stack; `docs/deployment.md` gives the
+  steps to run it against Vercel, Railway, and Supabase.
 
 ## Architecture
 
@@ -396,6 +397,7 @@ infra/
 - `docs/architecture.md`: implemented and target architecture boundaries;
 - `docs/actor-profiles.md`: actor profile aggregation and current boundaries;
 - `docs/configuration.md`: environment files, variable scopes, and secret handling;
+- `docs/deployment.md`: Supabase, Railway, and Vercel runbook and the end-to-end smoke test;
 - `docs/dataset-preparation.md`: raw dataset adapters, splits, and readiness rules;
 - `docs/demo-flow.md`: concise end-to-end demonstration;
 - `docs/honeytokens.md`: decoy credential tracking and current boundaries;

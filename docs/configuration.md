@@ -28,7 +28,7 @@ appropriate example and this reference in the same change.
 | `POSTGRES_USER` | No | PostgreSQL | Database user; defaults to `mirage` |
 | `POSTGRES_PASSWORD` | Yes | PostgreSQL | Strong URL-safe database password |
 | `POSTGRES_DB` | No | PostgreSQL | Database name; defaults to `mirage` |
-| `FRONTEND_ORIGIN` | No | Gateway | Allowed browser origin |
+| `FRONTEND_ORIGIN` | No | Gateway | The dashboard's browser origin: the only CORS origin and dashboard WebSocket origin outside development |
 | `RISK_THRESHOLD` | No | Gateway | Heuristic redirect threshold |
 | `ANOMALY_REDIRECT_CONFIDENCE` | No | Gateway | Confidence threshold for anomaly escalation |
 | `RATE_LIMIT_PER_MINUTE` | No | Gateway | Per-client API request limit |
@@ -86,22 +86,22 @@ routing automatically; it only records that the configured evidence passed the
 current gates. Keep `ML_LIVE_ROUTING_APPROVED=false` until that evidence and
 the false-positive tradeoff have been reviewed manually.
 
-## Cloud Deployment Scaffold
+## Cloud Deployment
 
-Cloud files describe intended configuration but do not prove a successful
-deployment. Configure secrets in provider dashboards, never in tracked files.
+`docs/deployment.md` is the runbook for Supabase, Railway and Vercel: order,
+every variable per service and its source, private versus public networking,
+migrations, the first admin, and the end-to-end smoke test
+(`apps/gateway/scripts/smoke_deploy.py`). `.env.supabase.example` is the
+matching checklist. Configure secrets in provider dashboards, never in
+tracked files.
 
-For Railway, create separate `gateway`, `real-app-demo`, and `decoy` services.
-Set their root directories to `/apps/gateway`, `/apps/real-app-demo`, and
-`/apps/decoy`. Set each service's config-as-code path explicitly to its absolute
-repository path, such as `/apps/gateway/railway.json`. Connect the gateway to
-the two upstream services with Railway private URLs.
+Deployment-only variables:
 
-For Vercel, set the project root to `/apps/web` and add all server-side web
-variables from `.env.supabase.example`. No `NEXT_PUBLIC_*` gateway credential
-or URL is needed. Use the public Railway gateway URL for
-`MIRAGE_INTERNAL_API_URL` and its `wss://` dashboard URL for
-`MIRAGE_DASHBOARD_WS_URL`.
+| Variable | Service | Purpose |
+| --- | --- | --- |
+| `PORT` | gateway, real app, decoy | Listen port; Railway injects it. Defaults 8000, 8001, 8002 |
+| `HOST` | gateway, real app, decoy | Bind address; default `0.0.0.0`. Set `::` on Railway's IPv6 private network |
+| `MIRAGE_TRUST_PROXY_HEADERS` | web | Read the client address from `X-Forwarded-For` for the login throttle; `true` on Vercel |
 
 The operator login throttle (five failures per client and 50 overall per 15
 minutes) lives in the memory of one Node.js process. On Vercel each serverless
@@ -128,11 +128,10 @@ built-in `api-key` admin. Attribution and roles therefore separate analysts
 who sign in through the dashboard; they do not limit a holder of the API key.
 Keep the key on the web server and the gateway only.
 
-For Supabase, copy the connection string from the project dashboard and change
-the scheme to `postgresql+asyncpg://`. A persistent Railway gateway should use
-the direct connection when IPv6 is available, or the shared session pooler on
-port `5432` when it needs IPv4. Run Alembic migrations and an end-to-end smoke
-test before marking the cloud deployment complete.
+`DATABASE_URL` may be pasted from Supabase as is. The gateway rewrites
+`postgres://` and `postgresql://` to `postgresql+asyncpg://` and `sslmode` to
+asyncpg's `ssl`. Use the session pooler (port 5432) or the direct connection;
+production startup refuses the transaction pooler (port 6543).
 
 ## Standalone-Only Gateway Variables
 

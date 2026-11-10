@@ -34,7 +34,7 @@ no additional analyst-reviewed rows have been claimed yet.
 | Automated real/decoy routing | Implemented for MVP | The proxy routes allowed or monitored traffic to the demo app and suspicious traffic to the isolated decoy. |
 | Fake endpoints and fake data | Implemented for MVP | The decoy exposes synthetic responses and never needs real credentials. |
 | Honeytoken detection | Implemented for MVP | Configured decoy credentials and issued per-actor canaries are recorded, alerted, displayed, and revocable. |
-| PostgreSQL/Supabase storage | Partial | Async PostgreSQL and Alembic are implemented and Compose-tested. Supabase connection guidance exists, but no live Supabase deployment is verified. |
+| PostgreSQL/Supabase storage | Partial | Async PostgreSQL and Alembic are implemented and Compose-tested. Supabase connection strings work as pasted and tables get row-level security, but no live Supabase deployment is verified. |
 | Feature-vector storage | Implemented | Versioned request and bounded payload-shape features are persisted with lineage and contract checks. |
 | CICIDS2017 dataset | Removed | The gateway works at the HTTP layer and never observes network-flow features, so CICIDS2017 rows (flow features only) cannot train an HTTP-layer model. The adapter was removed with feature contract v3. |
 | Custom API logs | Partial | JSONL adapters, analyst-label export, hash-bound manual runtime review, deterministic multi-batch aggregation, and synthetic fixtures exist. The first independently labeled 40-row batch has been trained and evaluated as a shadow-only pilot; collection still needs to reach 1,000 representative analyst-reviewed rows. |
@@ -43,7 +43,7 @@ no additional analyst-reviewed rows have been claimed yet.
 | Security dashboard and alerts | Implemented locally | Metrics, events, alerts, risk history, actor triage, and cases are protected by the operator session and server-side API bridge. |
 | Adaptive decoy generation | Partial | Route-aware variants and rotatable per-actor synthetic canaries exist; the decoy is template-driven rather than generative. |
 | Docker Compose | Locally verified | The five-service stack, health checks, Dockerfiles, and PostgreSQL migration startup are present. |
-| Vercel, Railway, and Supabase deployment | Configuration scaffold | Per-service manifests and environment guidance exist, but actual cloud provisioning, networking, migrations, and smoke tests remain to be completed. |
+| Vercel, Railway, and Supabase deployment | Deployable, not verified live | Railway-ready images (`PORT`/`HOST`), Supabase connection handling, row-level security, a step-by-step runbook (`docs/deployment.md`), and an HTTPS/WSS smoke test (`scripts/smoke_deploy.py`) exist. The smoke test passes against the local Compose stack; it has not yet been run against provisioned Vercel, Railway, and Supabase services. |
 
 ## Safe Claims
 
@@ -60,7 +60,8 @@ MIRAGE can accurately claim that it:
 - runs reviewed artifacts in shadow mode without changing routing by default;
 - provides experimental hybrid and ML-only routing behind a separate explicit
   approval switch;
-- supports PostgreSQL locally and provides cloud configuration scaffolding.
+- supports PostgreSQL locally and provides a cloud deployment runbook and an
+  HTTPS/WSS smoke test proven against the local Compose stack.
 
 It should not yet claim production readiness, validated cloud deployment,
 arbitrary ingress interception, production-quality custom API training data,
@@ -79,5 +80,6 @@ be labeled as pipeline validation, not model-quality evidence.
    and recall.
 3. Approve active hybrid routing only after dataset, artifact, false-positive,
    and shadow-observation gates pass; keep `ml_only` experimental.
-4. Provision Vercel, Railway, and Supabase, run migrations, verify private and
-   public networking, and execute an end-to-end HTTPS/WSS smoke test.
+4. Provision Vercel, Railway, and Supabase following `docs/deployment.md` and
+   run `scripts/smoke_deploy.py` against the live services. Record the date
+   and the passing output here before changing the deployment row.
