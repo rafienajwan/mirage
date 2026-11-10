@@ -20,9 +20,11 @@ def test_image_honours_railway_port(service, port):
 
 
 @pytest.mark.parametrize("service", SERVICES)
-def test_image_binds_dual_stack_for_private_networking(service):
-    # Railway's private network can be IPv6-only; "::" also accepts IPv4.
-    assert "--host ::" in _cmd(service)
+def test_image_bind_host_is_configurable(service):
+    # Railway's private network can be IPv6-only, so its upstreams set HOST=::.
+    # "::" cannot be the default: asyncio sets IPV6_V6ONLY, so it would refuse
+    # the IPv4 connections Compose and Docker port publishing use.
+    assert "--host ${HOST:-0.0.0.0}" in _cmd(service)
 
 
 @pytest.mark.parametrize("service", SERVICES)

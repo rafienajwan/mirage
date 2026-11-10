@@ -15,4 +15,4 @@ RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin mirage
 USER mirage
 
 EXPOSE 8000
-CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host :: --port ${PORT:-8000} --no-proxy-headers"]
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host ${HOST:-0.0.0.0} --port ${PORT:-8000} --no-proxy-headers"]

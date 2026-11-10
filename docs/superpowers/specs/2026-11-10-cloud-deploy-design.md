@@ -16,9 +16,10 @@ Measured on 2026-11-10 against `main` (`3df9a73`).
    Railway injects `PORT` and routes its public domain and health check there.
    A service that ignores `PORT` only works if someone sets a matching target
    port by hand in the dashboard, which the docs never mention.
-2. **Railway private network.** The two upstreams bind `0.0.0.0` (IPv4 only).
-   Railway's private network (`<service>.railway.internal`) is IPv6 in older
-   environments, so the gateway cannot reach the real app or the decoy there.
+2. **Railway private network.** The two upstreams bind `0.0.0.0` (IPv4 only)
+   with no way to change it. Railway's private network
+   (`<service>.railway.internal`) is IPv6 in older environments, so the
+   gateway cannot reach the real app or the decoy there.
 3. **Supabase connection strings do not work as pasted.**
    - The dashboard gives `postgresql://` or `postgres://`. With
      `postgresql://` SQLAlchemy picks psycopg2, which is not installed. With
@@ -48,10 +49,15 @@ Measured on 2026-11-10 against `main` (`3df9a73`).
 
 ### Ports and binding
 
-- Every image starts with `exec uvicorn ... --host :: --port ${PORT:-<default>}`
-  through `sh -c`. `::` binds dual-stack on Linux, so IPv4 health checks and
-  Compose still work while Railway's IPv6 private network can connect.
-  `exec` keeps uvicorn as PID 1 so it receives `SIGTERM`.
+- Every image starts with
+  `exec uvicorn ... --host ${HOST:-0.0.0.0} --port ${PORT:-<default>}` through
+  `sh -c`. `exec` keeps uvicorn as PID 1 so it receives `SIGTERM`.
+- The bind host is a variable, not `::`. Binding `::` was tried first and
+  broke Compose: asyncio sets `IPV6_V6ONLY` on IPv6 listeners, so uvicorn on
+  `::` refuses IPv4, and Docker port publishing and service-to-service calls
+  use IPv4. The container health checks still passed (they hit `localhost`,
+  which resolves to `::1`), so only the smoke test caught it. On Railway the
+  two private upstreams set `HOST=::` for the IPv6 private network.
 - Defaults stay 8000/8001/8002, so Compose and local runs are unchanged.
 - `railway.json` keeps `/health`; timeout grows to 30 s for the gateway, whose
   start runs `alembic upgrade head` first.
@@ -162,7 +168,7 @@ remaining-work item stays, narrowed to "provision and run the smoke test".
 - `test_settings_validation.py`: transaction-pooler rule.
 - `test_smoke_deploy.py`: each check passes and fails as specified; exit code;
   no secret appears in output; insecure URLs rejected without the flag.
-- `test_deploy_manifests.py`: each Dockerfile honours `PORT`, binds `::`,
+- `test_deploy_manifests.py`: each Dockerfile honours `PORT` and `HOST`,
   uses `exec`; each `railway.json` has a `/health` check.
 - Local proof: Compose stack up, first admin created, smoke test passes with
   `--allow-insecure`; output pasted into the PR.

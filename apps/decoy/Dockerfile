@@ -7,4 +7,4 @@ RUN pip install --no-cache-dir .
 RUN useradd --uid 10001 --no-create-home --shell /usr/sbin/nologin mirage
 USER mirage
 EXPOSE 8002
-CMD ["sh", "-c", "exec uvicorn app.main:app --host :: --port ${PORT:-8002}"]
+CMD ["sh", "-c", "exec uvicorn app.main:app --host ${HOST:-0.0.0.0} --port ${PORT:-8002}"]

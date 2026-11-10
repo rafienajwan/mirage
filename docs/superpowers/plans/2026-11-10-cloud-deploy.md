@@ -50,9 +50,9 @@
 
 **Files:** modify the three `Dockerfile`s and `apps/gateway/railway.json`; create `apps/gateway/tests/test_deploy_manifests.py`.
 
-- [ ] Failing test: each Dockerfile's `CMD` contains `exec uvicorn`, `--host ::` and `${PORT:-<default>}`; each `railway.json` uses `DOCKERFILE` and `/health`; gateway health timeout ≥ 30.
-- [ ] Update `CMD`s, e.g. gateway: `["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host :: --port ${PORT:-8000} --no-proxy-headers"]`.
-- [ ] `python infra/check-compose.py` still passes; tests pass; commit `fix(deploy): honour PORT and bind dual-stack for Railway`.
+- [ ] Failing test: each Dockerfile's `CMD` contains `exec uvicorn`, `--host ${HOST:-0.0.0.0}` and `${PORT:-<default>}`; each `railway.json` uses `DOCKERFILE` and `/health`; gateway health timeout ≥ 30.
+- [ ] Update `CMD`s, e.g. gateway: `["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host ${HOST:-0.0.0.0} --port ${PORT:-8000} --no-proxy-headers"]`.
+- [ ] `python infra/check-compose.py` still passes; tests pass; commit `fix(deploy): honour PORT and HOST for Railway`.
 
 ### Task 4: Smoke script
 
