@@ -101,3 +101,20 @@ async def test_lifespan_refuses_bad_production_config(monkeypatch):
     with pytest.raises(RuntimeError):
         async with app.router.lifespan_context(app):
             pass
+
+
+POOLER = "aws-0-eu-west-1.pooler.supabase.com"
+
+
+def test_supabase_transaction_pooler_is_refused():
+    error = _single_error(
+        database_url=f"postgresql+asyncpg://postgres.abc:hunter2-secret@{POOLER}:6543/postgres"
+    )
+    assert "DATABASE_URL" in error
+    assert "5432" in error
+    assert "hunter2-secret" not in error
+
+
+def test_supabase_session_pooler_is_accepted():
+    url = f"postgresql+asyncpg://postgres.abc:pw@{POOLER}:5432/postgres?ssl=require"
+    assert production_config_errors(_production(database_url=url)) == []

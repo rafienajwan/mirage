@@ -6,6 +6,9 @@ leak secrets.
 
 from __future__ import annotations
 
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError
+
 from app.core.client_ip import parse_trusted_proxies
 from app.core.config import Settings
 from app.services.payload_exemptions import parse_exemptions
@@ -24,6 +27,16 @@ def _is_memory_sqlite(url: str) -> bool:
     return lowered.startswith("sqlite") and (":memory:" in lowered or "mode=memory" in lowered)
 
 
+def _is_supabase_transaction_pooler(url: str) -> bool:
+    """Port 6543 on the Supabase pooler breaks asyncpg's prepared statements."""
+    try:
+        parsed = make_url(url)
+    except ArgumentError:
+        return False
+    host = (parsed.host or "").lower()
+    return parsed.port == 6543 and host.endswith(".pooler.supabase.com")
+
+
 def production_config_errors(settings: Settings) -> list[str]:
     errors: list[str] = []
     if not settings.api_key or len(settings.api_key) < MIN_SECRET_LENGTH:
@@ -38,6 +51,11 @@ def production_config_errors(settings: Settings) -> list[str]:
             errors.append(f"{variable} must be set; the placeholder default is not allowed")
     if _is_memory_sqlite(settings.database_url):
         errors.append("DATABASE_URL must not be an in-memory SQLite database")
+    if _is_supabase_transaction_pooler(settings.database_url):
+        errors.append(
+            "DATABASE_URL must not use the Supabase transaction pooler (port 6543); "
+            "use the session pooler on port 5432 or the direct connection"
+        )
     if settings.ml_model_artifact and not settings.ml_model_artifact_sha256:
         errors.append("MIRAGE_MODEL_ARTIFACT_SHA256 must be set when MIRAGE_MODEL_ARTIFACT is set")
     try:
