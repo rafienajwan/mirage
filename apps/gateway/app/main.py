@@ -49,7 +49,7 @@ def create_app(settings: Settings) -> FastAPI:
         openapi_url="/openapi.json" if development else None,
     )
 
-    configure_cors(app)
+    configure_cors(app, settings)
     configure_rate_limit(app)
 
     app.include_router(root_router)
