@@ -33,10 +33,14 @@ Measured on 2026-11-10 against `main` (`3df9a73`).
      `%` aborts `alembic upgrade head` and the gateway never starts.
    - The transaction pooler (port 6543) breaks asyncpg prepared statements.
      Nothing stops it from being configured.
-4. **Nothing proves a deployment works.** There is no end-to-end check for
+4. **Supabase publishes the tables.** Supabase's Data API serves every table
+   in the `public` schema, and its default grants let the `anon` role (whose
+   key ships to browsers by design) read them. Alembic creates all MIRAGE
+   tables there, including `operators.password_hash` and the attack log.
+5. **Nothing proves a deployment works.** There is no end-to-end check for
    health, routing, the dashboard stream, operator login or schema version.
    `smoke_ml_shadow.py` tests ML scoring in-process only.
-5. **No runbook.** `docs/configuration.md` has a short "Cloud Deployment
+6. **No runbook.** `docs/configuration.md` has a short "Cloud Deployment
    Scaffold" section; there is no provisioning order, no per-service variable
    list, no first-admin step for Supabase, and no smoke-test step.
 
@@ -70,6 +74,14 @@ by `Settings.database_url`:
 Production validation gains one rule: a `DATABASE_URL` whose port is `6543`
 on a `*.pooler.supabase.com` host fails startup with a message pointing at the
 session pooler (port 5432). The rule names the variable only, never its value.
+
+### Row-level security
+
+Migration `0012` enables row-level security on every table in the current
+schema when the dialect is PostgreSQL (no-op on SQLite). With no policies,
+`anon` and `authenticated` see no rows; the gateway connects as the table
+owner, which RLS does not restrict. The runbook also tells operators to turn
+off the Data API, since MIRAGE never uses it.
 
 ### Smoke test
 
