@@ -113,6 +113,7 @@ class ActorCaseWorkflow(BaseModel):
     recommended_action: str
     assigned_to: str = ""
     analyst_note: str = ""
+    updated_by: str | None = None
     opened_at: datetime
     updated_at: datetime
     last_seen: datetime

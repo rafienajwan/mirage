@@ -96,7 +96,6 @@ Fill every variable marked `REQUIRED` in `.env`:
 - `DATABASE_URL` must use the `postgresql+asyncpg` driver, host `db`, and the
   same user, password, and database configured by `POSTGRES_*`.
 - `MIRAGE_API_KEY` protects every dashboard endpoint and stays server-side.
-- `MIRAGE_OPERATOR_PASSWORD` is the shared operator login (16+ characters).
 - `MIRAGE_OPERATOR_SESSION_SECRET` and `MIRAGE_DASHBOARD_TICKET_SECRET` must be
   independent random values of at least 32 characters.
 - `MIRAGE_DASHBOARD_WS_URL` is the browser-reachable stream URL; use `wss://`
@@ -128,6 +127,26 @@ artifact without `MIRAGE_MODEL_ARTIFACT_SHA256`. Optional hardening settings:
   `MIRAGE_TRUST_PROXY_HEADERS=true` (the proxy-appended `X-Forwarded-For` hop
   identifies the client), and set `WEB_BIND_ADDRESS` to the proxy-facing
   address.
+
+### Operator Accounts
+
+Each analyst signs in with their own username and password. Accounts live in
+the gateway database with scrypt password hashes. After the stack is up,
+create the first admin (the command prompts for the password twice; 12 to 256
+characters):
+
+```bash
+docker compose --env-file .env -f infra/docker-compose.yml exec gateway python scripts/manage_operators.py create admin --role admin
+```
+
+Outside Docker, run the same script from `apps/gateway` with its virtual
+environment active: `python scripts/manage_operators.py create admin --role admin`.
+The script also lists accounts and can `disable`, `enable`, `reset-password`
+and `set-role`; a disabled account loses access on its next request.
+
+Roles: `analyst` can label events and open, assign and update cases. `admin`
+can also run retraining, revoke canary assignments and read the audit log.
+Labels, case changes, retraining and canary revocation record who did them.
 
 Networks are segmented: the decoy and the protected app are reachable only
 from the gateway, and Postgres only from the gateway. Containers run as
@@ -233,6 +252,11 @@ npm run dev
 
 All paths below use the `http://localhost:8000` base URL.
 
+The dashboard bridge sends `X-Mirage-Operator` with the API key to name the
+signed-in analyst; "admin" in the Auth column means that operator must hold the
+admin role. A request with the API key and no operator header acts as the
+built-in `api-key` admin.
+
 | Method and path | Auth | Purpose |
 | --- | --- | --- |
 | `GET /health` | Public | Health check |
@@ -243,13 +267,13 @@ All paths below use the `http://localhost:8000` base URL.
 | `GET /api/v1/dashboard/*` | API key | Dashboard metrics, events, alerts, and charts |
 | `GET /api/v1/dashboard/training-data/export` | API key | Export analyst-labeled feature vectors as JSONL |
 | `GET /api/v1/dashboard/training-data/summary` | API key | Check labeled row counts and class balance before training |
-| `POST /api/v1/dashboard/training-data/retrain` | API key | Train a local shadow-mode candidate artifact from analyst labels |
+| `POST /api/v1/dashboard/training-data/retrain` | API key, admin | Train a local shadow-mode candidate artifact from analyst labels |
 | `GET /api/v1/dashboard/ml-shadow/status` | API key | Report sanitized ML shadow artifact readiness |
 | `GET /api/v1/dashboard/ml-shadow/summary` | API key | Summarize recent model-only agreement with heuristic routing |
 | `GET /api/v1/dashboard/ml-promotion/readiness` | API key | Evaluate guarded promotion prerequisites without changing routing |
 | `GET /api/v1/dashboard/honeytokens` | API key | Show recent decoy credential interactions |
 | `GET /api/v1/dashboard/canary-assignments` | API key | Show issued canary assignment lifecycle records |
-| `POST /api/v1/dashboard/canary-assignments/{assignment_id}/revoke` | API key | Revoke a canary assignment for operator lifecycle tracking |
+| `POST /api/v1/dashboard/canary-assignments/{assignment_id}/revoke` | API key, admin | Revoke a canary assignment for operator lifecycle tracking |
 | `GET /api/v1/dashboard/actors` | API key | Show recent actor profiles grouped by threat fingerprint |
 | `GET /api/v1/dashboard/actor-clusters` | API key | Show lightweight actor clusters for triage |
 | `GET /api/v1/dashboard/actor-cases` | API key | Show recommended investigation cases |
@@ -257,6 +281,9 @@ All paths below use the `http://localhost:8000` base URL.
 | `POST /api/v1/dashboard/actor-cases/{case_id}/open` | API key | Open a recommended actor case workflow |
 | `PATCH /api/v1/dashboard/actor-case-workflows/{case_id}` | API key | Update an actor case workflow status |
 | `WS /api/v1/dashboard/ws` | Signed ticket | Stream dashboard event and alert updates |
+| `POST /api/v1/operators/login` | API key | Check an analyst's credentials for the dashboard login |
+| `GET /api/v1/operators` | API key | List enabled operators for the case assignee picker |
+| `GET /api/v1/operators/audit` | API key, admin | Read the operator audit log, newest first |
 | `GET /api/v1/decoy/status` | API key | Current decoy metrics |
 | `POST /api/v1/decoy/respond` | API key | Generate an in-process synthetic response |
 

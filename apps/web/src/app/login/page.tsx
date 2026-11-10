@@ -2,12 +2,13 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { KeyRound, Loader2, ShieldCheck } from "lucide-react";
+import { KeyRound, Loader2, ShieldCheck, UserRound } from "lucide-react";
 
 import { safeNextPath } from "@/lib/safe-next-path";
 
 export default function LoginPage() {
   const router = useRouter();
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -20,7 +21,7 @@ export default function LoginPage() {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ username, password }),
       });
       if (!response.ok) {
         const body = await response.json() as { detail?: string };
@@ -60,7 +61,28 @@ export default function LoginPage() {
         <form className="space-y-4" onSubmit={submit}>
           <label className="block">
             <span className="mb-2 block text-xs font-medium text-white/65">
-              Operator password
+              Username
+            </span>
+            <span className="relative block">
+              <UserRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
+              <input
+                type="text"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
+                maxLength={64}
+                required
+                autoFocus
+                className="h-11 w-full rounded border border-white/10 bg-black/20 pl-10 pr-3 text-sm text-white outline-none transition focus:border-brand-cyan/60 focus:ring-2 focus:ring-brand-cyan/40"
+              />
+            </span>
+          </label>
+
+          <label className="block">
+            <span className="mb-2 block text-xs font-medium text-white/65">
+              Password
             </span>
             <span className="relative block">
               <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/35" />
@@ -69,8 +91,8 @@ export default function LoginPage() {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 autoComplete="current-password"
+                maxLength={256}
                 required
-                autoFocus
                 className="h-11 w-full rounded border border-white/10 bg-black/20 pl-10 pr-3 text-sm text-white outline-none transition focus:border-brand-cyan/60 focus:ring-2 focus:ring-brand-cyan/40"
               />
             </span>

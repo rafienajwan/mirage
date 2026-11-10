@@ -8,7 +8,8 @@ import { Ban, CheckCircle2, KeyRound, Loader2, RotateCcw } from "lucide-react";
 interface CanaryAssignmentsPanelProps {
   data: CanaryAssignmentSummary | null;
   workingAssignmentId: string | null;
-  onRevoke: (assignmentId: string) => void;
+  // Omitted for analysts: revoking a canary is admin-only.
+  onRevoke?: (assignmentId: string) => void;
 }
 
 const statusStyles = {
@@ -92,6 +93,7 @@ export default function CanaryAssignmentsPanel({
                   <span className="truncate text-[8px] text-white/25">
                     {assignment.revokeReason || "Lifecycle record"}
                   </span>
+                  {onRevoke ? (
                   <button
                     type="button"
                     onClick={() => onRevoke(assignment.id)}
@@ -105,6 +107,7 @@ export default function CanaryAssignmentsPanel({
                     )}
                     Revoke
                   </button>
+                  ) : null}
                 </div>
               </div>
             );

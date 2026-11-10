@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import JSON, DateTime, Float, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import TypeDecorator
 
@@ -57,6 +57,7 @@ class EventModel(Base):
     labeled_at: Mapped[datetime | None] = mapped_column(
         UTCDateTime(), nullable=True
     )
+    labeled_by: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
 
 class AlertModel(Base):
@@ -156,6 +157,7 @@ class ActorCaseModel(Base):
     recommended_action: Mapped[str] = mapped_column(String(512))
     assigned_to: Mapped[str] = mapped_column(String(120), default="", index=True)
     analyst_note: Mapped[str] = mapped_column(Text, default="")
+    updated_by: Mapped[str | None] = mapped_column(String(32), nullable=True)
     opened_at: Mapped[datetime] = mapped_column(
         UTCDateTime(), default=lambda: datetime.now(timezone.utc)
     )
@@ -163,3 +165,34 @@ class ActorCaseModel(Base):
         UTCDateTime(), default=lambda: datetime.now(timezone.utc)
     )
     last_seen: Mapped[datetime] = mapped_column(UTCDateTime(), index=True)
+
+
+class OperatorModel(Base):
+    """Dashboard operator account."""
+
+    __tablename__ = "operators"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    username: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(256))
+    role: Mapped[str] = mapped_column(String(16))
+    disabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime(), default=lambda: datetime.now(timezone.utc)
+    )
+
+
+class OperatorAuditModel(Base):
+    """Append-only record of state-changing operator actions."""
+
+    __tablename__ = "operator_audit"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    occurred_at: Mapped[datetime] = mapped_column(UTCDateTime(), index=True)
+    operator: Mapped[str] = mapped_column(String(32), index=True)
+    action: Mapped[str] = mapped_column(String(48))
+    target: Mapped[str] = mapped_column(String(128), default="")
+    detail: Mapped[str] = mapped_column(String(500), default="")

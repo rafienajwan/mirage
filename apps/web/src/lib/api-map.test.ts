@@ -62,4 +62,12 @@ describe("api mappers", () => {
       },
     );
   });
+
+  it("carries who labeled an event, or null for older labels", () => {
+    assert.equal(
+      mapDashboardEvent(backendEvent({ analyst_label: "suspicious", labeled_by: "alice" })).labeledBy,
+      "alice",
+    );
+    assert.equal(mapDashboardEvent(backendEvent()).labeledBy, null);
+  });
 });

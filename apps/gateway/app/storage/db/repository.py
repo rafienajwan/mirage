@@ -20,6 +20,7 @@ from app.schemas.dashboard import AlertRecord, AlertSeverity
 from app.schemas.decision import Decision
 from app.schemas.event import AnalystLabel, EventRecord
 from app.schemas.honeytoken import HoneytokenHit
+from app.schemas.operator import AuditEntry, OperatorRecord
 from app.services.actor_identity import actor_id_from_key, actor_key, actor_status
 from app.storage.db.database import get_session
 from app.storage.db.models import (
@@ -29,6 +30,8 @@ from app.storage.db.models import (
     CanaryAssignmentModel,
     EventModel,
     HoneytokenHitModel,
+    OperatorAuditModel,
+    OperatorModel,
 )
 
 T = TypeVar("T")
@@ -82,6 +85,7 @@ class DatabaseStore:
                 ),
                 analyst_note=event.analyst_note,
                 labeled_at=event.labeled_at,
+                labeled_by=event.labeled_by,
             )
             session.add(row)
             await self._upsert_actor_event(session, event)
@@ -116,6 +120,7 @@ class DatabaseStore:
                     ),
                     analyst_note=r.analyst_note or "",
                     labeled_at=r.labeled_at,
+                    labeled_by=r.labeled_by,
                 )
                 for r in rows
             ]
@@ -125,6 +130,7 @@ class DatabaseStore:
         event_id: str,
         label: AnalystLabel,
         note: str = "",
+        labeled_by: str | None = None,
     ) -> EventRecord | None:
         async with get_session() as session:
             result = await session.execute(
@@ -137,6 +143,7 @@ class DatabaseStore:
             row.analyst_label = label.value
             row.analyst_note = note
             row.labeled_at = datetime.now(timezone.utc)
+            row.labeled_by = labeled_by
             return EventRecord(
                 event_id=row.event_id,
                 timestamp=row.timestamp,
@@ -153,6 +160,7 @@ class DatabaseStore:
                 analyst_label=label,
                 analyst_note=row.analyst_note or "",
                 labeled_at=row.labeled_at,
+                labeled_by=row.labeled_by,
             )
 
     async def get_labeled_events(
@@ -188,6 +196,7 @@ class DatabaseStore:
                     ),
                     analyst_note=r.analyst_note or "",
                     labeled_at=r.labeled_at,
+                    labeled_by=r.labeled_by,
                 )
                 for r in rows
             ]
@@ -417,6 +426,7 @@ class DatabaseStore:
         recommendation: ActorCase,
         note: str = "",
         assigned_to: str = "",
+        updated_by: str | None = None,
     ) -> ActorCaseWorkflow:
         now = datetime.now(timezone.utc)
         async with get_session() as session:
@@ -439,6 +449,7 @@ class DatabaseStore:
                     recommended_action=recommendation.recommended_action,
                     assigned_to=assigned_to,
                     analyst_note=note,
+                    updated_by=updated_by,
                     opened_at=now,
                     updated_at=now,
                     last_seen=recommendation.last_seen,
@@ -451,6 +462,7 @@ class DatabaseStore:
                 row.recommended_action = recommendation.recommended_action
                 row.assigned_to = assigned_to or row.assigned_to
                 row.analyst_note = note or row.analyst_note
+                row.updated_by = updated_by or row.updated_by
                 row.updated_at = now
                 row.last_seen = recommendation.last_seen
             await session.flush()
@@ -462,6 +474,7 @@ class DatabaseStore:
         status: CaseWorkflowStatus,
         note: str = "",
         assigned_to: str | None = None,
+        updated_by: str | None = None,
     ) -> ActorCaseWorkflow | None:
         async with get_session() as session:
             result = await session.execute(
@@ -474,6 +487,7 @@ class DatabaseStore:
             if assigned_to is not None:
                 row.assigned_to = assigned_to
             row.analyst_note = note or row.analyst_note
+            row.updated_by = updated_by or row.updated_by
             row.updated_at = datetime.now(timezone.utc)
             await session.flush()
             return self._actor_case_from_row(row)
@@ -686,6 +700,109 @@ class DatabaseStore:
             revoke_reason=row.revoke_reason or "",
         )
 
+    # -- Operators and audit ------------------------------------------------
+
+    @staticmethod
+    def _operator_from_row(row: OperatorModel) -> OperatorRecord:
+        return OperatorRecord(
+            username=row.username,
+            password_hash=row.password_hash,
+            role=row.role,
+            disabled=bool(row.disabled),
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+        )
+
+    async def get_operator(self, username: str) -> OperatorRecord | None:
+        async with get_session() as session:
+            row = (
+                await session.execute(
+                    select(OperatorModel).where(OperatorModel.username == username)
+                )
+            ).scalar_one_or_none()
+            return self._operator_from_row(row) if row is not None else None
+
+    async def create_operator(self, record: OperatorRecord) -> None:
+        try:
+            async with get_session() as session:
+                session.add(
+                    OperatorModel(
+                        username=record.username,
+                        password_hash=record.password_hash,
+                        role=record.role,
+                        disabled=record.disabled,
+                        created_at=record.created_at,
+                        updated_at=record.updated_at,
+                    )
+                )
+        except IntegrityError as exc:
+            raise ValueError("Operator already exists") from exc
+
+    async def update_operator(
+        self,
+        username: str,
+        *,
+        password_hash: str | None = None,
+        role: str | None = None,
+        disabled: bool | None = None,
+    ) -> OperatorRecord | None:
+        async with get_session() as session:
+            row = (
+                await session.execute(
+                    select(OperatorModel).where(OperatorModel.username == username)
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                return None
+            if password_hash is not None:
+                row.password_hash = password_hash
+            if role is not None:
+                row.role = role
+            if disabled is not None:
+                row.disabled = disabled
+            row.updated_at = datetime.now(timezone.utc)
+            await session.flush()
+            return self._operator_from_row(row)
+
+    async def list_operators(self) -> list[OperatorRecord]:
+        async with get_session() as session:
+            result = await session.execute(
+                select(OperatorModel).order_by(OperatorModel.username)
+            )
+            return [self._operator_from_row(row) for row in result.scalars().all()]
+
+    async def record_audit(self, entry: AuditEntry) -> None:
+        async with get_session() as session:
+            session.add(
+                OperatorAuditModel(
+                    occurred_at=entry.occurred_at,
+                    operator=entry.operator,
+                    action=entry.action,
+                    target=entry.target,
+                    detail=entry.detail,
+                )
+            )
+
+    async def get_audit(self, limit: int = 100) -> list[AuditEntry]:
+        async with get_session() as session:
+            result = await session.execute(
+                select(OperatorAuditModel)
+                .order_by(
+                    OperatorAuditModel.occurred_at.desc(), OperatorAuditModel.id.desc()
+                )
+                .limit(limit)
+            )
+            return [
+                AuditEntry(
+                    occurred_at=row.occurred_at,
+                    operator=row.operator,
+                    action=row.action,
+                    target=row.target or "",
+                    detail=row.detail or "",
+                )
+                for row in result.scalars().all()
+            ]
+
     def _actor_case_from_row(self, row: ActorCaseModel) -> ActorCaseWorkflow:
         return ActorCaseWorkflow(
             case_id=row.case_id,
@@ -699,6 +816,7 @@ class DatabaseStore:
             recommended_action=row.recommended_action,
             assigned_to=row.assigned_to or "",
             analyst_note=row.analyst_note or "",
+            updated_by=row.updated_by,
             opened_at=row.opened_at,
             updated_at=row.updated_at,
             last_seen=row.last_seen,

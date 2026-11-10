@@ -5,10 +5,39 @@ import {
   createDashboardStreamTicket,
   createOperatorSession,
   isSameOriginRequest,
+  readOperatorSession,
   verifyOperatorSession,
 } from "./operator-auth";
 
 const SESSION_SECRET = "session-secret-with-at-least-32-characters";
+const ALICE = { sub: "alice", role: "analyst" } as const;
+
+function base64Url(bytes: Uint8Array) {
+  return Buffer.from(bytes).toString("base64url");
+}
+
+// Signs arbitrary claims with the session secret, so claim checks are tested
+// apart from the signature check.
+async function signClaims(claims: Record<string, unknown>) {
+  const payload = base64Url(new TextEncoder().encode(JSON.stringify(claims)));
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(SESSION_SECRET),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+  return `${payload}.${base64Url(new Uint8Array(signature))}`;
+}
+
+const BASE_CLAIMS = {
+  aud: "mirage-operator-session",
+  iat: 1_000,
+  exp: 2_000,
+  nonce: "session-nonce-0123456789",
+};
+
 const TICKET_SECRET = "ticket-secret-with-at-least-32-characters!";
 
 describe("operator authentication tokens", () => {
@@ -17,6 +46,7 @@ describe("operator authentication tokens", () => {
       secret: SESSION_SECRET,
       now: 1_000,
       nonce: "session-nonce-0123456789",
+      operator: ALICE,
     });
 
     assert.equal(
@@ -34,6 +64,7 @@ describe("operator authentication tokens", () => {
       secret: SESSION_SECRET,
       now: 1_000,
       nonce: "session-nonce-0123456789",
+      operator: ALICE,
     });
 
     assert.equal(
@@ -62,6 +93,7 @@ describe("operator authentication tokens", () => {
         secret: "too-short",
         now: 1_000,
         nonce: "session-nonce-0123456789",
+        operator: ALICE,
       }),
       /at least 32 characters/,
     );
@@ -94,6 +126,49 @@ describe("operator authentication tokens", () => {
         protocol: "http:",
       }),
       false,
+    );
+  });
+
+  it("reads the operator back from a session", async () => {
+    const token = await createOperatorSession({
+      secret: SESSION_SECRET,
+      now: 1_000,
+      nonce: "session-nonce-0123456789",
+      operator: ALICE,
+    });
+    assert.deepEqual(await readOperatorSession(token, SESSION_SECRET, 1_001), {
+      sub: "alice",
+      role: "analyst",
+    });
+  });
+
+  it("rejects sessions from before operator accounts", async () => {
+    const token = await signClaims(BASE_CLAIMS);
+    assert.equal(await readOperatorSession(token, SESSION_SECRET, 1_001), null);
+    assert.equal(await verifyOperatorSession(token, SESSION_SECRET, 1_001), false);
+  });
+
+  it("rejects malformed usernames and unknown roles", async () => {
+    const badName = await signClaims({ ...BASE_CLAIMS, sub: "Bad!", role: "analyst" });
+    const badRole = await signClaims({ ...BASE_CLAIMS, sub: "alice", role: "root" });
+    assert.equal(await readOperatorSession(badName, SESSION_SECRET, 1_001), null);
+    assert.equal(await readOperatorSession(badRole, SESSION_SECRET, 1_001), null);
+  });
+
+  it("rejects a session whose payload was altered", async () => {
+    const token = await createOperatorSession({
+      secret: SESSION_SECRET,
+      now: 1_000,
+      nonce: "session-nonce-0123456789",
+      operator: ALICE,
+    });
+    const [, signature] = token.split(".");
+    const forged = base64Url(
+      new TextEncoder().encode(JSON.stringify({ ...BASE_CLAIMS, sub: "alice", role: "admin" })),
+    );
+    assert.equal(
+      await readOperatorSession(`${forged}.${signature}`, SESSION_SECRET, 1_001),
+      null,
     );
   });
 });

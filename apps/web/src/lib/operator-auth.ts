@@ -14,6 +14,16 @@ interface SignedClaims {
   nonce: string;
 }
 
+const OPERATOR_USERNAME = /^[a-z0-9][a-z0-9._-]{1,31}$/;
+const OPERATOR_ROLES = new Set(["analyst", "admin"]);
+
+export type OperatorRole = "analyst" | "admin";
+
+export interface OperatorIdentity {
+  sub: string;
+  role: OperatorRole;
+}
+
 interface CreateTokenOptions {
   secret: string;
   now: number;
@@ -94,7 +104,7 @@ async function importHmacKey(secret: string) {
 }
 
 async function createSignedToken(
-  claims: SignedClaims,
+  claims: SignedClaims & Record<string, unknown>,
   secret: string,
 ): Promise<string> {
   assertSecret(secret);
@@ -121,10 +131,10 @@ async function verifySignedToken(
     now: number;
     maximumLifetime: number;
   },
-): Promise<boolean> {
-  if (secret.length < 32 || !Number.isInteger(now) || now < 0) return false;
+): Promise<Record<string, unknown> | null> {
+  if (secret.length < 32 || !Number.isInteger(now) || now < 0) return null;
   const segments = token.split(".");
-  if (segments.length !== 2) return false;
+  if (segments.length !== 2) return null;
 
   try {
     const [payloadSegment, signatureSegment] = segments;
@@ -134,11 +144,11 @@ async function verifySignedToken(
       decodeBase64Url(signatureSegment),
       encoder.encode(payloadSegment),
     );
-    if (!validSignature) return false;
+    if (!validSignature) return null;
 
     const claims = JSON.parse(
       decoder.decode(decodeBase64Url(payloadSegment)),
-    ) as Partial<SignedClaims>;
+    ) as Partial<SignedClaims> & Record<string, unknown>;
     if (
       claims.aud !== audience ||
       !Number.isInteger(claims.iat) ||
@@ -146,49 +156,76 @@ async function verifySignedToken(
       typeof claims.nonce !== "string" ||
       claims.nonce.length < 16
     ) {
-      return false;
+      return null;
     }
 
     const issuedAt = claims.iat as number;
     const expiresAt = claims.exp as number;
-    return (
+    const current =
       issuedAt - CLOCK_SKEW_SECONDS <= now &&
       now < expiresAt &&
       expiresAt > issuedAt &&
-      expiresAt - issuedAt <= maximumLifetime
-    );
+      expiresAt - issuedAt <= maximumLifetime;
+    return current ? claims : null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+function isOperatorIdentity(value: { sub?: unknown; role?: unknown }): value is OperatorIdentity {
+  return (
+    typeof value.sub === "string" &&
+    OPERATOR_USERNAME.test(value.sub) &&
+    typeof value.role === "string" &&
+    OPERATOR_ROLES.has(value.role)
+  );
 }
 
 export async function createOperatorSession({
   secret,
   now,
   nonce,
-}: CreateTokenOptions): Promise<string> {
+  operator,
+}: CreateTokenOptions & { operator: OperatorIdentity }): Promise<string> {
   assertTokenInput(now, nonce);
+  if (!isOperatorIdentity(operator)) {
+    throw new Error("Operator session needs a valid username and role");
+  }
   return createSignedToken(
     {
       aud: OPERATOR_SESSION_AUDIENCE,
       iat: now,
       exp: now + OPERATOR_SESSION_TTL_SECONDS,
       nonce,
+      sub: operator.sub,
+      role: operator.role,
     },
     secret,
   );
 }
 
-export function verifyOperatorSession(
+// The operator a session names, or null when the session is invalid, expired,
+// or predates operator accounts.
+export async function readOperatorSession(
   token: string,
   secret: string,
   now: number,
-): Promise<boolean> {
-  return verifySignedToken(token, secret, {
+): Promise<OperatorIdentity | null> {
+  const claims = await verifySignedToken(token, secret, {
     audience: OPERATOR_SESSION_AUDIENCE,
     now,
     maximumLifetime: OPERATOR_SESSION_TTL_SECONDS,
   });
+  if (!claims || !isOperatorIdentity(claims)) return null;
+  return { sub: claims.sub, role: claims.role };
+}
+
+export async function verifyOperatorSession(
+  token: string,
+  secret: string,
+  now: number,
+): Promise<boolean> {
+  return (await readOperatorSession(token, secret, now)) !== null;
 }
 
 export async function createDashboardStreamTicket({

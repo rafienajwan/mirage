@@ -14,6 +14,7 @@ from app.schemas.dashboard import AlertRecord, AlertSeverity
 from app.schemas.decision import Decision
 from app.schemas.event import AnalystLabel, EventRecord
 from app.schemas.honeytoken import HoneytokenHit
+from app.schemas.operator import AuditEntry, OperatorRecord
 from app.services.actor_identity import actor_id_from_key, actor_key, actor_status
 
 
@@ -27,6 +28,8 @@ class MemoryStore:
         self.canary_assignments: dict[str, CanaryAssignment] = {}
         self.actor_profiles: dict[str, dict] = {}
         self.actor_cases: dict[str, ActorCaseWorkflow] = {}
+        self.operators: dict[str, OperatorRecord] = {}
+        self.audit: list[AuditEntry] = []
         self._alert_counter: int = 0
 
     # ── Events ─────────────────────────────────────────────────
@@ -43,6 +46,7 @@ class MemoryStore:
         event_id: str,
         label: AnalystLabel,
         note: str = "",
+        labeled_by: str | None = None,
     ) -> EventRecord | None:
         for index, event in enumerate(self.events):
             if event.event_id == event_id:
@@ -51,6 +55,7 @@ class MemoryStore:
                         "analyst_label": label,
                         "analyst_note": note,
                         "labeled_at": datetime.now(timezone.utc),
+                        "labeled_by": labeled_by,
                     }
                 )
                 self.events[index] = updated
@@ -179,6 +184,7 @@ class MemoryStore:
         recommendation: ActorCase,
         note: str = "",
         assigned_to: str = "",
+        updated_by: str | None = None,
     ) -> ActorCaseWorkflow:
         existing = self.actor_cases.get(recommendation.case_id)
         now = datetime.now(timezone.utc)
@@ -191,6 +197,7 @@ class MemoryStore:
                     "recommended_action": recommendation.recommended_action,
                     "assigned_to": assigned_to or existing.assigned_to,
                     "analyst_note": note or existing.analyst_note,
+                    "updated_by": updated_by or existing.updated_by,
                     "updated_at": now,
                     "last_seen": recommendation.last_seen,
                 }
@@ -210,6 +217,7 @@ class MemoryStore:
             recommended_action=recommendation.recommended_action,
             assigned_to=assigned_to,
             analyst_note=note,
+            updated_by=updated_by,
             opened_at=now,
             updated_at=now,
             last_seen=recommendation.last_seen,
@@ -223,6 +231,7 @@ class MemoryStore:
         status: CaseWorkflowStatus,
         note: str = "",
         assigned_to: str | None = None,
+        updated_by: str | None = None,
     ) -> ActorCaseWorkflow | None:
         existing = self.actor_cases.get(case_id)
         if existing is None:
@@ -232,6 +241,7 @@ class MemoryStore:
                 "status": status,
                 "assigned_to": existing.assigned_to if assigned_to is None else assigned_to,
                 "analyst_note": note or existing.analyst_note,
+                "updated_by": updated_by or existing.updated_by,
                 "updated_at": datetime.now(timezone.utc),
             }
         )
@@ -377,6 +387,52 @@ class MemoryStore:
             last_decision=profile["last_decision"],
             status=profile["status"],
         )
+
+    # -- Operators and audit ------------------------------------------------
+
+    async def get_operator(self, username: str) -> OperatorRecord | None:
+        return self.operators.get(username)
+
+    async def create_operator(self, record: OperatorRecord) -> None:
+        if record.username in self.operators:
+            raise ValueError("Operator already exists")
+        self.operators[record.username] = record
+
+    async def update_operator(
+        self,
+        username: str,
+        *,
+        password_hash: str | None = None,
+        role: str | None = None,
+        disabled: bool | None = None,
+    ) -> OperatorRecord | None:
+        existing = self.operators.get(username)
+        if existing is None:
+            return None
+        changes: dict = {"updated_at": datetime.now(timezone.utc)}
+        if password_hash is not None:
+            changes["password_hash"] = password_hash
+        if role is not None:
+            changes["role"] = role
+        if disabled is not None:
+            changes["disabled"] = disabled
+        updated = existing.model_copy(update=changes)
+        self.operators[username] = updated
+        return updated
+
+    async def list_operators(self) -> list[OperatorRecord]:
+        return [self.operators[name] for name in sorted(self.operators)]
+
+    async def record_audit(self, entry: AuditEntry) -> None:
+        self.audit.append(entry)
+
+    async def get_audit(self, limit: int = 100) -> list[AuditEntry]:
+        ordered = sorted(
+            enumerate(self.audit),
+            key=lambda pair: (pair[1].occurred_at, pair[0]),
+            reverse=True,
+        )
+        return [entry for _, entry in ordered[:limit]]
 
 
 # Global singleton — fine for demo; replace with DI in production.

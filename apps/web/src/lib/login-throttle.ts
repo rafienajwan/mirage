@@ -96,10 +96,18 @@ export function createLoginThrottle({
 // Next.js route handlers expose no socket address, so forwarded headers are
 // honored only when a trusted reverse proxy sets them. That proxy appends the
 // address it saw; everything to its left was written by the client.
-export function loginClientKey(headers: Headers, trustProxyHeaders: boolean): string {
-  if (!trustProxyHeaders) return "direct";
-  const hops = headers.get("x-forwarded-for")?.split(",") ?? [];
-  return hops[hops.length - 1]?.trim() || "direct";
+// The username is part of the key, so guessing one account's password does
+// not lock out other analysts behind the same address.
+export function loginClientKey(
+  headers: Headers,
+  trustProxyHeaders: boolean,
+  username: string,
+): string {
+  const hops = trustProxyHeaders
+    ? headers.get("x-forwarded-for")?.split(",") ?? []
+    : [];
+  const address = hops[hops.length - 1]?.trim() || "direct";
+  return `${address}|${username.trim().toLowerCase()}`;
 }
 
 export const loginThrottle = createLoginThrottle();

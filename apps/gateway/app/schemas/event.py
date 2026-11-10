@@ -43,3 +43,4 @@ class EventRecord(BaseModel):
     analyst_label: AnalystLabel | None = None
     analyst_note: str = ""
     labeled_at: datetime | None = None
+    labeled_by: str | None = None

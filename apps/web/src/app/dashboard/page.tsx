@@ -12,9 +12,9 @@ import CanaryAssignmentsPanel from "@/components/dashboard/CanaryAssignmentsPane
 import DecoyStatusCard from "@/components/dashboard/DecoyStatusCard";
 import AlertPanel from "@/components/dashboard/AlertPanel";
 import SimulationPanel from "@/components/dashboard/SimulationPanel";
-import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchMLShadowSummary, fetchMLPromotionReadiness, fetchHoneytokens, fetchCanaryAssignments, fetchActorProfiles, fetchActorClusters, fetchActorCases, fetchActorCaseWorkflows, revokeCanaryAssignment, openActorCase, updateActorCase, labelEvent, downloadTrainingData, runRetraining } from "@/lib/api";
+import { fetchOverview, fetchEvents, fetchAlerts, fetchTraffic, fetchRiskHistory, fetchDecoyStatus, fetchTrainingDataSummary, fetchMLShadowStatus, fetchMLShadowSummary, fetchMLPromotionReadiness, fetchHoneytokens, fetchCanaryAssignments, fetchActorProfiles, fetchActorClusters, fetchActorCases, fetchActorCaseWorkflows, fetchOperators, fetchSession, revokeCanaryAssignment, openActorCase, updateActorCase, labelEvent, downloadTrainingData, runRetraining } from "@/lib/api";
 import { mapDashboardAlert, mapDashboardEvent, mapDashboardSnapshot } from "@/lib/api-map";
-import type { ActorCaseSummary, ActorCaseWorkflow, ActorCaseWorkflowSummary, ActorClusterSummary, ActorProfileSummary, AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, MLShadowSummaryData, MLPromotionReadinessData, HoneytokenSummary, CanaryAssignmentSummary, RetrainingRun, DashboardStreamMessage } from "@/lib/api-types";
+import type { ActorCaseSummary, ActorCaseWorkflow, ActorCaseWorkflowSummary, ActorClusterSummary, ActorProfileSummary, AnalystLabel, OverviewMetrics, FeedEvent, FeedAlert, TrafficPoint, RiskHistoryPoint, DecoyStatusData, TrainingDataSummary, MLShadowStatusData, MLShadowSummaryData, MLPromotionReadinessData, HoneytokenSummary, CanaryAssignmentSummary, RetrainingRun, DashboardStreamMessage, OperatorSession, OperatorSummary } from "@/lib/api-types";
 import { useDashboardStream } from "@/hooks/useDashboardStream";
 import { pollIntervalFor } from "@/lib/dashboard-stream";
 import { selectNewAlerts } from "@/lib/alert-toasts";
@@ -135,6 +135,9 @@ export default function DashboardPage() {
   const [retrainingRun, setRetrainingRun] = useState<RetrainingRun | null>(null);
   const [workingActorCaseId, setWorkingActorCaseId] = useState<string | null>(null);
   const [workingCanaryAssignmentId, setWorkingCanaryAssignmentId] = useState<string | null>(null);
+  const [session, setSession] = useState<OperatorSession | null>(null);
+  const [operators, setOperators] = useState<OperatorSummary[]>([]);
+  const isAdmin = session?.role === "admin";
 
   // Toast notifications & audio toggle
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
@@ -164,6 +167,12 @@ export default function DashboardPage() {
     }
     setError(err instanceof Error ? err.message : fallback);
   }, [router]);
+
+  // Who is signed in, and who cases can be assigned to, change rarely: read once.
+  useEffect(() => {
+    fetchSession().then(setSession).catch((err) => reportError(err, "Failed to read session"));
+    fetchOperators().then(setOperators).catch((err) => reportError(err, "Failed to list operators"));
+  }, [reportError]);
 
   const handleAlertsUpdate = useCallback((newAlerts: FeedAlert[]) => {
     const { fresh, watermark } = selectNewAlerts(newAlerts, alertWatermarkRef.current);
@@ -246,7 +255,11 @@ export default function DashboardPage() {
   const handleOpenActorCase = useCallback(async (caseId: string) => {
     setWorkingActorCaseId(caseId);
     try {
-      const opened = await openActorCase(caseId, "Opened from dashboard triage", "operator");
+      const opened = await openActorCase(
+        caseId,
+        "Opened from dashboard triage",
+        session?.username ?? "",
+      );
       setActorCaseWorkflows((current) => ({
         totalCases: current?.cases.some((item) => item.id === opened.id)
           ? current.totalCases
@@ -262,18 +275,21 @@ export default function DashboardPage() {
     } finally {
       setWorkingActorCaseId(null);
     }
-  }, [reportError]);
+  }, [reportError, session]);
 
+  // assignedTo undefined keeps the current assignee; "" unassigns.
   const handleUpdateActorCase = useCallback(
-    async (caseId: string, status: ActorCaseWorkflow["status"]) => {
-      const actionId = `${caseId}:${status}`;
-      setWorkingActorCaseId(actionId);
+    async (caseId: string, status: ActorCaseWorkflow["status"], assignedTo?: string) => {
+      const reassigning = assignedTo !== undefined;
+      setWorkingActorCaseId(`${caseId}:${reassigning ? "assign" : status}`);
       try {
         const updated = await updateActorCase(
           caseId,
           status,
-          `Marked ${status} from dashboard`,
-          "operator",
+          reassigning
+            ? `Assigned to ${assignedTo || "nobody"} from dashboard`
+            : `Marked ${status} from dashboard`,
+          assignedTo,
         );
         setActorCaseWorkflows((current) => ({
           totalCases: current?.totalCases ?? 1,
@@ -450,7 +466,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-bg-dark-navy text-white relative">
-      <Header showLogout />
+      <Header showLogout operatorName={session?.username} />
 
       <main className="flex-1 w-full max-w-350 mx-auto px-6 pt-28 pb-8 lg:pt-32 lg:pb-12">
         {/* Page title */}
@@ -532,6 +548,7 @@ export default function DashboardPage() {
               <span>EXPORT JSONL</span>
             </button>
 
+            {isAdmin ? (
             <button
               type="button"
               onClick={handleRetraining}
@@ -550,6 +567,7 @@ export default function DashboardPage() {
               )}
               <span>RUN TRAINING</span>
             </button>
+            ) : null}
 
             {/* Cyberpunk Audio Toggle */}
             <button
@@ -678,6 +696,7 @@ export default function DashboardPage() {
             cases={actorCases}
             workflows={actorCaseWorkflows}
             workingCaseId={workingActorCaseId}
+            operators={operators}
             onOpenCase={handleOpenActorCase}
             onUpdateCase={handleUpdateActorCase}
           />
@@ -699,7 +718,7 @@ export default function DashboardPage() {
           <CanaryAssignmentsPanel
             data={canaryAssignments}
             workingAssignmentId={workingCanaryAssignmentId}
-            onRevoke={handleRevokeCanaryAssignment}
+            onRevoke={isAdmin ? handleRevokeCanaryAssignment : undefined}
           />
           <AlertPanel alerts={alerts} />
         </div>

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { gatewayTargetPath, isAllowedBridgeRequest } from "./gateway-bridge";
+import { bridgeHeaders, gatewayTargetPath, isAllowedBridgeRequest } from "./gateway-bridge";
 
 const split = (path: string) => path.split("/");
 
@@ -48,6 +48,34 @@ describe("gatewayTargetPath", () => {
     assert.equal(
       gatewayTargetPath(["dashboard", "events", "a/b c", "label"]),
       "/api/v1/dashboard/events/a%2Fb%20c/label",
+    );
+  });
+});
+
+describe("operator routes", () => {
+  it("forwards only the roster read", () => {
+    assert.equal(isAllowedBridgeRequest("GET", ["operators"]), true);
+    assert.equal(isAllowedBridgeRequest("GET", ["operators", "audit"]), false);
+    assert.equal(isAllowedBridgeRequest("POST", ["operators", "login"]), false);
+  });
+});
+
+describe("bridgeHeaders", () => {
+  it("sends the key, the operator and the content type, nothing else", () => {
+    assert.deepEqual(
+      bridgeHeaders({ apiKey: "key", operator: "alice", contentType: "application/json" }),
+      {
+        "X-Mirage-API-Key": "key",
+        "X-Mirage-Operator": "alice",
+        "Content-Type": "application/json",
+      },
+    );
+  });
+
+  it("omits the content type when the request has none", () => {
+    assert.deepEqual(
+      bridgeHeaders({ apiKey: "key", operator: "alice", contentType: null }),
+      { "X-Mirage-API-Key": "key", "X-Mirage-Operator": "alice" },
     );
   });
 });

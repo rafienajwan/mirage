@@ -86,13 +86,25 @@ describe("login attempts", () => {
 describe("login client key", () => {
   it("uses the hop the trusted proxy appended, not one the client wrote", () => {
     const spoofed = new Headers({ "x-forwarded-for": "1.2.3.4, 198.51.100.7" });
-    assert.equal(loginClientKey(spoofed, true), "198.51.100.7");
+    assert.equal(loginClientKey(spoofed, true, "alice"), "198.51.100.7|alice");
   });
 
   it("ignores forwarded headers unless trusted", () => {
     const headers = new Headers({ "x-forwarded-for": "203.0.113.9, 10.0.0.1" });
-    assert.equal(loginClientKey(headers, false), "direct");
-    assert.equal(loginClientKey(headers, true), "10.0.0.1");
-    assert.equal(loginClientKey(new Headers(), true), "direct");
+    assert.equal(loginClientKey(headers, false, "alice"), "direct|alice");
+    assert.equal(loginClientKey(headers, true, "alice"), "10.0.0.1|alice");
+    assert.equal(loginClientKey(new Headers(), true, "alice"), "direct|alice");
+  });
+
+  it("treats usernames that differ only in case as one key", () => {
+    const headers = new Headers();
+    assert.equal(
+      loginClientKey(headers, false, "Alice"),
+      loginClientKey(headers, false, " alice "),
+    );
+    assert.notEqual(
+      loginClientKey(headers, false, "alice"),
+      loginClientKey(headers, false, "bob"),
+    );
   });
 });
