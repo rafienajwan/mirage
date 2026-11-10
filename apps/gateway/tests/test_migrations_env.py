@@ -19,7 +19,9 @@ def test_upgrade_head_with_percent_in_url(tmp_path, monkeypatch):
     db_dir.mkdir()
     url = f"sqlite+aiosqlite:///{(db_dir / 'm.db').as_posix()}"
     monkeypatch.setattr(config, "settings", dataclasses.replace(config.settings, database_url=url))
-    alembic_config = Config(str(GATEWAY / "alembic.ini"))
+    # No ini file: env.py would run logging.fileConfig, which disables the
+    # app's loggers for every later test in this process.
+    alembic_config = Config()
     alembic_config.set_main_option("script_location", str(GATEWAY / "migrations"))
 
     command.upgrade(alembic_config, "head")
